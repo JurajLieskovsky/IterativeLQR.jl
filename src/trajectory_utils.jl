@@ -53,7 +53,7 @@ function set_initial_inputs!(workset, u::Matrix{T}) where {T}
     elseif p == nu && q == N
         iterator = eachcol(u)
     else
-        error("dimensions do not match horizon lenght and/or number of inputs")
+        error("dimensions do not match horizon's length and/or number of inputs")
     end
 
     for (k, input) in enumerate(iterator)
