@@ -8,7 +8,6 @@ using .RungeKutta
 
 using ForwardDiff
 using Plots
-using Infiltrator
 
 # Horizon and timestep
 T = 2
@@ -72,17 +71,16 @@ IterativeLQR.iLQR!(
 
 # Plotting
 position_plot = plot()
-plot!(position_plot, [x[1] for x in nominal_trajectory(workset).x], label="x1")
-plot!(position_plot, [x[2] for x in nominal_trajectory(workset).x], label="x2")
-
-velocity_plot = plot()
-plot!(velocity_plot, [x[3] for x in nominal_trajectory(workset).x], label="x3")
-plot!(velocity_plot, [x[4] for x in nominal_trajectory(workset).x], label="x4")
+for i = 1:2
+    state_series = [x[i] for x in nominal_trajectory(workset).x]
+    plot!(position_plot, 0:N, state_series, label="x"*string(i))
+end
 
 input_plot = plot()
-plot!(input_plot, [u[1] for u in nominal_trajectory(workset).u], label="u")
+input_series = [u[1] for u in nominal_trajectory(workset).u]
+plot!(input_plot, 0:N, vcat(input_series, input_series[end]), label="u", seriestype=:steppost)
 
 cost_plot = plot()
-plot!(cost_plot, vcat(1:N,N), cumsum(nominal_trajectory(workset).l), label="c")
+plot!(cost_plot, 0:N, cumsum(nominal_trajectory(workset).l), label="c", seriestype=:steppost)
 
-plot(position_plot, cost_plot, input_plot, layout=(3,1))
+plot(position_plot, input_plot, cost_plot, layout=(3,1))
