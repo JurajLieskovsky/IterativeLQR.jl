@@ -93,7 +93,7 @@ end
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
     maxiter=200, μ=10.0^0, ρ=0.5, ψs=0.70, ψf=5,
-    rollout=true, verbose=true
+    rollout=true, verbose=true, plotting_callback=nothing
 )
     # initial trajectory rollout
     rollout == true && trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
@@ -129,6 +129,8 @@ function iLQR!(
             μ = (μ > 0) ? μ : 0
 
             verbose && @printf("%-9s\n", "true")
+
+            (plotting_callback !== nothing) && plotting_callback(workset) 
         else
             μ *= ψf
 

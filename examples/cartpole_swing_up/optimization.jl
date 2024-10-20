@@ -63,24 +63,31 @@ workset = IterativeLQR.Workset{Float64}(4, 1, N)
 IterativeLQR.set_initial_state!(workset, [0.0, 0, 0, 0])
 IterativeLQR.set_initial_inputs!(workset, [[1e-3] for _ in 1:N])
 
+# Plotting callback
+function plotting_callback(workset)
+    range = 0:workset.N
+
+    position_plot = plot()
+    for i = 1:2
+        state_series = [x[i] for x in nominal_trajectory(workset).x]
+        plot!(position_plot, range, state_series, label="x"*string(i))
+    end
+
+    input_plot = plot()
+    input_series = [u[1] for u in nominal_trajectory(workset).u]
+    plot!(input_plot, range, vcat(input_series, input_series[end]), label="u", seriestype=:steppost)
+
+    cost_plot = plot()
+    plot!(cost_plot, range, cumsum(nominal_trajectory(workset).l), label="c", seriestype=:steppost)
+
+    plt = plot(position_plot, input_plot, cost_plot, layout=(3,1))
+    display(plt)
+
+    return plt
+end
+
 # Trajectory optimization
 IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    verbose=true
+    verbose=true, plotting_callback=plotting_callback
 )
-
-# Plotting
-position_plot = plot()
-for i = 1:2
-    state_series = [x[i] for x in nominal_trajectory(workset).x]
-    plot!(position_plot, 0:N, state_series, label="x"*string(i))
-end
-
-input_plot = plot()
-input_series = [u[1] for u in nominal_trajectory(workset).u]
-plot!(input_plot, 0:N, vcat(input_series, input_series[end]), label="u", seriestype=:steppost)
-
-cost_plot = plot()
-plot!(cost_plot, 0:N, cumsum(nominal_trajectory(workset).l), label="c", seriestype=:steppost)
-
-plot(position_plot, input_plot, cost_plot, layout=(3,1))
