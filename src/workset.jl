@@ -12,12 +12,12 @@ struct Trajectory{T}
     end
 end
 
-struct CostToGo{T}
+struct ValueFunction{T}
     Δv::Vector{T}
     vx::Vector{Vector{T}}
     vxx::Vector{Matrix{T}}
 
-    function CostToGo{T}(nx, N) where {T}
+    function ValueFunction{T}(nx, N) where {T}
         Δv = Vector{T}(undef, N)
         vx = [Vector{T}(undef, nx) for _ in 1:N+1]
         vxx = [Matrix{T}(undef, nx, nx) for _ in 1:N+1]
@@ -77,19 +77,19 @@ struct Workset{T}
     nominal::Ref{Int}
     active::Ref{Int}
     trajectory::Tuple{Trajectory{T},Trajectory{T}}
-    cost_to_go::CostToGo{T}
+    value_function::ValueFunction{T}
     policy_update::PolicyUpdate{T}
     dynamics_derivatives::DynamicsDerivatives{T}
     cost_derivatives::CostDerivatives{T}
 
     function Workset{T}(nx, nu, N) where {T}
         trajectory = (Trajectory{T}(nx, nu, N), Trajectory{T}(nx, nu, N))
-        cost_to_go = CostToGo{T}(nx, N)
+        value_function = ValueFunction{T}(nx, N)
         policy_update = PolicyUpdate{T}(nx, nu, N)
         dynamics_derivatives = DynamicsDerivatives{T}(nx, nu, N)
         cost_derivatives = CostDerivatives{T}(nx, nu, N)
 
-        return new(N, nx, nu, 1, 2, trajectory, cost_to_go, policy_update, dynamics_derivatives, cost_derivatives)
+        return new(N, nx, nu, 1, 2, trajectory, value_function, policy_update, dynamics_derivatives, cost_derivatives)
     end
 end
 

@@ -15,7 +15,7 @@ function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cos
     @unpack x, u = nominal_trajectory(workset)
     @unpack fx, fu = workset.dynamics_derivatives
     @unpack lx, lu, lxx, lxu, luu = workset.cost_derivatives
-    @unpack vx, vxx = workset.cost_to_go
+    @unpack vx, vxx = workset.value_function
 
     for k in 1:N
         dynamics_diff!(fx[k], fu[k], x[k], u[k])
@@ -29,7 +29,7 @@ function backward_pass!(workset, μ, regularization)
     @unpack N = workset
     @unpack fx, fu = workset.dynamics_derivatives
     @unpack lx, lu, lxx, lxu, luu = workset.cost_derivatives
-    @unpack Δv, vx, vxx = workset.cost_to_go
+    @unpack Δv, vx, vxx = workset.value_function
     @unpack Δu, Δux = workset.policy_update
 
     if regularization == :state
