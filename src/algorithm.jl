@@ -25,14 +25,18 @@ function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cos
     final_cost_diff!(vx[N+1], vxx[N+1], x[N+1])
 end
 
-function backward_pass!(workset, μ)
+function backward_pass!(workset, μ, regularization)
     @unpack N = workset
     @unpack fx, fu = workset.dynamics_derivatives
     @unpack lx, lu, lxx, lxu, luu = workset.cost_derivatives
     @unpack Δv, vx, vxx = workset.cost_to_go
     @unpack Δu, Δux = workset.policy_update
 
-    μI = μ * I(workset.nx)
+    if regularization == :state
+        μI = μ * I(workset.nx)
+    elseif regularization == :input
+        μI = μ * I(workset.nu)
+    end
 
     for k in N:-1:1
         # perturbed argument
@@ -43,9 +47,16 @@ function backward_pass!(workset, μ)
         quu = luu[k] + fu[k]' * vxx[k+1] * fu[k]
         qux = lxu[k]' + fu[k]' * vxx[k+1] * fx[k]
 
-        # controls (with regularization equivalent to vxx[k+1] .+= μI)
-        q̃uu = quu + fu[k]' * μI * fu[k]
-        q̃ux = qux + fu[k]' * μI * fx[k]
+        # controls
+        if regularization == :input
+            # standard regularization as proposed by D.Q.Mayne
+            q̃uu = quu + μI
+            q̃ux = qux
+        elseif regularization == :state
+            # regularization equivalent to vxx[k+1] += μI proposed by Y.Tassa
+            q̃uu = quu + fu[k]' * μI * fu[k]
+            q̃ux = qux + fu[k]' * μI * fx[k]
+        end
 
         Δu[k] .= -q̃uu \ qu
         Δux[k] .= -q̃uu \ q̃ux
@@ -88,54 +99,80 @@ function forward_pass!(workset, dynamics!, running_cost, final_cost)
     return true, sum(l), sum(l) - sum(l_ref)
 end
 
-# main algorithm
+function print_iteration!(line_count, i, μ, α, J, ΔJ, Δv, accepted)
+    line_count[] % 10 == 0 && @printf(
+        "%-9s %-9s %-9s %-9s %-9s %-9s %-9s\n",
+        "iter", "μ", "α", "∑lₖ", "∑Δlₖ", "∑Δvₖ", "accepted"
+    )
+    @printf(
+        "%-9i %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9s\n",
+        i, μ, α, J, ΔJ, Δv, accepted
+    )
+    line_count[] += 1
+end
 
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
-    maxiter=200, μ=10.0^0, ρ=0.5, ψs=0.70, ψf=5,
+    maxiter=200, regularization=:input, ρ=0.5,
+    μ=1e-1, μ_dec=3 / 4, μ_inc=4, μ_min=0.0, μ_max=1e4,
+    α_values=1:-0.3:0.1, α_reg_dec=0.7, α_reg_inc=0.1,
     rollout=true, verbose=true, plotting_callback=nothing
 )
+    # regularization parameter adjustment functions
+    decrease_μ(μ) = μ * μ_dec
+    increase_μ(μ) = μ * μ_inc
+
     # initial trajectory rollout
     rollout == true && trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
 
-    # algorithm
-    for i = 1:maxiter
-        # header 
-        verbose && (i - 1) % 5 == 0 && @printf(
-                "%-9s %-9s %-9s %-9s %-9s %-9s\n",
-                "iter", "μ", "∑lₖ", "∑Δlₖ", "∑Δvₖ", "accepted"
-            )
+    # line count for printing
+    line_count = Ref(0)
 
+    # algorithm
+    for i in 1:maxiter
         # nominal trajectory differentiation
         differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
 
         # backward pass
-        expected_improvement = backward_pass!(workset, μ)
+        Δv = backward_pass!(workset, μ, regularization)
 
         # forward pass
-        successful, cost, improvement = forward_pass!(workset, dynamics!, running_cost, final_cost)
+        for α in α_values
+            successful, J, ΔJ = forward_pass!(workset, dynamics!, running_cost, final_cost)
 
-        # pre-decision printout
-        verbose && @printf(
-            "%-9i %-9.3g %-9.3g %-9.3g %-9.3g ",
-            i, μ, cost, improvement, expected_improvement
-        )
+            # error handling
+            if !successful
+                μ = increase_μ(μ)
+                continue
+            end
 
-        # accept/reject new trajectory
-        if (improvement <= ρ * expected_improvement) && successful
-            swap_trajectories!(workset)
+            # iteration's evaluation
+            accepted = ΔJ < 0 && ΔJ <= ρ * Δv
 
-            μ *= ψs
-            μ = (μ > 0) ? μ : 0
+            # printout
+            verbose && print_iteration!(line_count, i, μ, α, J, ΔJ, Δv, accepted)
 
-            verbose && @printf("%-9s\n", "true")
+            # solution copying and regularization parameter adjustment
+            if accepted
+                (plotting_callback !== nothing) && plotting_callback(workset)
 
-            (plotting_callback !== nothing) && plotting_callback(workset) 
-        else
-            μ *= ψf
+                swap_trajectories!(workset)
 
-            verbose && @printf("%-9s\n", "false")
+                if α >= α_reg_dec
+                    μ = decrease_μ(μ)
+                    μ = μ < μ_min ? μ_min : μ
+                elseif α <= α_reg_inc
+                    μ = increase_μ(μ)
+                end
+
+                break
+            elseif !accepted && α == α_values[end]
+                μ = increase_μ(μ)
+            end
         end
+
+        # termination condition
+        μ >= μ_max && break
     end
 end
 
