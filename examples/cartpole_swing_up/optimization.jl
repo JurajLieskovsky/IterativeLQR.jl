@@ -1,10 +1,9 @@
 import IterativeLQR
 import IterativeLQR: nominal_trajectory
 
+using RungeKutta
 include("CartPole.jl")
 using .CartPole
-include("RungeKutta.jl")
-using .RungeKutta
 
 using ForwardDiff
 using Plots
