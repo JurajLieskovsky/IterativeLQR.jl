@@ -20,7 +20,7 @@ xₜ = vcat(zeros(3), [1, 0, 0, 0], zeros(3), zeros(3))
 
 # Initial state and inputs
 x₀ = vcat([-3, -3, -1], [cos(pi / 16), 0, 0, sin(pi / 16)], zeros(3), zeros(3))
-u₀ = 9.81 / 4 * ones(4) 
+u₀ = 9.81 / 4 * ones(4)
 us₀ = [u₀ for _ in 1:N]
 
 # Dynamics
@@ -90,17 +90,17 @@ IterativeLQR.set_initial_inputs!(workset, us₀)
 
 # Plotting callback
 function plotting_callback(workset)
-    N = workset.N
+    range = 0:workset.N
 
     states = mapreduce(x -> x', vcat, nominal_trajectory(workset).x)
     state_labels = ["x" "y" "z" "q₀" "q₁" "q₂" "q₃" "vx" "vy" "vz" "ωx" "ωy" "ωz"]
-    position_plot = plot(0:N, states[:, 1:7], label=state_labels[1:1, 1:7])
+    position_plot = plot(range, states[:, 1:7], label=state_labels[1:1, 1:7])
 
     inputs = mapreduce(u -> u', vcat, nominal_trajectory(workset).u)
     input_labels = ["u₀" "u₁" "u₂" "u₃"]
-    input_plot = plot(0:N-1, inputs, label=input_labels, seriestype=:steppost)
+    input_plot = plot(range, vcat(inputs, inputs[end, :]'), label=input_labels, seriestype=:steppost)
 
-    cost_plot = plot(0:N, cumsum(nominal_trajectory(workset).l), label="c", seriestype=:steppost)
+    cost_plot = plot(range, cumsum(nominal_trajectory(workset).l), label="c", seriestype=:steppost)
 
     plt = plot(position_plot, input_plot, cost_plot, layout=(3, 1))
     display(plt)

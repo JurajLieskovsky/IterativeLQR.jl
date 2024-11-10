@@ -70,16 +70,16 @@ IterativeLQR.set_initial_inputs!(workset, us₀)
 
 # Plotting callback
 function plotting_callback(workset)
-    N = workset.N
+    range = 0:workset.N
 
     states = mapreduce(x -> x', vcat, nominal_trajectory(workset).x)
     state_labels = ["x₁" "x₂" "x₃" "x₄"]
-    position_plot = plot(0:N, states[:, 1:2], label=state_labels[1:1, 1:2])
+    position_plot = plot(range, states[:, 1:2], label=state_labels[1:1, 1:2])
 
     inputs = mapreduce(u -> u', vcat, nominal_trajectory(workset).u)
-    input_plot = plot(0:N-1, inputs, label="u", seriestype=:steppost)
+    input_plot = plot(range, vcat(inputs, inputs[end,:]'), label="u", seriestype=:steppost)
 
-    cost_plot = plot(0:N, cumsum(nominal_trajectory(workset).l), label="c", seriestype=:steppost)
+    cost_plot = plot(range, cumsum(nominal_trajectory(workset).l), label="c", seriestype=:steppost)
 
     plt = plot(position_plot, input_plot, cost_plot, layout=(3, 1))
     display(plt)
