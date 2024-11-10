@@ -1,3 +1,6 @@
 [submodule "examples/deps/RungeKutta"]
 	path = examples/deps/RungeKutta
 	url = git@github.com:JurajLieskovsky/RungeKutta.jl.git
+[submodule "examples/deps/QuadrotorODE"]
+	path = examples/deps/QuadrotorODE
+	url = git@github.com:JurajLieskovsky/QuadrotorODE.jl.git
