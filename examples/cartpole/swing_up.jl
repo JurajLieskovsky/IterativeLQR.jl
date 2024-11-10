@@ -1,3 +1,5 @@
+using Revise
+
 import IterativeLQR
 import IterativeLQR: nominal_trajectory
 
