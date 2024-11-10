@@ -17,10 +17,10 @@ struct ValueFunction{T}
     vx::Vector{Vector{T}}
     vxx::Vector{Matrix{T}}
 
-    function ValueFunction{T}(nx, N) where {T}
+    function ValueFunction{T}(ndx, N) where {T}
         Δv = Vector{T}(undef, N)
-        vx = [Vector{T}(undef, nx) for _ in 1:N+1]
-        vxx = [Matrix{T}(undef, nx, nx) for _ in 1:N+1]
+        vx = [Vector{T}(undef, ndx) for _ in 1:N+1]
+        vxx = [Matrix{T}(undef, ndx, ndx) for _ in 1:N+1]
 
         return new(Δv, vx, vxx)
     end
@@ -30,9 +30,9 @@ struct PolicyUpdate{T}
     Δu::Vector{Vector{T}}
     Δux::Vector{Matrix{T}}
 
-    function PolicyUpdate{T}(nx, nu, N) where {T}
+    function PolicyUpdate{T}(ndx, nu, N) where {T}
         Δu = [Vector{T}(undef, nu) for _ in 1:N]
-        Δux = [Matrix{T}(undef, nu, nx) for _ in 1:N]
+        Δux = [Matrix{T}(undef, nu, ndx) for _ in 1:N]
 
         return new(Δu, Δux)
     end
@@ -42,9 +42,9 @@ struct DynamicsDerivatives{T}
     fx::Vector{Matrix{T}}
     fu::Vector{Matrix{T}}
 
-    function DynamicsDerivatives{T}(nx, nu, N) where {T}
-        fx = [Matrix{T}(undef, nx, nx) for _ in 1:N]
-        fu = [Matrix{T}(undef, nx, nu) for _ in 1:N]
+    function DynamicsDerivatives{T}(ndx, nu, N) where {T}
+        fx = [Matrix{T}(undef, ndx, ndx) for _ in 1:N]
+        fu = [Matrix{T}(undef, ndx, nu) for _ in 1:N]
 
         return new(fx, fu)
     end
@@ -58,12 +58,12 @@ struct CostDerivatives{T}
     lxu::Vector{Matrix{T}}
     luu::Vector{Matrix{T}}
 
-    function CostDerivatives{T}(nx, nu, N) where {T}
-        lx = [Vector{T}(undef, nx) for _ in 1:N]
+    function CostDerivatives{T}(ndx, nu, N) where {T}
+        lx = [Vector{T}(undef, ndx) for _ in 1:N]
         lu = [Vector{T}(undef, nu) for _ in 1:N]
 
-        lxx = [Matrix{T}(undef, nx, nx) for _ in 1:N]
-        lxu = [Matrix{T}(undef, nx, nu) for _ in 1:N]
+        lxx = [Matrix{T}(undef, ndx, ndx) for _ in 1:N]
+        lxu = [Matrix{T}(undef, ndx, nu) for _ in 1:N]
         luu = [Matrix{T}(undef, nu, nu) for _ in 1:N]
 
         return new(lx, lu, lxx, lxu, luu)
@@ -73,6 +73,7 @@ end
 struct Workset{T}
     N::Int64
     nx::Int64
+    ndx::Int64
     nu::Int64
     nominal::Ref{Int}
     active::Ref{Int}
@@ -82,14 +83,16 @@ struct Workset{T}
     dynamics_derivatives::DynamicsDerivatives{T}
     cost_derivatives::CostDerivatives{T}
 
-    function Workset{T}(nx, nu, N) where {T}
-        trajectory = (Trajectory{T}(nx, nu, N), Trajectory{T}(nx, nu, N))
-        value_function = ValueFunction{T}(nx, N)
-        policy_update = PolicyUpdate{T}(nx, nu, N)
-        dynamics_derivatives = DynamicsDerivatives{T}(nx, nu, N)
-        cost_derivatives = CostDerivatives{T}(nx, nu, N)
+    function Workset{T}(nx, nu, N, ndx=nothing) where {T}
+        ndx = ndx !== nothing ? ndx : nx
 
-        return new(N, nx, nu, 1, 2, trajectory, value_function, policy_update, dynamics_derivatives, cost_derivatives)
+        trajectory = (Trajectory{T}(nx, nu, N), Trajectory{T}(nx, nu, N))
+        value_function = ValueFunction{T}(ndx, N)
+        policy_update = PolicyUpdate{T}(ndx, nu, N)
+        dynamics_derivatives = DynamicsDerivatives{T}(ndx, nu, N)
+        cost_derivatives = CostDerivatives{T}(ndx, nu, N)
+
+        return new(N, nx, ndx, nu, 1, 2, trajectory, value_function, policy_update, dynamics_derivatives, cost_derivatives)
     end
 end
 
