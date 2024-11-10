@@ -10,21 +10,28 @@ using LinearAlgebra
 using ForwardDiff
 using Plots
 
+using MeshCat
+using CoordinateTransformations
+using Rotations
+using GeometryBasics
+using Colors: RGB
+
 # Horizon and timestep
-T = 2
-N = 200
+T = 3
+N = 300
 h = T / N
 
 # Target state
-xₜ = vcat(zeros(3), [1, 0, 0, 0], zeros(3), zeros(3))
+xₜ = vcat([0, 0, 2], [1, 0, 0, 0], zeros(3), zeros(3))
 
 # Initial state and inputs
-x₀ = vcat([-3, -3, -1], [cos(pi / 16), 0, 0, sin(pi / 16)], zeros(3), zeros(3))
+x₀ = vcat([5, -5, 1], [1, 0, 0, 0], zeros(3), zeros(3))
 u₀ = 9.81 / 4 * ones(4)
 us₀ = [u₀ for _ in 1:N]
 
 # Dynamics
-quadrotor = QuadrotorODE.System([0, 0, -9.81], 1, I(3), 0.3, 0.01)
+a = 0.3
+quadrotor = QuadrotorODE.System([0, 0, -9.81], 1, I(3), a, 0.01)
 
 rk4 = RungeKutta.RK4()
 
@@ -113,3 +120,36 @@ IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
     verbose=true, plotting_callback=plotting_callback, state_difference=QuadrotorODE.state_difference
 )
+
+# Visualization
+vis = (@isdefined vis) ? vis : Visualizer()
+render(vis)
+
+## materials (colors)
+red = MeshPhongMaterial(color=RGB(1, 0, 0))
+green = MeshPhongMaterial(color=RGB(0, 1, 0))
+blue = MeshPhongMaterial(color=RGB(0, 0, 1))
+
+## quadrotor
+setobject!(vis[:quadrotor][:body], HyperRectangle(Vec(-a, -a, -0.06), Vec(2 * a, 2 * a, 0.12)), green)
+
+for (i, (x, y)) in enumerate([[a, -a], [a, a], [-a, a], [-a, -a]])
+    setobject!(vis[:quadrotor][Symbol("prop$i")], Cylinder(Point(x, y, 0.03), Point(x, y, 0.09), 0.25), blue)
+end
+
+## target position
+setobject!(vis[:target], Sphere(Point(xₜ[1:3]...), 0.12), red)
+
+## initial configuration
+x0 = nominal_trajectory(workset).x[1]
+settransform!(vis[:quadrotor], Translation(x0[1:3]) ∘ LinearMap(QuatRotation(x0[4:7])))
+
+## animation
+anim = MeshCat.Animation(vis, fps=100)
+for i in 2:workset.N+1
+    atframe(anim, i) do
+        x = nominal_trajectory(workset).x[i]
+        settransform!(vis[:quadrotor], Translation(x[1:3]) ∘ LinearMap(QuatRotation(x[4:7])))
+    end
+end
+setanimation!(vis, anim, play=false);
