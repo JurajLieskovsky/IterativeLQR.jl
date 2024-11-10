@@ -15,14 +15,13 @@ T = 2
 N = 200
 h = T / N
 
-# Equilibrium (target hovering) state and input
-r₀ = zeros(3)
-q₀ = [1, 0, 0, 0]
-v₀ = zeros(3)
-ω₀ = zeros(3)
+# Target state
+xₜ = vcat(zeros(3), [1, 0, 0, 0], zeros(3), zeros(3))
 
-x₀ = vcat(r₀, q₀, v₀, ω₀)
-u₀ = 9.81 / 4 * ones(4)
+# Initial state and inputs
+x₀ = vcat([-3, -3, -1], [cos(pi / 16), 0, 0, sin(pi / 16)], zeros(3), zeros(3))
+u₀ = 9.81 / 4 * ones(4) 
+us₀ = [u₀ for _ in 1:N]
 
 # Dynamics
 quadrotor = QuadrotorODE.System([0, 0, -9.81], 1, I(3), 0.3, 0.01)
@@ -39,10 +38,10 @@ dynamics!(xnew, x, u) = RungeKutta.f!(
 )
 
 function dynamics_diff!(fx, fu, x, u)
-    f!(dznew, x₀, dz, u) = RungeKutta.f!(
+    f!(dznew, xₜ, dz, u) = RungeKutta.f!(
         dznew,
         rk4,
-        (dznew, dz, u) -> dznew .= QuadrotorODE.tangential_forward_dynamics(quadrotor, x₀, dz, u),
+        (dznew, dz, u) -> dznew .= QuadrotorODE.tangential_forward_dynamics(quadrotor, xₜ, dz, u),
         dz,
         u,
         h
@@ -69,7 +68,7 @@ end
 
 # Final cost
 function final_cost(x)
-    dx = QuadrotorODE.state_difference(x, x₀)
+    dx = QuadrotorODE.state_difference(x, xₜ)
     return dx' * diagm(vcat(1e1 * ones(6), 1e-2 * ones(6))) * dx
 end
 
@@ -86,8 +85,8 @@ end
 
 # Workset
 workset = IterativeLQR.Workset{Float64}(13, 4, N, 12)
-IterativeLQR.set_initial_state!(workset, vcat([-3, -3, -1], [cos(pi / 16), 0, 0, sin(pi / 16)], v₀, ω₀))
-IterativeLQR.set_initial_inputs!(workset, [u₀ for _ in 1:N])
+IterativeLQR.set_initial_state!(workset, x₀)
+IterativeLQR.set_initial_inputs!(workset, us₀)
 
 # Plotting callback
 function plotting_callback(workset)
@@ -109,6 +108,7 @@ function plotting_callback(workset)
     return plt
 end
 
+# Trajectory optimization
 IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
     verbose=true, plotting_callback=plotting_callback, state_difference=QuadrotorODE.state_difference

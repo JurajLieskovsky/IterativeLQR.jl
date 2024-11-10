@@ -15,6 +15,11 @@ T = 2
 N = 100
 h = T / N
 
+# Initial state and inputs
+x₀ = zeros(4)
+us₀ = [[1e-3] for _ in 1:N]
+# us₀ = [[1e-4 * 2 * pi * k / N] for k in 0:N-1]
+
 # Dynamics
 model = CartPole.Model(9.8, 1, 0.5, 0.1)
 f!(dx, x, u) = CartPole.f!(model, dx, x, u)
@@ -60,27 +65,21 @@ end
 
 # iLQR workset and initial guess
 workset = IterativeLQR.Workset{Float64}(4, 1, N)
-
-IterativeLQR.set_initial_state!(workset, [0.0, 0, 0, 0])
-IterativeLQR.set_initial_inputs!(workset, [[1e-3] for _ in 1:N])
-# IterativeLQR.set_initial_inputs!(workset, [[1e-4 * 2 * pi * k / N] for k in 0:N-1])
+IterativeLQR.set_initial_state!(workset, x₀)
+IterativeLQR.set_initial_inputs!(workset, us₀)
 
 # Plotting callback
 function plotting_callback(workset)
-    range = 0:workset.N
+    N = workset.N
 
-    position_plot = plot()
-    for i = 1:2
-        state_series = [x[i] for x in nominal_trajectory(workset).x]
-        plot!(position_plot, range, state_series, label="x" * string(i))
-    end
+    states = mapreduce(x -> x', vcat, nominal_trajectory(workset).x)
+    state_labels = ["x₁" "x₂" "x₃" "x₄"]
+    position_plot = plot(0:N, states[:, 1:2], label=state_labels[1:1, 1:2])
 
-    input_plot = plot()
-    input_series = [u[1] for u in nominal_trajectory(workset).u]
-    plot!(input_plot, range, vcat(input_series, input_series[end]), label="u", seriestype=:steppost)
+    inputs = mapreduce(u -> u', vcat, nominal_trajectory(workset).u)
+    input_plot = plot(0:N-1, inputs, label="u", seriestype=:steppost)
 
-    cost_plot = plot()
-    plot!(cost_plot, range, cumsum(nominal_trajectory(workset).l), label="c", seriestype=:steppost)
+    cost_plot = plot(0:N, cumsum(nominal_trajectory(workset).l), label="c", seriestype=:steppost)
 
     plt = plot(position_plot, input_plot, cost_plot, layout=(3, 1))
     display(plt)
