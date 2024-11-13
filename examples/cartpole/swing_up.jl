@@ -4,8 +4,7 @@ import IterativeLQR
 import IterativeLQR: nominal_trajectory
 
 using RungeKutta
-include("CartPole.jl")
-using .CartPole
+using CartPoleODE
 
 using ForwardDiff
 using Plots
@@ -21,8 +20,8 @@ us₀ = [[1e-3] for _ in 1:N]
 # us₀ = [[1e-4 * 2 * pi * k / N] for k in 0:N-1]
 
 # Dynamics
-model = CartPole.Model(9.8, 1, 0.5, 0.1)
-f!(dx, x, u) = CartPole.f!(model, dx, x, u)
+model = CartPoleODE.Model(9.8, 1, 0.5, 0.1)
+f!(dx, x, u) = dx .= CartPoleODE.f(model, x, u)
 
 tsit5 = RungeKutta.Tsit5()
 dynamics!(dx, x, u) = RungeKutta.f!(dx, tsit5, f!, x, u, h)

@@ -7,3 +7,6 @@
 [submodule "examples/deps/MeshCatBenchmarkMechanisms"]
 	path = examples/deps/MeshCatBenchmarkMechanisms
 	url = git@github.com:JurajLieskovsky/MeshCatBenchmarkMechanisms.jl.git
+[submodule "examples/deps/CartPoleODE"]
+	path = examples/deps/CartPoleODE
+	url = git@github.com:JurajLieskovsky/CartPoleODE.jl.git
