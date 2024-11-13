@@ -33,7 +33,7 @@ tsit5 = RungeKutta.Tsit5()
 dynamics!(xnew, x, u) = RungeKutta.f!(
     xnew,
     tsit5,
-    (xnew, dz, u) -> xnew .= QuadrotorODE.forward_dynamics(quadrotor, x, u),
+    (xnew, dz, u) -> xnew .= QuadrotorODE.dynamics(quadrotor, x, u),
     x,
     u,
     h
@@ -43,14 +43,17 @@ function dynamics_diff!(fx, fu, x, u)
     f!(dznew, xₜ, dz, u) = RungeKutta.f!(
         dznew,
         tsit5,
-        (dznew, dz, u) -> dznew .= QuadrotorODE.tangential_forward_dynamics(quadrotor, xₜ, dz, u),
+        (dznew, dz, u) -> dznew .= QuadrotorODE.tangential_dynamics(quadrotor, xₜ, dz, u),
         dz,
         u,
         h
     )
-    dz = zeros(12)
-    fx .= ForwardDiff.jacobian((dznew_, dz_) -> f!(dznew_, x, dz_, u), zeros(12), dz)
-    fu .= ForwardDiff.jacobian((dznew_, u_) -> f!(dznew_, x, dz, u_), zeros(12), u)
+
+    ndx = QuadrotorODE.nz
+    dx = zeros(ndx)
+
+    fx .= ForwardDiff.jacobian((dznew_, dx_) -> f!(dznew_, x, dx_, u), zeros(ndx), dx)
+    fu .= ForwardDiff.jacobian((dznew_, u_) -> f!(dznew_, x, dx, u_), zeros(ndx), u)
 end
 
 # Running cost
@@ -60,7 +63,8 @@ function running_cost_diff!(lx, lu, lxx, lxu, luu, x, u)
     ∇x!(grad, dx, u) = ForwardDiff.gradient!(grad, (dx_) -> running_cost(QuadrotorODE.incremented_state(x, dx_), u), dx)
     ∇u!(grad, dx, u) = ForwardDiff.gradient!(grad, (u_) -> running_cost(QuadrotorODE.incremented_state(x, dx), u_), u)
 
-    dx = zeros(12)
+    dx = zeros(QuadrotorODE.nz)
+
     ForwardDiff.jacobian!(lxx, (grad, dx_) -> ∇x!(grad, dx_, u), lx, dx)
     ForwardDiff.jacobian!(lxu, (grad, u_) -> ∇x!(grad, dx, u_), lx, u)
     ForwardDiff.jacobian!(luu, (grad, u_) -> ∇u!(grad, dx, u_), lu, u)
@@ -121,7 +125,7 @@ vis = (@isdefined vis) ? vis : Visualizer()
 render(vis)
 
 ## quadrotor and target
-MeshCatBenchmarkMechanisms.set_quadrotor!(vis, 2*a, 0.12, 0.25)
+MeshCatBenchmarkMechanisms.set_quadrotor!(vis, 2 * a, 0.12, 0.25)
 MeshCatBenchmarkMechanisms.set_target!(vis, 0.12)
 
 ## initial configuration
