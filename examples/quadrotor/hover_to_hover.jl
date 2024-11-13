@@ -33,17 +33,17 @@ tsit5 = RungeKutta.Tsit5()
 dynamics!(xnew, x, u) = RungeKutta.f!(
     xnew,
     tsit5,
-    (xnew, dz, u) -> xnew .= QuadrotorODE.dynamics(quadrotor, x, u),
+    (xnew_, x_, u_) -> xnew_ .= QuadrotorODE.dynamics(quadrotor, x_, u_),
     x,
     u,
     h
 )
 
 function dynamics_diff!(fx, fu, x, u)
-    f!(dznew, xₜ, dz, u) = RungeKutta.f!(
+    f!(dznew, x, dz, u) = RungeKutta.f!(
         dznew,
         tsit5,
-        (dznew, dz, u) -> dznew .= QuadrotorODE.tangential_dynamics(quadrotor, xₜ, dz, u),
+        (dznew_, dz_, u_) -> dznew_ .= QuadrotorODE.tangential_dynamics(quadrotor, x, dz_, u_),
         dz,
         u,
         h
