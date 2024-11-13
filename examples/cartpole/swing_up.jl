@@ -12,7 +12,7 @@ using Plots
 
 # Horizon and timestep
 T = 2
-N = 100
+N = 400
 h = T / N
 
 # Initial state and inputs
