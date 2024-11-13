@@ -5,16 +5,11 @@ using IterativeLQR
 using IterativeLQR: nominal_trajectory, active_trajectory
 using RungeKutta
 using QuadrotorODE
+using MeshCatBenchmarkMechanisms
 
 using LinearAlgebra
 using ForwardDiff
 using Plots
-
-using MeshCat
-using CoordinateTransformations
-using Rotations
-using GeometryBasics
-using Colors: RGB
 
 # Horizon and timestep
 T = 3
@@ -125,31 +120,20 @@ IterativeLQR.iLQR!(
 vis = (@isdefined vis) ? vis : Visualizer()
 render(vis)
 
-## materials (colors)
-red = MeshPhongMaterial(color=RGB(1, 0, 0))
-green = MeshPhongMaterial(color=RGB(0, 1, 0))
-blue = MeshPhongMaterial(color=RGB(0, 0, 1))
-
-## quadrotor
-setobject!(vis[:quadrotor][:body], HyperRectangle(Vec(-a, -a, -0.06), Vec(2 * a, 2 * a, 0.12)), green)
-
-for (i, (x, y)) in enumerate([[a, -a], [a, a], [-a, a], [-a, -a]])
-    setobject!(vis[:quadrotor][Symbol("prop$i")], Cylinder(Point(x, y, 0.03), Point(x, y, 0.09), 0.25), blue)
-end
-
-## target position
-setobject!(vis[:target], Sphere(Point(xₜ[1:3]...), 0.12), red)
+## quadrotor and target
+MeshCatBenchmarkMechanisms.set_quadrotor!(vis, 2*a, 0.12, 0.25)
+MeshCatBenchmarkMechanisms.set_target!(vis, 0.12)
 
 ## initial configuration
-x0 = nominal_trajectory(workset).x[1]
-settransform!(vis[:quadrotor], Translation(x0[1:3]) ∘ LinearMap(QuatRotation(x0[4:7])))
+MeshCatBenchmarkMechanisms.set_quadrotor_state!(vis, nominal_trajectory(workset).x[1])
+MeshCatBenchmarkMechanisms.set_target_position!(vis, xₜ[1:3])
 
 ## animation
-anim = MeshCat.Animation(vis, fps=100)
-for i in 2:workset.N+1
+fps = 100
+anim = MeshCatBenchmarkMechanisms.Animation(vis, fps=fps)
+for (i, x) in enumerate(nominal_trajectory(workset).x)
     atframe(anim, i) do
-        x = nominal_trajectory(workset).x[i]
-        settransform!(vis[:quadrotor], Translation(x[1:3]) ∘ LinearMap(QuatRotation(x[4:7])))
+        MeshCatBenchmarkMechanisms.set_quadrotor_state!(vis, x)
     end
 end
 setanimation!(vis, anim, play=false);

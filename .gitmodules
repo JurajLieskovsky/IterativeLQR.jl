@@ -4,3 +4,6 @@
 [submodule "examples/deps/QuadrotorODE"]
 	path = examples/deps/QuadrotorODE
 	url = git@github.com:JurajLieskovsky/QuadrotorODE.jl.git
+[submodule "examples/deps/MeshCatBenchmarkMechanisms"]
+	path = examples/deps/MeshCatBenchmarkMechanisms
+	url = git@github.com:JurajLieskovsky/MeshCatBenchmarkMechanisms.jl.git
