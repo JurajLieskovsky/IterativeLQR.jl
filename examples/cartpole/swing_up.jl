@@ -1,8 +1,7 @@
 using Revise
 
-import IterativeLQR
-import IterativeLQR: nominal_trajectory
-
+using IterativeLQR
+using IterativeLQR: nominal_trajectory
 using RungeKutta
 using CartPoleODE
 
