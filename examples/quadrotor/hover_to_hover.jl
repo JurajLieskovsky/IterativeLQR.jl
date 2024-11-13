@@ -28,11 +28,11 @@ us₀ = [u₀ for _ in 1:N]
 a = 0.3
 quadrotor = QuadrotorODE.System([0, 0, -9.81], 1, I(3), a, 0.01)
 
-rk4 = RungeKutta.RK4()
+tsit5 = RungeKutta.Tsit5()
 
 dynamics!(xnew, x, u) = RungeKutta.f!(
     xnew,
-    rk4,
+    tsit5,
     (xnew, dz, u) -> xnew .= QuadrotorODE.forward_dynamics(quadrotor, x, u),
     x,
     u,
@@ -42,7 +42,7 @@ dynamics!(xnew, x, u) = RungeKutta.f!(
 function dynamics_diff!(fx, fu, x, u)
     f!(dznew, xₜ, dz, u) = RungeKutta.f!(
         dznew,
-        rk4,
+        tsit5,
         (dznew, dz, u) -> dznew .= QuadrotorODE.tangential_forward_dynamics(quadrotor, xₜ, dz, u),
         dz,
         u,

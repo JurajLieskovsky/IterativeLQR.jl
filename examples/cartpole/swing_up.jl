@@ -12,7 +12,7 @@ using Plots
 
 # Horizon and timestep
 T = 2
-N = 400
+N = 200
 h = T / N
 
 # Initial state and inputs
@@ -24,8 +24,8 @@ us₀ = [[1e-3] for _ in 1:N]
 model = CartPole.Model(9.8, 1, 0.5, 0.1)
 f!(dx, x, u) = CartPole.f!(model, dx, x, u)
 
-rk4 = RungeKutta.RK4()
-dynamics!(dx, x, u) = RungeKutta.f!(dx, rk4, f!, x, u, h)
+tsit5 = RungeKutta.Tsit5()
+dynamics!(dx, x, u) = RungeKutta.f!(dx, tsit5, f!, x, u, h)
 
 function dynamics_diff!(dFdx, dFdu, x, u)
     F = similar(x)
