@@ -10,10 +10,11 @@ using MeshCatBenchmarkMechanisms
 using LinearAlgebra
 using ForwardDiff
 using Plots
+using DataFrames, CSV
 
 # Horizon and timestep
 T = 3
-N = 300
+N = 100
 h = T / N
 
 # Target state
@@ -57,7 +58,7 @@ function dynamics_diff!(fx, fu, x, u)
 end
 
 # Running cost
-running_cost(_, u) = 1e-5 * h * u' * u
+running_cost(_, u) = 1e-6 * h * u' * u
 
 function running_cost_diff!(lx, lu, lxx, lxu, luu, x, u)
     ∇x!(grad, dx, u) = ForwardDiff.gradient!(grad, (dx_) -> running_cost(QuadrotorODE.incremented_state(x, dx_), u), dx)
@@ -75,7 +76,7 @@ end
 # Final cost
 function final_cost(x)
     dx = QuadrotorODE.state_difference(x, xₜ)
-    return dx' * diagm(vcat(1e1 * ones(6), 1e-2 * ones(6))) * dx
+    return dx' * diagm(vcat(1e0 * ones(6), 1e-1 * ones(6))) * dx
 end
 
 function final_cost_diff!(Φx, Φxx, x)
@@ -115,9 +116,9 @@ function plotting_callback(workset)
 end
 
 # Trajectory optimization
-IterativeLQR.iLQR!(
+df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    verbose=true, plotting_callback=plotting_callback, state_difference=QuadrotorODE.state_difference
+    verbose=true, logging=true, plotting_callback=plotting_callback, state_difference=QuadrotorODE.state_difference, μ=10
 )
 
 # Visualization
@@ -141,3 +142,7 @@ for (i, x) in enumerate(nominal_trajectory(workset).x)
     end
 end
 setanimation!(vis, anim, play=false);
+
+df[!, :bwd] .= N
+df[!, :fwd] .= N
+CSV.write("quadrotor/results/ilqr-iterations.csv", df)

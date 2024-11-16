@@ -1,8 +1,9 @@
 module IterativeLQR
 
 using Parameters
-using Printf
 using LinearAlgebra
+using Printf
+using DataFrames, CSV
 
 include("workset.jl")
 include("trajectory_utils.jl")

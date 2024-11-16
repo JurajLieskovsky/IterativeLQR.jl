@@ -7,10 +7,11 @@ using CartPoleODE
 
 using ForwardDiff
 using Plots
+using DataFrames, CSV
 
 # Horizon and timestep
 T = 2
-N = 200
+N = 150
 h = T / N
 
 # Initial state and inputs
@@ -19,7 +20,7 @@ us₀ = [[1e-3] for _ in 1:N]
 # us₀ = [[1e-4 * 2 * pi * k / N] for k in 0:N-1]
 
 # Dynamics
-model = CartPoleODE.Model(9.8, 1, 0.5, 0.1)
+model = CartPoleODE.Model(9.81, 1, 0.5, 0.1)
 f!(dx, x, u) = dx .= CartPoleODE.f(model, x, u)
 
 tsit5 = RungeKutta.Tsit5()
@@ -86,7 +87,11 @@ function plotting_callback(workset)
 end
 
 # Trajectory optimization
-IterativeLQR.iLQR!(
+df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    verbose=true, plotting_callback=plotting_callback
+    verbose=true, logging=true, plotting_callback=plotting_callback, μ=10
 )
+
+df[!, :bwd] .= N
+df[!, :fwd] .= N
+CSV.write("cartpole/results/ilqr-iterations.csv", df)

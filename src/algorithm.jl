@@ -111,12 +111,22 @@ function print_iteration!(line_count, i, μ, α, J, ΔJ, Δv, accepted)
     line_count[] += 1
 end
 
+iteration_dataframe() = DataFrame(
+    i=Int[], μ=Float64[], α=Float64[],
+    J=Float64[], ΔJ=Float64[], ΔV=Float64[],
+    accepted=Bool[]
+)
+
+function log_iteration!(dataframe, i, μ, α, J, ΔJ, Δv, accepted)
+    push!(dataframe, (i, μ, α, J, ΔJ, Δv, accepted))
+end
+
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
-    maxiter=200, regularization=:input, ρ=0.5,
+    maxiter=100, regularization=:input, ρ=0.5,
     μ=1e-1, μ_dec=3 / 4, μ_inc=4, μ_min=0.0, μ_max=1e4,
     α_values=1:-0.3:0.1, α_reg_dec=0.7, α_reg_inc=0.1,
-    rollout=true, verbose=true, plotting_callback=nothing,
+    rollout=true, verbose=true, logging=false, plotting_callback=nothing,
     state_difference=-,
 )
     # regularization parameter adjustment functions
@@ -128,6 +138,9 @@ function iLQR!(
 
     # line count for printing
     line_count = Ref(0)
+
+    # dataframe for logging
+    dataframe = logging ? iteration_dataframe() : nothing
 
     # algorithm
     for i in 1:maxiter
@@ -152,6 +165,7 @@ function iLQR!(
 
             # printout
             verbose && print_iteration!(line_count, i, μ, α, J, ΔJ, Δv, accepted)
+            logging && log_iteration!(dataframe, i, μ, α, J, ΔJ, Δv, accepted)
 
             # solution copying and regularization parameter adjustment
             if accepted
@@ -174,6 +188,12 @@ function iLQR!(
 
         # termination condition
         μ >= μ_max && break
+    end
+    
+    if logging == true
+        return dataframe
+    else
+        return nothing
     end
 end
 
