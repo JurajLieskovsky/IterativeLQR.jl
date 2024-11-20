@@ -20,7 +20,7 @@ us₀ = [[1e-3] for _ in 1:N]
 # us₀ = [[1e-4 * 2 * pi * k / N] for k in 0:N-1]
 
 # Dynamics
-model = CartPoleODE.Model(9.81, 1, 0.5, 0.1)
+model = CartPoleODE.Model(9.81, 1, 0.1, 0.2)
 f!(dx, x, u) = dx .= CartPoleODE.f(model, x, u)
 
 tsit5 = RungeKutta.Tsit5()
@@ -36,7 +36,7 @@ function dynamics_diff!(dFdx, dFdu, x, u)
 end
 
 # Running cost
-running_cost(_, u) = 1e-4 * h * u[1]^2
+running_cost(_, u) = 1e-2 * h * u[1]^2
 
 function running_cost_diff!(dLdx, dLdu, ddLdxx, ddLdxu, ddLduu, x, u)
     ∇xL!(grad, x0, u0) = ForwardDiff.gradient!(grad, (x_) -> running_cost(x_, u0), x0)
@@ -50,7 +50,7 @@ function running_cost_diff!(dLdx, dLdu, ddLdxx, ddLdxu, ddLduu, x, u)
 end
 
 # Final cost
-final_cost(x) = 1 + cos(x[2]) + 1e-1 * x[1]^2 + 1e0 * x[3]^2 + 1e0 * x[4]^2
+final_cost(x) = 1e2 * (1 + cos(x[2])) + 1e1 * x[1]^2 + 1e2 * x[3]^2 + 1e2 * x[4]^2
 
 function final_cost_diff!(dΦdx, ddΦdxx, x)
     result = DiffResults.HessianResult(x)
@@ -89,7 +89,7 @@ end
 # Trajectory optimization
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    verbose=true, logging=true, plotting_callback=plotting_callback, μ=10
+    verbose=true, logging=true, plotting_callback=plotting_callback, maxiter=200
 )
 
 df[!, :bwd] .= N
