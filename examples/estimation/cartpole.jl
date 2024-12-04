@@ -33,7 +33,7 @@ end
 N = 100
 x0 = [0, 3 / 4 * pi, 0, 0]
 u = [zeros(CartPoleODE.nu) for _ in 1:N]
-p = [1, 0.1]
+p_accurate = [1, 0.1]
 
 # Noise models
 ## process
@@ -58,12 +58,26 @@ x[1] .= x0
 z[1] .= h(x0, μv)
 
 for i in 1:N
-    f!(x[i+1], x[i], u[i], noise(μw, Σw), p)
+    f!(x[i+1], x[i], u[i], noise(μw, Σw), p_accurate)
     z[i+1] .= h(x[i+1], noise(μv, Σv))
 end
 
 # MHE functions
-dynamics!(xnew, x, w, k) = f!(xnew, x, u[k], w, p)
+function dynamics!(ynew, y, w, k)
+    @views begin
+        xnew = ynew[1:4]
+        pnew = ynew[5:6]
+
+        x = y[1:4]
+        p = y[5:6]
+
+        wx = w[1:4]
+        wp = w[5:6]
+    end
+
+    f!(xnew, x, u[k], wx, p)
+    pnew .= p + wp
+end
 
 function dynamics_diff!(dFdx, dFdu, x, w, k)
     F = similar(x)
@@ -74,10 +88,22 @@ function dynamics_diff!(dFdx, dFdu, x, w, k)
     return nothing
 end
 
-function running_cost(x, w, k)
-    dy = z[k] - h(x, μv)
-    dw = μw - w
-    return 0.5 * (dy' * invΣv * dy + dw' * invΣw * dw)
+y0 = vcat(x0, p_accurate)
+
+function running_cost(y, w, k)
+    invΣwp = k == 1 ? 1e2 * I(2) : 1e4 * I(2)
+
+    @views begin
+        x = y[1:4]
+
+        wx = w[1:4]
+        wp = w[5:6]
+    end
+
+    dz = z[k] - h(x, μv)
+    dw = μw - wx
+
+    return 0.5 * (dz' * invΣv * dz + dw' * invΣw * dw + wp' * invΣwp * wp)
 end
 
 function running_cost_diff!(dLdx, dLdu, ddLdxx, ddLdxu, ddLduu, x, w, k)
@@ -91,9 +117,10 @@ function running_cost_diff!(dLdx, dLdu, ddLdxx, ddLdxu, ddLduu, x, w, k)
     return nothing
 end
 
-function final_cost(x, k)
-    dy = z[k] - h(x, μv)
-    return 0.5 * dy' * invΣv * dy
+function final_cost(y, k)
+    x = y[1:4]
+    dz = z[k] - h(x, μv)
+    return 0.5 * dz' * invΣv * dz
 end
 
 function final_cost_diff!(dΦdx, ddΦdxx, x, k)
@@ -110,36 +137,47 @@ end
 function plotting_callback(workset)
     range = 0:workset.N
 
-    states = mapreduce(x -> x', vcat, nominal_trajectory(workset).x)[:,1:2]
+    # states
+    states = mapreduce(x -> x[1:4]', vcat, nominal_trajectory(workset).x)[:, 1:2]
     state_labels = ["x₁", "x₂", "x₃", "x₄"]
     state_plot = plot(range, states, label=permutedims(state_labels))
-    
 
-    errors = mapreduce((x_, x_ref_) -> (x_ - x_ref_)', vcat, nominal_trajectory(workset).x, x)[:,1:2]
-    error_labels = ["e₁", "e₂", "e₃", "e₄"]
-    error_plot = plot(range, errors, label=permutedims(error_labels))
+    state_errors = mapreduce((x_, x_ref_) -> (x_[1:4] - x_ref_)', vcat, nominal_trajectory(workset).x, x)[:, 1:2]
+    state_error_labels = ["Δx₁", "Δx₂", "Δx₃", "Δx₄"]
+    state_error_plot = plot(range, state_errors, label=permutedims(state_error_labels))
 
+    # parameters
+    params = mapreduce(x -> x[5:6]', vcat, nominal_trajectory(workset).x)
+    param_labels = ["p₁", "p₂"]
+    param_plot = plot(range, params, label=permutedims(param_labels))
+
+    param_errors = mapreduce(x_ -> (x_[5:6] - p_accurate)', vcat, nominal_trajectory(workset).x)
+    param_error_labels = ["Δp₁", "Δp₂"]
+    param_error_plot = plot(range, param_errors, label=permutedims(param_error_labels))
+
+    # disturbances
     dstrb_labels = ["w₁", "w₂", "w₃", "w₄"]
-    dstrbs = mapreduce(w -> w', vcat, nominal_trajectory(workset).u)[:,1:2]
+    dstrbs = mapreduce(w -> w', vcat, nominal_trajectory(workset).u)[:, 1:2]
     dstrb_plot = plot(range, vcat(dstrbs, dstrbs[end, :]'), label=permutedims(dstrb_labels), seriestype=:steppost)
 
-    plt = plot(state_plot, error_plot, dstrb_plot, layout=(3, 1))
+    # combination
+    plt = plot(state_plot, state_error_plot, param_plot, param_error_plot, dstrb_plot, layout=(5, 1))
     display(plt)
 
     return plt
 end
 
 # optimal estimation
-workset = [IterativeLQR.Workset{Float64}(4, 4, n) for n in 1:N] # here nu is actually nw
+workset = [IterativeLQR.Workset{Float64}(6, 6, n) for n in 1:N] # here nu is actually nw
 
 for i in 1:N
-    IterativeLQR.set_initial_state!(workset[i], x0)
+    IterativeLQR.set_initial_state!(workset[i], y0)
 
     # copy noise estimates from previous iteration and add mean
     if i == 1
-        IterativeLQR.set_initial_inputs!(workset[i], [μw])
+        IterativeLQR.set_initial_inputs!(workset[i], [vcat(μw, zeros(2))])
     else
-        IterativeLQR.set_initial_inputs!(workset[i], vcat(nominal_trajectory(workset[i-1]).u, [μw]))
+        IterativeLQR.set_initial_inputs!(workset[i], vcat(nominal_trajectory(workset[i-1]).u, [vcat(μw, zeros(2))]))
     end
 
     IterativeLQR.iLQR!(
