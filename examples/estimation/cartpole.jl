@@ -10,7 +10,7 @@ using Plots
 using Infiltrator
 
 # dynamics of the adaptive system
-function f(x, u, w, p)
+function f!(xnew, x, u, w, p)
     model = CartPoleODE.Model(9.81, p..., 0.2)
     tsit5 = RungeKutta.Tsit5()
 
@@ -18,7 +18,10 @@ function f(x, u, w, p)
         dx .= CartPoleODE.f(model, x, u)
     end
 
-    return RungeKutta.f(tsit5, dynamics!, x, u, 1e-2) + w
+    RungeKutta.f!(xnew, tsit5, dynamics!, x, u, 1e-2)
+    xnew .+= w
+
+    return nothing
 end
 
 function h(x, _, v, _)
@@ -52,7 +55,7 @@ x[1] .= x0
 y[1] .= h(x0, u, μv, p)
 
 for i in 1:N
-    x[i+1] .= f(x[i], u, noise(μw, Σw), p)
+    f!(x[i+1], x[i], u, noise(μw, Σw), p)
     y[i+1] .= h(x[i+1], u, noise(μv, Σv), p)
 end
 
@@ -63,4 +66,5 @@ ys = mapreduce(y -> y', vcat, y)
 plt = plot(layout=(2,1))
 plot!(plt,xs, subplot=1)
 plot!(plt,ys, subplot=2)
+display(plt)
 
