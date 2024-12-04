@@ -91,7 +91,7 @@ end
 y0 = vcat(x0, p_accurate .* [0.8, 1.2])
 
 function running_cost(y, w, k)
-    invΣwp = k == 1 ? diagm([1e0, 1e2]) : diagm([1e4, 1e6])
+    invΣwp = k == 1 ? diagm([1e-2, 1e0]) : diagm([1e4, 1e6])
 
     @views begin
         x = y[1:4]
@@ -149,11 +149,11 @@ function plotting_callback(workset)
     # parameters
     params = mapreduce(x -> x[5:6]', vcat, nominal_trajectory(workset).x)
     param_labels = ["p₁", "p₂"]
-    param_plot = plot(range, params, label=permutedims(param_labels))
+    param_plot = plot(range, params, label=permutedims(param_labels), seriestype=:steppre)
 
     param_errors = mapreduce(x_ -> ((x_[5:6] - p_accurate) ./ p_accurate)', vcat, nominal_trajectory(workset).x)
     param_error_labels = ["Δp₁/p₁", "Δp₂/p₂"]
-    param_error_plot = plot(range, param_errors, label=permutedims(param_error_labels))
+    param_error_plot = plot(range, param_errors, label=permutedims(param_error_labels), seriestype=:steppre)
 
     # disturbances
     dstrb_labels = ["w₁", "w₂", "w₃", "w₄"]
