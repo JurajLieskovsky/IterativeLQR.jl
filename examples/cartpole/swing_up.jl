@@ -24,23 +24,23 @@ model = CartPoleODE.Model(9.81, 1, 0.1, 0.2)
 f!(dx, x, u) = dx .= CartPoleODE.f(model, x, u)
 
 tsit5 = RungeKutta.Tsit5()
-dynamics!(dx, x, u) = RungeKutta.f!(dx, tsit5, f!, x, u, h)
+dynamics!(dx, x, u, _) = RungeKutta.f!(dx, tsit5, f!, x, u, h)
 
-function dynamics_diff!(dFdx, dFdu, x, u)
+function dynamics_diff!(dFdx, dFdu, x, u, k)
     F = similar(x)
 
-    ForwardDiff.jacobian!(dFdx, (xnew, x_) -> dynamics!(xnew, x_, u), F, x)
-    ForwardDiff.jacobian!(dFdu, (xnew, u_) -> dynamics!(xnew, x, u_), F, u)
+    ForwardDiff.jacobian!(dFdx, (xnew, x_) -> dynamics!(xnew, x_, u, k), F, x)
+    ForwardDiff.jacobian!(dFdu, (xnew, u_) -> dynamics!(xnew, x, u_, k), F, u)
 
     return nothing
 end
 
 # Running cost
-running_cost(_, u) = 1e-2 * h * u[1]^2
+running_cost(_, u, _) = 1e-2 * h * u[1]^2
 
-function running_cost_diff!(dLdx, dLdu, ddLdxx, ddLdxu, ddLduu, x, u)
-    ∇xL!(grad, x0, u0) = ForwardDiff.gradient!(grad, (x_) -> running_cost(x_, u0), x0)
-    ∇uL!(grad, x0, u0) = ForwardDiff.gradient!(grad, (u_) -> running_cost(x0, u_), u0)
+function running_cost_diff!(dLdx, dLdu, ddLdxx, ddLdxu, ddLduu, x, u, k)
+    ∇xL!(grad, x0, u0) = ForwardDiff.gradient!(grad, (x_) -> running_cost(x_, u0, k), x0)
+    ∇uL!(grad, x0, u0) = ForwardDiff.gradient!(grad, (u_) -> running_cost(x0, u_, k), u0)
 
     ForwardDiff.jacobian!(ddLdxx, (grad, x_) -> ∇xL!(grad, x_, u), dLdx, x)
     ForwardDiff.jacobian!(ddLdxu, (grad, u_) -> ∇xL!(grad, x, u_), dLdx, u)
@@ -50,11 +50,11 @@ function running_cost_diff!(dLdx, dLdu, ddLdxx, ddLdxu, ddLduu, x, u)
 end
 
 # Final cost
-final_cost(x) = 1e2 * (1 + cos(x[2])) + 1e1 * x[1]^2 + 1e2 * x[3]^2 + 1e2 * x[4]^2
+final_cost(x, _) = 1e2 * (1 + cos(x[2])) + 1e1 * x[1]^2 + 1e2 * x[3]^2 + 1e2 * x[4]^2
 
-function final_cost_diff!(dΦdx, ddΦdxx, x)
+function final_cost_diff!(dΦdx, ddΦdxx, x, k)
     result = DiffResults.HessianResult(x)
-    ForwardDiff.hessian!(result, final_cost, x)
+    ForwardDiff.hessian!(result, x -> final_cost(x, k), x)
 
     dΦdx .= result.derivs[1]
     ddΦdxx .= result.derivs[2]
@@ -76,7 +76,7 @@ function plotting_callback(workset)
     position_plot = plot(range, states[:, 1:2], label=state_labels[1:1, 1:2])
 
     inputs = mapreduce(u -> u', vcat, nominal_trajectory(workset).u)
-    input_plot = plot(range, vcat(inputs, inputs[end,:]'), label="u", seriestype=:steppost)
+    input_plot = plot(range, vcat(inputs, inputs[end, :]'), label="u", seriestype=:steppost)
 
     cost_plot = plot(range, cumsum(nominal_trajectory(workset).l), label="c", seriestype=:steppost)
 
