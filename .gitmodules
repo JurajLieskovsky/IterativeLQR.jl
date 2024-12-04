@@ -10,3 +10,6 @@
 [submodule "examples/deps/CartPoleODE"]
 	path = examples/deps/CartPoleODE
 	url = git@github.com:JurajLieskovsky/CartPoleODE.jl.git
+[submodule "examples/deps/BrachiationRobotODE"]
+	path = examples/deps/BrachiationRobotODE
+	url = git@github.com:JurajLieskovsky/BrachiationRobot.jl.git
