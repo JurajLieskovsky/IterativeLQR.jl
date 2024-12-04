@@ -38,10 +38,12 @@ p = [1, 0.1]
 ## process
 μw = zeros(CartPoleODE.nx)
 Σw = diagm([1e-4, 1e-2, 1e-2, 1e-1])
+invΣw = inv(Σw)
 
 ## measurement
 μv = zeros(2)
 Σv = 1e-6 * I(2)
+invΣv = inv(Σv)
 
 # random noise
 noise(μ, Σ) = μ + sqrt.(diag(Σ)) .* (rand(length(μ)) .- 0.5)
@@ -68,3 +70,16 @@ plot!(plt, xs, subplot=1)
 plot!(plt, zs, subplot=2)
 display(plt)
 
+# MHE functions
+dynamics!(xnew, x, w, k) = f!(xnew, x, u[k], w, p)
+
+function running_cost(x, w, k)
+    dy = z[k] - h(x, μv)
+    dw = μw - w
+    return 0.5 * (dy' * invΣv * dy + dw' * invΣw * dw)
+end
+
+function final_cost(x, k)
+    dy = z[k] - h(x, μv)
+    return 0.5 * dy' * invΣv * dy
+end
