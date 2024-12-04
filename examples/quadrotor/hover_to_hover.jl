@@ -30,7 +30,7 @@ quadrotor = QuadrotorODE.System([0, 0, -9.81], 1, I(3), a, 0.01)
 
 tsit5 = RungeKutta.Tsit5()
 
-dynamics!(xnew, x, u) = RungeKutta.f!(
+dynamics!(xnew, x, u, _) = RungeKutta.f!(
     xnew,
     tsit5,
     (xnew_, x_, u_) -> xnew_ .= QuadrotorODE.dynamics(quadrotor, x_, u_),
@@ -39,7 +39,7 @@ dynamics!(xnew, x, u) = RungeKutta.f!(
     h
 )
 
-function dynamics_diff!(fx, fu, x, u)
+function dynamics_diff!(fx, fu, x, u, _)
     f!(dznew, x, dz, u) = RungeKutta.f!(
         dznew,
         tsit5,
@@ -57,11 +57,11 @@ function dynamics_diff!(fx, fu, x, u)
 end
 
 # Running cost
-running_cost(_, u) = 1e-3 * h * u' * u
+running_cost(_, u, _) = 1e-3 * h * u' * u
 
-function running_cost_diff!(lx, lu, lxx, lxu, luu, x, u)
-    ∇x!(grad, dx, u) = ForwardDiff.gradient!(grad, (dx_) -> running_cost(QuadrotorODE.incremented_state(x, dx_), u), dx)
-    ∇u!(grad, dx, u) = ForwardDiff.gradient!(grad, (u_) -> running_cost(QuadrotorODE.incremented_state(x, dx), u_), u)
+function running_cost_diff!(lx, lu, lxx, lxu, luu, x, u, k)
+    ∇x!(grad, dx, u) = ForwardDiff.gradient!(grad, (dx_) -> running_cost(QuadrotorODE.incremented_state(x, dx_), u, k), dx)
+    ∇u!(grad, dx, u) = ForwardDiff.gradient!(grad, (u_) -> running_cost(QuadrotorODE.incremented_state(x, dx), u_, k), u)
 
     dx = zeros(QuadrotorODE.nz)
 
@@ -73,15 +73,15 @@ function running_cost_diff!(lx, lu, lxx, lxu, luu, x, u)
 end
 
 # Final cost
-function final_cost(x)
+function final_cost(x, _)
     dx = QuadrotorODE.state_difference(x, xₜ)
     return dx' * diagm(vcat(1e3 * ones(6), 1e2 * ones(6))) * dx
 end
 
-function final_cost_diff!(Φx, Φxx, x)
+function final_cost_diff!(Φx, Φxx, x, k)
     dz = zeros(12)
     result = DiffResults.HessianResult(dz)
-    ForwardDiff.hessian!(result, dz_ -> final_cost(QuadrotorODE.incremented_state(x, dz_)), dz)
+    ForwardDiff.hessian!(result, dz_ -> final_cost(QuadrotorODE.incremented_state(x, dz_), k), dz)
 
     Φx .= result.derivs[1]
     Φxx .= result.derivs[2]

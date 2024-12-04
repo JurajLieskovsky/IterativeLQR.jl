@@ -3,11 +3,11 @@ function trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
     @unpack x, u, l = nominal_trajectory(workset)
 
     for k in 1:N
-        dynamics!(x[k+1], x[k], u[k])
-        l[k] = running_cost(x[k], u[k])
+        dynamics!(x[k+1], x[k], u[k], k)
+        l[k] = running_cost(x[k], u[k], k)
     end
 
-    l[N+1] = final_cost(x[N+1])
+    l[N+1] = final_cost(x[N+1], N + 1)
 end
 
 function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
@@ -18,11 +18,11 @@ function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cos
     @unpack vx, vxx = workset.value_function
 
     for k in 1:N
-        dynamics_diff!(fx[k], fu[k], x[k], u[k])
-        running_cost_diff!(lx[k], lu[k], lxx[k], lxu[k], luu[k], x[k], u[k])
+        dynamics_diff!(fx[k], fu[k], x[k], u[k], k)
+        running_cost_diff!(lx[k], lu[k], lxx[k], lxu[k], luu[k], x[k], u[k], k)
     end
 
-    final_cost_diff!(vx[N+1], vxx[N+1], x[N+1])
+    final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
 end
 
 function backward_pass!(workset, μ, regularization)
@@ -87,14 +87,14 @@ function forward_pass!(workset, dynamics!, difference, running_cost, final_cost)
         u[k] .= u_ref[k] + Δu[k] + Δux[k] * difference(x[k], x_ref[k])
 
         try
-            dynamics!(x[k+1], x[k], u[k])
-            l[k] = running_cost(x[k], u[k])
+            dynamics!(x[k+1], x[k], u[k], k)
+            l[k] = running_cost(x[k], u[k], k)
         catch
             return false, NaN, NaN
         end
     end
 
-    l[N+1] = final_cost(x[N+1])
+    l[N+1] = final_cost(x[N+1], N + 1)
 
     return true, sum(l), sum(l) - sum(l_ref)
 end
@@ -189,7 +189,7 @@ function iLQR!(
         # termination condition
         μ >= μ_max && break
     end
-    
+
     if logging == true
         return dataframe
     else
