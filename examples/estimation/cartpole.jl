@@ -28,7 +28,7 @@ end
 # Horizon, initial state, and inputs
 N = 100
 x0 = [0, 3 / 4 * pi, 0, 0]
-u = [zeros(CartPoleODE.nu) for _ in 1:N]
+u = zeros(CartPoleODE.nu)
 p = [1, 0.1]
 
 # Noise models
@@ -49,11 +49,11 @@ x = [zeros(CartPoleODE.nx) for _ in 1:N+1]
 y = [zeros(2) for _ in 1:N+1]
 
 x[1] .= x0
-y[1] .= h(x0, u[1], μv, p)
+y[1] .= h(x0, u, μv, p)
 
 for i in 1:N
-    x[i+1] .= f(x[i], u[i], noise(μw, Σw), p)
-    y[i+1] .= h(x[i+1], u[i], noise(μv, Σv), p)
+    x[i+1] .= f(x[i], u, noise(μw, Σw), p)
+    y[i+1] .= h(x[i+1], u, noise(μv, Σv), p)
 end
 
 # figure
