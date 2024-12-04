@@ -24,14 +24,14 @@ function f!(xnew, x, u, w, p)
     return nothing
 end
 
-function h(x, _, v, _)
+function h(x, v)
     return x[1:2] + v
 end
 
 # Horizon, initial state, and inputs
 N = 100
 x0 = [0, 3 / 4 * pi, 0, 0]
-u = zeros(CartPoleODE.nu)
+u = [zeros(CartPoleODE.nu) for _ in 1:N]
 p = [1, 0.1]
 
 # Noise models
@@ -44,27 +44,27 @@ p = [1, 0.1]
 Σv = 1e-6 * I(2)
 
 # random noise
-noise(μ,Σ) = μ + sqrt.(diag(Σ)) .* (rand(length(μ)) .- 0.5)
+noise(μ, Σ) = μ + sqrt.(diag(Σ)) .* (rand(length(μ)) .- 0.5)
 # noise(μ, _) = zeros(length(μ))
 
 # Reference trajectory
 x = [zeros(CartPoleODE.nx) for _ in 1:N+1]
-y = [zeros(2) for _ in 1:N+1]
+z = [zeros(2) for _ in 1:N+1]
 
 x[1] .= x0
-y[1] .= h(x0, u, μv, p)
+z[1] .= h(x0, μv)
 
 for i in 1:N
-    f!(x[i+1], x[i], u, noise(μw, Σw), p)
-    y[i+1] .= h(x[i+1], u, noise(μv, Σv), p)
+    f!(x[i+1], x[i], u[i], noise(μw, Σw), p)
+    z[i+1] .= h(x[i+1], noise(μv, Σv))
 end
 
 # figure
-xs = mapreduce(x -> x', vcat, x)
-ys = mapreduce(y -> y', vcat, y)
+xs = mapreduce(x_ -> x_', vcat, x)
+zs = mapreduce(z_ -> z_', vcat, z)
 
-plt = plot(layout=(2,1))
-plot!(plt,xs, subplot=1)
-plot!(plt,ys, subplot=2)
+plt = plot(layout=(2, 1))
+plot!(plt, xs, subplot=1)
+plot!(plt, zs, subplot=2)
 display(plt)
 
