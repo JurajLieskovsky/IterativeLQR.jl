@@ -38,7 +38,7 @@ p_accurate = [1, 0.1]
 # Noise models
 ## process
 μw = zeros(CartPoleODE.nx)
-Σw = diagm([1e-4, 1e-2, 1e-2, 1e-1])
+Σw = diagm([1e-4, 1e-3, 1e-3, 1e-2])
 invΣw = inv(Σw)
 
 ## measurement
