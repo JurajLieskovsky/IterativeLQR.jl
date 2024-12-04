@@ -83,3 +83,22 @@ function final_cost(x, k)
     dy = z[k] - h(x, μv)
     return 0.5 * dy' * invΣv * dy
 end
+
+# optimal estimation
+workset = [IterativeLQR.Workset{Float64}(4, 4, n) for n in 1:N] # here nu is actually nw
+
+for i in 1:N
+    IterativeLQR.set_initial_state!(workset[i], x0)
+
+    # copy noise estimates from previous iteration and add mean
+    if i == 1
+        IterativeLQR.set_initial_inputs!(workset[i], [μw])
+    else
+        IterativeLQR.set_initial_inputs!(workset[i], vcat(nominal_trajectory(workset[i-1]).u, [μw]))
+    end
+
+    # IterativeLQR.iLQR!(
+    #     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
+    #     verbose=true, logging=true, plotting_callback=plotting_callback, maxiter=200
+    # )
+end
