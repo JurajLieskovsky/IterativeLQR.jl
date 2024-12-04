@@ -8,6 +8,7 @@ using CartPoleODE
 using LinearAlgebra
 using Plots
 using Infiltrator
+using ForwardDiff
 
 # dynamics of the adaptive system
 function f!(xnew, x, u, w, p)
@@ -61,17 +62,17 @@ for i in 1:N
     z[i+1] .= h(x[i+1], noise(μv, Σv))
 end
 
-# figure
-xs = mapreduce(x_ -> x_', vcat, x)
-zs = mapreduce(z_ -> z_', vcat, z)
-
-plt = plot(layout=(2, 1))
-plot!(plt, xs, subplot=1)
-plot!(plt, zs, subplot=2)
-display(plt)
-
 # MHE functions
 dynamics!(xnew, x, w, k) = f!(xnew, x, u[k], w, p)
+
+function dynamics_diff!(dFdx, dFdu, x, w, k)
+    F = similar(x)
+
+    ForwardDiff.jacobian!(dFdx, (xnew, x_) -> dynamics!(xnew, x_, w, k), F, x)
+    ForwardDiff.jacobian!(dFdu, (xnew, w_) -> dynamics!(xnew, x, w_, k), F, w)
+
+    return nothing
+end
 
 function running_cost(x, w, k)
     dy = z[k] - h(x, μv)
@@ -79,9 +80,53 @@ function running_cost(x, w, k)
     return 0.5 * (dy' * invΣv * dy + dw' * invΣw * dw)
 end
 
+function running_cost_diff!(dLdx, dLdu, ddLdxx, ddLdxu, ddLduu, x, w, k)
+    ∇xL!(grad, x0, w0) = ForwardDiff.gradient!(grad, (x_) -> running_cost(x_, w0, k), x0)
+    ∇uL!(grad, x0, w0) = ForwardDiff.gradient!(grad, (w_) -> running_cost(x0, w_, k), w0)
+
+    ForwardDiff.jacobian!(ddLdxx, (grad, x_) -> ∇xL!(grad, x_, w), dLdx, x)
+    ForwardDiff.jacobian!(ddLdxu, (grad, w_) -> ∇xL!(grad, x, w_), dLdx, w)
+    ForwardDiff.jacobian!(ddLduu, (grad, w_) -> ∇uL!(grad, x, w_), dLdu, w)
+
+    return nothing
+end
+
 function final_cost(x, k)
     dy = z[k] - h(x, μv)
     return 0.5 * dy' * invΣv * dy
+end
+
+function final_cost_diff!(dΦdx, ddΦdxx, x, k)
+    result = DiffResults.HessianResult(x)
+    ForwardDiff.hessian!(result, x -> final_cost(x, k), x)
+
+    dΦdx .= result.derivs[1]
+    ddΦdxx .= result.derivs[2]
+
+    return nothing
+end
+
+# plotting callback
+function plotting_callback(workset)
+    range = 0:workset.N
+
+    states = mapreduce(x -> x', vcat, nominal_trajectory(workset).x)[:,1:2]
+    state_labels = ["x₁", "x₂", "x₃", "x₄"]
+    state_plot = plot(range, states, label=permutedims(state_labels))
+    
+
+    errors = mapreduce((x_, x_ref_) -> (x_ - x_ref_)', vcat, nominal_trajectory(workset).x, x)[:,1:2]
+    error_labels = ["e₁", "e₂", "e₃", "e₄"]
+    error_plot = plot(range, errors, label=permutedims(error_labels))
+
+    dstrb_labels = ["w₁", "w₂", "w₃", "w₄"]
+    dstrbs = mapreduce(w -> w', vcat, nominal_trajectory(workset).u)[:,1:2]
+    dstrb_plot = plot(range, vcat(dstrbs, dstrbs[end, :]'), label=permutedims(dstrb_labels), seriestype=:steppost)
+
+    plt = plot(state_plot, error_plot, dstrb_plot, layout=(3, 1))
+    display(plt)
+
+    return plt
 end
 
 # optimal estimation
@@ -97,8 +142,8 @@ for i in 1:N
         IterativeLQR.set_initial_inputs!(workset[i], vcat(nominal_trajectory(workset[i-1]).u, [μw]))
     end
 
-    # IterativeLQR.iLQR!(
-    #     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    #     verbose=true, logging=true, plotting_callback=plotting_callback, maxiter=200
-    # )
+    IterativeLQR.iLQR!(
+        workset[i], dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
+        verbose=true, logging=true, plotting_callback=plotting_callback, maxiter=i == N ? 50 : 5
+    )
 end
