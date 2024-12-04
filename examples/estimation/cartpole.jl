@@ -34,15 +34,15 @@ p = [1, 0.1]
 # Noise models
 ## process
 μw = zeros(CartPoleODE.nx)
-Σw = diagm([1e-6, 1e-6, 1e-4, 1e-4])
+Σw = diagm([1e-4, 1e-2, 1e-2, 1e-1])
 
 ## measurement
 μv = zeros(2)
 Σv = 1e-6 * I(2)
 
 # random noise
-# noise(μ,Σ) = μ + sqrt.(diag(Σ)) .* (rand(length(μ)) .- 0.5)
-noise(μ, _) = zeros(length(μ))
+noise(μ,Σ) = μ + sqrt.(diag(Σ)) .* (rand(length(μ)) .- 0.5)
+# noise(μ, _) = zeros(length(μ))
 
 # Reference trajectory
 x = [zeros(CartPoleODE.nx) for _ in 1:N+1]
@@ -58,5 +58,9 @@ end
 
 # figure
 xs = mapreduce(x -> x', vcat, x)
-plt = plot(xs)
+ys = mapreduce(y -> y', vcat, y)
+
+plt = plot(layout=(2,1))
+plot!(plt,xs, subplot=1)
+plot!(plt,ys, subplot=2)
 
