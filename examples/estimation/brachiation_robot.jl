@@ -147,12 +147,9 @@ M = 10 # observation horizon
 
 for i in 1:N
     if i > M
+        IterativeLQR.circshift_trajectory!(workset, -1)
         n = M
         k0 = i - M
-        circshift!(nominal_trajectory(workset).u, -1)
-        circshift!(nominal_trajectory(workset).x, -1)
-        circshift!(nominal_trajectory(workset).l, -1)
-        copy!(active_trajectory(workset), nominal_trajectory(workset))
     else
         n = i
         k0 = 0

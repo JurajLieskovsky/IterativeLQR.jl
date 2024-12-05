@@ -29,6 +29,18 @@ function swap_trajectories!(workset)
     return nothing
 end
 
+## trajectory circle shift
+
+"""
+Circle shifts the nominal trajectory and copies its values to the active trajectory.
+"""
+function circshift_trajectory!(workset::Workset, k)
+    circshift!(nominal_trajectory(workset).u, k)
+    circshift!(nominal_trajectory(workset).x, k)
+    circshift!(nominal_trajectory(workset).l, k)
+    copy!(active_trajectory(workset), nominal_trajectory(workset))
+end
+
 ## set functions
 
 function set_initial_state!(workset, x0)
