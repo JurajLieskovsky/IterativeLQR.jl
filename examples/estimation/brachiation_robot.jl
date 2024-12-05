@@ -68,10 +68,6 @@ for i in 1:N
     z[i+1] .= h(x[i+1], noise(μv, Σv))
 end
 
-plt = plot(layout=(2, 1))
-plot!(plt, mapreduce(x_ -> x_[1:2]', vcat, x), subplot=1)
-plot!(plt, mapreduce(u_ -> u_, vcat, u), subplot=2)
-
 # Differentiation functions
 function dynamics_diff!(dynamics!, fx, fu, x, w, k)
     f = similar(x)
@@ -125,12 +121,14 @@ function plotting_callback(workset, k0=0)
     return plt
 end
 
-# optimal estimation
+# Moving horizon estimation
 workset = IterativeLQR.Workset{Float64}(4, 4, N) # here nu is actually nw
 IterativeLQR.set_initial_state!(workset, x0)
 IterativeLQR.set_initial_inputs!(workset, [μw for _ in 1:N])
 
-dynamics!(xnew, x, w, k, k0) = f!(xnew, x, u[k+k0], w, p_accurate .* [1+1e-6, 1.])
+M = 10 # observation horizon
+
+dynamics!(xnew, x, w, k, k0) = f!(xnew, x, u[k+k0], w, p_accurate .* [1.2, 0.8])
 
 function running_cost(x, w, k, k0)
     dy = z[k+k0] - h(x, μv)
@@ -142,8 +140,6 @@ function final_cost(x, k, k0)
     dy = z[k+k0] - h(x, μv)
     return 0.5 * dy' * invΣv * dy
 end
-
-M = 10 # observation horizon
 
 for i in 1:N
     if i > M
@@ -157,16 +153,16 @@ for i in 1:N
 
     dyn!(xnew, x, w, k) = dynamics!(xnew, x, w, k, k0)
     run(x, w, k) = running_cost(x, w, k, k0)
-    fin(x,k) = final_cost(x, k, k0)
+    fin(x, k) = final_cost(x, k, k0)
 
     IterativeLQR.iLQR!(
         workset,
         dyn!, (fx, fu, x, w, k) -> dynamics_diff!(dyn!, fx, fu, x, w, k),
         run, (lx, lu, lxx, lxu, luu, x, w, k) -> running_cost_diff!(run, lx, lu, lxx, lxu, luu, x, w, k),
         fin, (Φx, Φxx, x, k) -> final_cost_diff!(fin, Φx, Φxx, x, k),
-        verbose=false, logging=true, plotting_callback=workset -> plotting_callback(workset, k0), maxiter=10, N=n
+        verbose=false, logging=true, plotting_callback=workset -> plotting_callback(workset, k0), maxiter=5, N=n
     )
 end
 
-IterativeLQR.circshift_trajectory!(workset, -(M+1))
+IterativeLQR.circshift_trajectory!(workset, -(M + 1))
 display(plotting_callback(workset))
