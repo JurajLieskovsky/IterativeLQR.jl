@@ -1,5 +1,4 @@
-function trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
-    @unpack N = workset
+function trajectory_rollout!(workset, dynamics!, running_cost, final_cost, N)
     @unpack x, u, l = nominal_trajectory(workset)
 
     for k in 1:N
@@ -10,8 +9,7 @@ function trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
     l[N+1] = final_cost(x[N+1], N + 1)
 end
 
-function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
-    @unpack N = workset
+function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!, N)
     @unpack x, u = nominal_trajectory(workset)
     @unpack fx, fu = workset.dynamics_derivatives
     @unpack lx, lu, lxx, lxu, luu = workset.cost_derivatives
@@ -25,8 +23,7 @@ function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cos
     final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
 end
 
-function backward_pass!(workset, μ, regularization)
-    @unpack N = workset
+function backward_pass!(workset, μ, regularization, N)
     @unpack fx, fu = workset.dynamics_derivatives
     @unpack lx, lu, lxx, lxu, luu = workset.cost_derivatives
     @unpack Δv, vx, vxx = workset.value_function
@@ -72,8 +69,7 @@ function backward_pass!(workset, μ, regularization)
     return sum(Δv) # expected improvement
 end
 
-function forward_pass!(workset, dynamics!, difference, running_cost, final_cost)
-    @unpack N = workset
+function forward_pass!(workset, dynamics!, difference, running_cost, final_cost, N)
     @unpack x, u, l = active_trajectory(workset)
     @unpack Δu, Δux = workset.policy_update
 
@@ -127,14 +123,17 @@ function iLQR!(
     μ=1e-2, μ_dec=3 / 4, μ_inc=4, μ_min=0.0, μ_max=1e4,
     α_values=1:-0.3:0.1, α_reg_dec=0.7, α_reg_inc=0.1,
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
-    state_difference=-,
+    state_difference=-, N=nothing
 )
+    # set the horizon to the length of the workset if not specified otherwise
+    N = (N === nothing) ? workset.N : N
+
     # regularization parameter adjustment functions
     decrease_μ(μ) = μ * μ_dec
     increase_μ(μ) = μ * μ_inc
 
     # initial trajectory rollout
-    rollout == true && trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
+    rollout == true && trajectory_rollout!(workset, dynamics!, running_cost, final_cost, N)
 
     # line count for printing
     line_count = Ref(0)
@@ -145,14 +144,14 @@ function iLQR!(
     # algorithm
     for i in 1:maxiter
         # nominal trajectory differentiation
-        differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
+        differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!, N)
 
         # backward pass
-        Δv = backward_pass!(workset, μ, regularization)
+        Δv = backward_pass!(workset, μ, regularization, N)
 
         # forward pass
         for α in α_values
-            successful, J, ΔJ = forward_pass!(workset, dynamics!, state_difference, running_cost, final_cost)
+            successful, J, ΔJ = forward_pass!(workset, dynamics!, state_difference, running_cost, final_cost, N)
 
             # error handling
             if !successful
