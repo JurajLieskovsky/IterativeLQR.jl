@@ -35,9 +35,9 @@ end
 Circle shifts the nominal trajectory and copies its values to the active trajectory.
 """
 function circshift_trajectory!(workset::Workset, k)
-    circshift!(nominal_trajectory(workset).u, k)
-    circshift!(nominal_trajectory(workset).x, k)
-    circshift!(nominal_trajectory(workset).l, k)
+    nominal_trajectory(workset).u .= circshift(deepcopy(nominal_trajectory(workset).u), k)
+    nominal_trajectory(workset).x .= circshift(deepcopy(nominal_trajectory(workset).x), k)
+    nominal_trajectory(workset).l .= circshift(deepcopy(nominal_trajectory(workset).l), k)
     copy!(active_trajectory(workset), nominal_trajectory(workset))
 end
 
