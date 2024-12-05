@@ -72,9 +72,7 @@ plt = plot(layout=(2, 1))
 plot!(plt, mapreduce(x_ -> x_[1:2]', vcat, x), subplot=1)
 plot!(plt, mapreduce(u_ -> u_, vcat, u), subplot=2)
 
-# MHE functions
-dynamics!(xnew, x, w, k, k0) = f!(xnew, x, u[k+k0], w, p_accurate .* [0.8, 1.2])
-
+# Differentiation functions
 function dynamics_diff!(dynamics!, fx, fu, x, w, k)
     f = similar(x)
 
@@ -82,12 +80,6 @@ function dynamics_diff!(dynamics!, fx, fu, x, w, k)
     ForwardDiff.jacobian!(fu, (xnew, w_) -> dynamics!(xnew, x, w_, k), f, w)
 
     return nothing
-end
-
-function running_cost(x, w, k, k0)
-    dy = z[k+k0] - h(x, μv)
-    dw = μw - w
-    return 0.5 * (dy' * invΣv * dy + dw' * invΣw * dw)
 end
 
 function running_cost_diff!(running_cost, lx, lu, lxx, lxu, luu, x, w, k)
@@ -99,11 +91,6 @@ function running_cost_diff!(running_cost, lx, lu, lxx, lxu, luu, x, w, k)
     ForwardDiff.jacobian!(luu, (grad, w_) -> ∇uL!(grad, x, w_), lu, w)
 
     return nothing
-end
-
-function final_cost(x, k, k0)
-    dy = z[k+k0] - h(x, μv)
-    return 0.5 * dy' * invΣv * dy
 end
 
 function final_cost_diff!(final_cost, Φx, Φxx, x, k)
@@ -142,6 +129,19 @@ end
 workset = IterativeLQR.Workset{Float64}(4, 4, N) # here nu is actually nw
 IterativeLQR.set_initial_state!(workset, x0)
 IterativeLQR.set_initial_inputs!(workset, [μw for _ in 1:N])
+
+dynamics!(xnew, x, w, k, k0) = f!(xnew, x, u[k+k0], w, p_accurate .* [1+1e-6, 1.])
+
+function running_cost(x, w, k, k0)
+    dy = z[k+k0] - h(x, μv)
+    dw = μw - w
+    return 0.5 * (dy' * invΣv * dy + dw' * invΣw * dw)
+end
+
+function final_cost(x, k, k0)
+    dy = z[k+k0] - h(x, μv)
+    return 0.5 * dy' * invΣv * dy
+end
 
 M = 10 # observation horizon
 
