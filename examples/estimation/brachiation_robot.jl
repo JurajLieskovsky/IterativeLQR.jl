@@ -75,11 +75,11 @@ plot!(plt, mapreduce(u_ -> u_, vcat, u), subplot=2)
 # MHE functions
 dynamics!(xnew, x, w, k, k0) = f!(xnew, x, u[k+k0], w, p_accurate .* [0.8, 1.2])
 
-function dynamics_diff!(fx, fu, x, w, k, k0)
-    F = similar(x)
+function dynamics_diff!(dynamics!, fx, fu, x, w, k)
+    f = similar(x)
 
-    ForwardDiff.jacobian!(fx, (xnew, x_) -> dynamics!(xnew, x_, w, k, k0), F, x)
-    ForwardDiff.jacobian!(fu, (xnew, w_) -> dynamics!(xnew, x, w_, k, k0), F, w)
+    ForwardDiff.jacobian!(fx, (xnew, x_) -> dynamics!(xnew, x_, w, k), f, x)
+    ForwardDiff.jacobian!(fu, (xnew, w_) -> dynamics!(xnew, x, w_, k), f, w)
 
     return nothing
 end
@@ -90,9 +90,9 @@ function running_cost(x, w, k, k0)
     return 0.5 * (dy' * invΣv * dy + dw' * invΣw * dw)
 end
 
-function running_cost_diff!(lx, lu, lxx, lxu, luu, x, w, k, k0)
-    ∇xL!(grad, x0, w0) = ForwardDiff.gradient!(grad, (x_) -> running_cost(x_, w0, k, k0), x0)
-    ∇uL!(grad, x0, w0) = ForwardDiff.gradient!(grad, (w_) -> running_cost(x0, w_, k, k0), w0)
+function running_cost_diff!(running_cost, lx, lu, lxx, lxu, luu, x, w, k)
+    ∇xL!(grad, x0, w0) = ForwardDiff.gradient!(grad, (x_) -> running_cost(x_, w0, k), x0)
+    ∇uL!(grad, x0, w0) = ForwardDiff.gradient!(grad, (w_) -> running_cost(x0, w_, k), w0)
 
     ForwardDiff.jacobian!(lxx, (grad, x_) -> ∇xL!(grad, x_, w), lx, x)
     ForwardDiff.jacobian!(lxu, (grad, w_) -> ∇xL!(grad, x, w_), lx, w)
@@ -106,9 +106,9 @@ function final_cost(x, k, k0)
     return 0.5 * dy' * invΣv * dy
 end
 
-function final_cost_diff!(Φx, Φxx, x, k, k0)
+function final_cost_diff!(final_cost, Φx, Φxx, x, k)
     result = DiffResults.HessianResult(x)
-    ForwardDiff.hessian!(result, x -> final_cost(x, k, k0), x)
+    ForwardDiff.hessian!(result, x -> final_cost(x, k), x)
 
     Φx .= result.derivs[1]
     Φxx .= result.derivs[2]
@@ -155,14 +155,15 @@ for i in 1:N
         k0 = 0
     end
 
+    dyn!(xnew, x, w, k) = dynamics!(xnew, x, w, k, k0)
+    run(x, w, k) = running_cost(x, w, k, k0)
+    fin(x,k) = final_cost(x, k, k0)
+
     IterativeLQR.iLQR!(
         workset,
-        (xnew, x, w, k) -> dynamics!(xnew, x, w, k, k0),
-        (fx, fu, x, w, k) -> dynamics_diff!(fx, fu, x, w, k, k0),
-        (x, w, k) -> running_cost(x, w, k, k0),
-        (lx, lu, lxx, lxu, luu, x, w, k) -> running_cost_diff!(lx, lu, lxx, lxu, luu, x, w, k, k0),
-        (x, k) -> final_cost(x, k, k0),
-        (Φx, Φxx, x, k) -> final_cost_diff!(Φx, Φxx, x, k, k0),
+        dyn!, (fx, fu, x, w, k) -> dynamics_diff!(dyn!, fx, fu, x, w, k),
+        run, (lx, lu, lxx, lxu, luu, x, w, k) -> running_cost_diff!(run, lx, lu, lxx, lxu, luu, x, w, k),
+        fin, (Φx, Φxx, x, k) -> final_cost_diff!(fin, Φx, Φxx, x, k),
         verbose=false, logging=true, plotting_callback=workset -> plotting_callback(workset, k0), maxiter=10, N=n
     )
 end
