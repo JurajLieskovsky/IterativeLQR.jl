@@ -72,7 +72,6 @@ plt = plot(layout=(2, 1))
 plot!(plt, mapreduce(x_ -> x_[1:2]', vcat, x), subplot=1)
 plot!(plt, mapreduce(u_ -> u_, vcat, u), subplot=2)
 
-#=
 # MHE functions
 function dynamics!(ynew, y, w, k)
     @views begin
@@ -99,7 +98,7 @@ function dynamics_diff!(dFdx, dFdu, x, w, k)
     return nothing
 end
 
-y0 = vcat(x0, p_accurate .* [0.8, 1.2])
+y0 = vcat(x0, p_accurate)
 
 function running_cost(y, w, k)
     invΣwp = k == 1 ? diagm([1e-2, 1e0]) : diagm([1e4, 1e6])
@@ -196,4 +195,3 @@ for i in 1:N
         verbose=true, logging=true, plotting_callback=plotting_callback, maxiter=i == N ? 50 : 5
     )
 end
-=#
