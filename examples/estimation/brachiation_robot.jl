@@ -104,7 +104,7 @@ function final_cost_diff!(final_cost, Φx, Φxx, x, k)
 end
 
 # plotting callback
-function plotting_callback(workset, k0)
+function plotting_callback(workset, k0=0)
     range = 0:workset.N
 
     states = mapreduce(x -> x', vcat, nominal_trajectory(workset).x)[:, 1:2]
@@ -167,3 +167,6 @@ for i in 1:N
         verbose=false, logging=true, plotting_callback=workset -> plotting_callback(workset, k0), maxiter=10, N=n
     )
 end
+
+IterativeLQR.circshift_trajectory!(workset, -(M+1))
+display(plotting_callback(workset))
