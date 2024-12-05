@@ -1,7 +1,7 @@
 using Revise
 
 using IterativeLQR
-using IterativeLQR: nominal_trajectory
+using IterativeLQR: nominal_trajectory, active_trajectory, Workset
 using RungeKutta
 using BrachiationRobotODE
 
@@ -73,125 +73,99 @@ plot!(plt, mapreduce(x_ -> x_[1:2]', vcat, x), subplot=1)
 plot!(plt, mapreduce(u_ -> u_, vcat, u), subplot=2)
 
 # MHE functions
-function dynamics!(ynew, y, w, k)
-    @views begin
-        xnew = ynew[1:4]
-        pnew = ynew[5:6]
+dynamics!(xnew, x, w, k, k0) = f!(xnew, x, u[k+k0], w, p_accurate .* [0.8, 1.2])
 
-        x = y[1:4]
-        p = y[5:6]
-
-        wx = w[1:4]
-        wp = w[5:6]
-    end
-
-    f!(xnew, x, u[k], wx, p)
-    pnew .= p + wp
-end
-
-function dynamics_diff!(dFdx, dFdu, x, w, k)
+function dynamics_diff!(fx, fu, x, w, k, k0)
     F = similar(x)
 
-    ForwardDiff.jacobian!(dFdx, (xnew, x_) -> dynamics!(xnew, x_, w, k), F, x)
-    ForwardDiff.jacobian!(dFdu, (xnew, w_) -> dynamics!(xnew, x, w_, k), F, w)
+    ForwardDiff.jacobian!(fx, (xnew, x_) -> dynamics!(xnew, x_, w, k, k0), F, x)
+    ForwardDiff.jacobian!(fu, (xnew, w_) -> dynamics!(xnew, x, w_, k, k0), F, w)
 
     return nothing
 end
 
-y0 = vcat(x0, p_accurate)
-
-function running_cost(y, w, k)
-    invΣwp = k == 1 ? diagm([1e-2, 1e0]) : diagm([1e4, 1e6])
-
-    @views begin
-        x = y[1:4]
-
-        wx = w[1:4]
-        wp = w[5:6]
-    end
-
-    dz = z[k] - h(x, μv)
-    dw = μw - wx
-
-    return 0.5 * (dz' * invΣv * dz + dw' * invΣw * dw + wp' * invΣwp * wp)
+function running_cost(x, w, k, k0)
+    dy = z[k+k0] - h(x, μv)
+    dw = μw - w
+    return 0.5 * (dy' * invΣv * dy + dw' * invΣw * dw)
 end
 
-function running_cost_diff!(dLdx, dLdu, ddLdxx, ddLdxu, ddLduu, x, w, k)
-    ∇xL!(grad, x0, w0) = ForwardDiff.gradient!(grad, (x_) -> running_cost(x_, w0, k), x0)
-    ∇uL!(grad, x0, w0) = ForwardDiff.gradient!(grad, (w_) -> running_cost(x0, w_, k), w0)
+function running_cost_diff!(lx, lu, lxx, lxu, luu, x, w, k, k0)
+    ∇xL!(grad, x0, w0) = ForwardDiff.gradient!(grad, (x_) -> running_cost(x_, w0, k, k0), x0)
+    ∇uL!(grad, x0, w0) = ForwardDiff.gradient!(grad, (w_) -> running_cost(x0, w_, k, k0), w0)
 
-    ForwardDiff.jacobian!(ddLdxx, (grad, x_) -> ∇xL!(grad, x_, w), dLdx, x)
-    ForwardDiff.jacobian!(ddLdxu, (grad, w_) -> ∇xL!(grad, x, w_), dLdx, w)
-    ForwardDiff.jacobian!(ddLduu, (grad, w_) -> ∇uL!(grad, x, w_), dLdu, w)
+    ForwardDiff.jacobian!(lxx, (grad, x_) -> ∇xL!(grad, x_, w), lx, x)
+    ForwardDiff.jacobian!(lxu, (grad, w_) -> ∇xL!(grad, x, w_), lx, w)
+    ForwardDiff.jacobian!(luu, (grad, w_) -> ∇uL!(grad, x, w_), lu, w)
 
     return nothing
 end
 
-function final_cost(y, k)
-    x = y[1:4]
-    dz = z[k] - h(x, μv)
-    return 0.5 * dz' * invΣv * dz
+function final_cost(x, k, k0)
+    dy = z[k+k0] - h(x, μv)
+    return 0.5 * dy' * invΣv * dy
 end
 
-function final_cost_diff!(dΦdx, ddΦdxx, x, k)
+function final_cost_diff!(Φx, Φxx, x, k, k0)
     result = DiffResults.HessianResult(x)
-    ForwardDiff.hessian!(result, x -> final_cost(x, k), x)
+    ForwardDiff.hessian!(result, x -> final_cost(x, k, k0), x)
 
-    dΦdx .= result.derivs[1]
-    ddΦdxx .= result.derivs[2]
+    Φx .= result.derivs[1]
+    Φxx .= result.derivs[2]
 
     return nothing
 end
 
 # plotting callback
-function plotting_callback(workset)
+function plotting_callback(workset, k0)
     range = 0:workset.N
 
-    # states
-    states = mapreduce(x -> x[1:4]', vcat, nominal_trajectory(workset).x)[:, 1:2]
+    states = mapreduce(x -> x', vcat, nominal_trajectory(workset).x)[:, 1:2]
     state_labels = ["x₁", "x₂", "x₃", "x₄"]
     state_plot = plot(range, states, label=permutedims(state_labels))
 
-    state_errors = mapreduce((x_, x_ref_) -> (x_[1:4] - x_ref_)', vcat, nominal_trajectory(workset).x, x)[:, 1:2]
-    state_error_labels = ["Δx₁", "Δx₂", "Δx₃", "Δx₄"]
-    state_error_plot = plot(range, state_errors, label=permutedims(state_error_labels))
+    errors = mapreduce((x_, x_ref_) -> (x_ - x_ref_)', vcat, nominal_trajectory(workset).x, circshift(x, -k0))[:, 1:2]
+    error_labels = ["e₁", "e₂", "e₃", "e₄"]
+    error_plot = plot(range, errors, label=permutedims(error_labels))
 
-    # parameters
-    params = mapreduce(x -> x[5:6]', vcat, nominal_trajectory(workset).x)
-    param_labels = ["p₁", "p₂"]
-    param_plot = plot(range, params, label=permutedims(param_labels), seriestype=:steppre)
-
-    param_errors = mapreduce(x_ -> ((x_[5:6] - p_accurate) ./ p_accurate)', vcat, nominal_trajectory(workset).x)
-    param_error_labels = ["Δp₁/p₁", "Δp₂/p₂"]
-    param_error_plot = plot(range, param_errors, label=permutedims(param_error_labels), seriestype=:steppre)
-
-    # disturbances
     dstrb_labels = ["w₁", "w₂", "w₃", "w₄"]
     dstrbs = mapreduce(w -> w', vcat, nominal_trajectory(workset).u)[:, 1:2]
     dstrb_plot = plot(range, vcat(dstrbs, dstrbs[end, :]'), label=permutedims(dstrb_labels), seriestype=:steppost)
 
-    # combination
-    plt = plot(state_plot, state_error_plot, param_plot, param_error_plot, dstrb_plot, layout=(5, 1))
+    plt = plot(state_plot, error_plot, dstrb_plot, layout=(3, 1))
     display(plt)
 
     return plt
 end
 
 # optimal estimation
-workset = [IterativeLQR.Workset{Float64}(6, 6, n) for n in 1:N] # here nu is actually nw
+workset = IterativeLQR.Workset{Float64}(4, 4, N) # here nu is actually nw
+IterativeLQR.set_initial_state!(workset, x0)
+IterativeLQR.set_initial_inputs!(workset, [μw for _ in 1:N])
+
+M = 10 # observation horizon
 
 for i in 1:N
-    IterativeLQR.set_initial_state!(workset[i], y0)
-
-    # copy noise estimates from previous iteration and add mean
-    if i == 1
-        IterativeLQR.set_initial_inputs!(workset[i], [vcat(μw, zeros(2))])
+    if i > M
+        n = M
+        k0 = i - M
+        circshift!(nominal_trajectory(workset).u, -1)
+        circshift!(nominal_trajectory(workset).x, -1)
+        circshift!(nominal_trajectory(workset).l, -1)
+        copy!(active_trajectory(workset), nominal_trajectory(workset))
     else
-        IterativeLQR.set_initial_inputs!(workset[i], vcat(nominal_trajectory(workset[i-1]).u, [vcat(μw, zeros(2))]))
+        n = i
+        k0 = 0
     end
 
     IterativeLQR.iLQR!(
-        workset[i], dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-        verbose=true, logging=true, plotting_callback=plotting_callback, maxiter=i == N ? 50 : 5
+        workset,
+        (xnew, x, w, k) -> dynamics!(xnew, x, w, k, k0),
+        (fx, fu, x, w, k) -> dynamics_diff!(fx, fu, x, w, k, k0),
+        (x, w, k) -> running_cost(x, w, k, k0),
+        (lx, lu, lxx, lxu, luu, x, w, k) -> running_cost_diff!(lx, lu, lxx, lxu, luu, x, w, k, k0),
+        (x, k) -> final_cost(x, k, k0),
+        (Φx, Φxx, x, k) -> final_cost_diff!(Φx, Φxx, x, k, k0),
+        verbose=false, logging=true, plotting_callback=workset -> plotting_callback(workset, k0), maxiter=10, N=n
     )
 end

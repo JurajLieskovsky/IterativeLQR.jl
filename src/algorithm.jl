@@ -66,7 +66,7 @@ function backward_pass!(workset, μ, regularization, N)
         Δv[k] = Δu[k]' * qu + Δu[k]' * quu * Δu[k]
     end
 
-    return sum(Δv) # expected improvement
+    return sum(Δv[1:N]) # expected improvement
 end
 
 function forward_pass!(workset, dynamics!, difference, running_cost, final_cost, N)
