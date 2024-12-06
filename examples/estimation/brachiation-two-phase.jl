@@ -109,40 +109,36 @@ IterativeLQR.set_initial_inputs!(workset, noise_estimate)
 
 M = 20 # observation horizon
 
-function dynamics!(ynew, y, w, k, k0=0)
+function dynamics!(x̂new, x̂, û, k, k0=0)
     @views begin
-        xnew = ynew[1:4]
-        pnew = ynew[5:6]
+        xnew = x̂new[1:4]
+        pnew = x̂new[5:6]
 
-        x = y[1:4]
-        p = y[5:6]
-
-        wx = w[1:4]
-        wp = w[5:6]
+        x = x̂[1:4]
+        p = x̂[5:6]
+        w = û[1:4]
+        q = û[5:6]
     end
 
-    f!(xnew, x, u[k+k0], wx, p)
-    pnew .= p + wp
+    f!(xnew, x, u[k+k0], w, p)
+    pnew .= p + q
 end
 
-function running_cost(y, w, k, k0=0)
-    invΣwp = diagm([1e2, 1e2])
-
+function running_cost(x̂, û, k, invΣq, k0=0)
     @views begin
-        x = y[1:4]
-
-        wx = w[1:4]
-        wp = w[5:6]
+        x = x̂[1:4]
+        w = û[1:4]
+        q = û[5:6]
     end
 
     dz = z[k+k0] - h(x, μv)
-    dw = μw - wx
+    dw = μw - w
 
-    return 0.5 * (dz' * invΣv * dz + dw' * invΣw * dw + wp' * invΣwp * wp)
+    return 0.5 * (dz' * invΣv * dz + dw' * invΣw * dw + q' * invΣq * q)
 end
 
-function final_cost(y, k, k0=0)
-    x = y[1:4]
+function final_cost(x̂, k, k0=0)
+    x = x̂[1:4]
     dz = z[k+k0] - h(x, μv)
     return 0.5 * dz' * invΣv * dz
 end
@@ -183,8 +179,10 @@ for i in 1:N
         k0 = 0
     end
 
+    invΣq = diagm([1e2, 1e2])
+
     dyn!(xnew, x, w, k) = dynamics!(xnew, x, w, k, k0)
-    run(x, w, k) = running_cost(x, w, k, k0)
+    run(x, w, k) = running_cost(x, w, k, invΣq, k0)
     fin(x, k) = final_cost(x, k, k0)
 
     IterativeLQR.iLQR!(
