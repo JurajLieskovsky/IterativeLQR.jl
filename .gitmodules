@@ -12,4 +12,4 @@
 	url = git@github.com:JurajLieskovsky/CartPoleODE.jl.git
 [submodule "examples/deps/BrachiationRobotODE"]
 	path = examples/deps/BrachiationRobotODE
-	url = git@github.com:JurajLieskovsky/BrachiationRobot.jl.git
+	url = git@github.com:JurajLieskovsky/BrachiationRobotODE.jl.git
