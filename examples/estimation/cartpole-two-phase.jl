@@ -199,26 +199,3 @@ IterativeLQR.circshift_trajectory!(workset, -(M + 1))
 nominal_trajectory(workset).u .= circshift(deepcopy(nominal_trajectory(workset).u), 1)
 display(plotting_callback(workset))
 nominal_trajectory(workset).x[end]
-
-# Smooting
-#=
-initial_jt_state = vcat(x0, p0)
-jt_noise_estimate = map(w -> vcat(w, zeros(2)), nominal_trajectory(workset).u)
-
-jt_workset = IterativeLQR.Workset{Float64}(6, 6, N)
-IterativeLQR.set_initial_state!(jt_workset, initial_jt_state)
-IterativeLQR.set_initial_inputs!(jt_workset, jt_noise_estimate)
-
-## dynamics, running cost, and final cost
-
-## estimation
-IterativeLQR.iLQR!(
-    jt_workset,
-    jt_dynamics!, (fx, fu, x, w, k) -> dynamics_diff!(jt_dynamics!, fx, fu, x, w, k),
-    jt_running_cost, (lx, lu, lxx, lxu, luu, x, w, k) -> running_cost_diff!(jt_running_cost, lx, lu, lxx, lxu, luu, x, w, k),
-    jt_final_cost, (Φx, Φxx, x, k) -> final_cost_diff!(jt_final_cost, Φx, Φxx, x, k),
-    verbose=true, plotting_callback=jt_plotting_callback, maxiter=500, μ=1e2, μ_max=1e6
-)
-
-nominal_trajectory(jt_workset).x[end]
-=#
