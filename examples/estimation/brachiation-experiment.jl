@@ -20,7 +20,7 @@ function f!(xnew, x, u, w, p)
 end
 
 function h(x, v)
-    return x[1:2] + v
+    return x[1:3] + v
 end
 
 # Horizon, initial state, and inputs
@@ -35,8 +35,8 @@ p_accurate = [0.67, 0.72]
 invΣw = inv(Σw)
 
 ## measurement
-μv = zeros(2)
-Σv = 1e-6 * I(2)
+μv = zeros(3)
+Σv = 1e-4 * I(3)
 invΣv = inv(Σv)
 
 # Controller
@@ -50,12 +50,12 @@ function controller(x)
 end
 
 # random noise
-# noise(μ, Σ) = μ + sqrt.(diag(Σ)) .* (rand(length(μ)) .- 0.5)
-noise(μ, _) = zeros(length(μ))
+noise(μ, Σ) = μ + sqrt.(diag(Σ)) .* (rand(length(μ)) .- 0.5)
+# noise(μ, _) = zeros(length(μ))
 
 # Reference trajectory
 x = [zeros(BrachiationRobotODE.nx) for _ in 1:N+1]
-z = [zeros(2) for _ in 1:N+1]
+z = [zeros(3) for _ in 1:N+1]
 u = [zeros(BrachiationRobotODE.nu) for _ in 1:N]
 
 x[1] .= x0
@@ -156,7 +156,7 @@ function plotting_callback(workset, n=0)
         vcat,
         nominal_trajectory(workset).x, circshift(z, -n)
     )
-    error_labels = ["Δz₁", "Δz₂"]
+    error_labels = ["Δz₁", "Δz₂", "Δz₃"]
     error_plot = plot(range, errors, label=permutedims(error_labels))
 
     dstrb_labels = ["w₁", "w₂", "w₃", "w₄", "q₁", "q₂"]
