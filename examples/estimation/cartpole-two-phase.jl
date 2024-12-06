@@ -30,14 +30,14 @@ function h(x, v)
 end
 
 # Horizon, initial state, and inputs
-N = 100
+N = 300
 x0 = [0, 3 / 4 * pi, 0, 0]
 p_accurate = [1, 0.1]
 
 # Noise models
 ## process
 μw = zeros(CartPoleODE.nx)
-Σw = diagm([1e-4, 1e-3, 1e-3, 1e-2])
+Σw = diagm([1e-5, 1e-4, 1e-4, 1e-3])
 invΣw = inv(Σw)
 
 ## measurement
@@ -98,19 +98,72 @@ function final_cost_diff!(final_cost, Φx, Φxx, x, k)
     return nothing
 end
 
-# plotting callback
+# Moving horizon estimation
+p0 = p_accurate .* [1.2, 0.8] # false assumption on parameters
+initial_state = vcat(x0, p0)
+noise_estimate = [ vcat(μw, zeros(2)) for _ in 1:N]
+
+workset = IterativeLQR.Workset{Float64}(6, 6, N)
+IterativeLQR.set_initial_state!(workset, initial_state)
+IterativeLQR.set_initial_inputs!(workset, noise_estimate)
+
+M = 20 # observation horizon
+
+function dynamics!(ynew, y, w, k, k0=0)
+    @views begin
+        xnew = ynew[1:4]
+        pnew = ynew[5:6]
+
+        x = y[1:4]
+        p = y[5:6]
+
+        wx = w[1:4]
+        wp = w[5:6]
+    end
+
+    f!(xnew, x, u[k+k0], wx, p)
+    pnew .= p + wp
+end
+
+function running_cost(y, w, k, k0=0)
+    invΣwp = diagm([1e2, 1e4])
+
+    @views begin
+        x = y[1:4]
+
+        wx = w[1:4]
+        wp = w[5:6]
+    end
+
+    dz = z[k+k0] - h(x, μv)
+    dw = μw - wx
+
+    return 0.5 * (dz' * invΣv * dz + dw' * invΣw * dw + wp' * invΣwp * wp)
+end
+
+function final_cost(y, k, k0=0)
+    x = y[1:4]
+    dz = z[k+k0] - h(x, μv)
+    return 0.5 * dz' * invΣv * dz
+end
+
+## plotting callback
 function plotting_callback(workset, k0=0)
     range = 0:workset.N
 
     states = mapreduce(x -> x', vcat, nominal_trajectory(workset).x)
-    state_labels = ["x₁", "x₂", "x₃", "x₄"]
+    state_labels = ["x₁", "x₂", "x₃", "x₄", "p₁", "p₂"]
     state_plot = plot(range, states, label=permutedims(state_labels))
 
-    errors = mapreduce((x_, x_ref_) -> (x_ - x_ref_)', vcat, nominal_trajectory(workset).x, circshift(x, -k0))
-    error_labels = ["e₁", "e₂", "e₃", "e₄"]
+    errors = mapreduce(
+        (x_, x_ref_) -> (x_ - vcat(x_ref_, p_accurate))',
+        vcat,
+        nominal_trajectory(workset).x, circshift(x, -k0)
+    )
+    error_labels = ["Δx₁", "Δx₂", "Δx₃", "Δx₄", "Δp₁", "Δp₂"]
     error_plot = plot(range, errors, label=permutedims(error_labels))
 
-    dstrb_labels = ["w₁", "w₂", "w₃", "w₄"]
+    dstrb_labels = ["w₁", "w₂", "w₃", "w₄", "q₁", "q₂"]
     dstrbs = mapreduce(w -> w', vcat, nominal_trajectory(workset).u)
     dstrb_plot = plot(range, vcat(dstrbs, dstrbs[end, :]'), label=permutedims(dstrb_labels), seriestype=:steppost)
 
@@ -118,27 +171,6 @@ function plotting_callback(workset, k0=0)
     display(plt)
 
     return plt
-end
-
-# Moving horizon estimation
-workset = IterativeLQR.Workset{Float64}(4, 4, N) # here nu is actually nw
-IterativeLQR.set_initial_state!(workset, x0)
-IterativeLQR.set_initial_inputs!(workset, [μw for _ in 1:N])
-
-M = 10 # observation horizon
-
-p0 = p_accurate .* [1.2, 0.8] # false assumption on parameters
-dynamics!(xnew, x, w, k, k0=0) = f!(xnew, x, u[k+k0], w, p0)
-
-function running_cost(x, w, k, k0=0)
-    dy = z[k+k0] - h(x, μv)
-    dw = μw - w
-    return 0.5 * (dy' * invΣv * dy + dw' * invΣw * dw)
-end
-
-function final_cost(x, k, k0=0)
-    dy = z[k+k0] - h(x, μv)
-    return 0.5 * dy' * invΣv * dy
 end
 
 for i in 1:N
@@ -167,9 +199,11 @@ end
 ## horizon shift counter-action
 IterativeLQR.circshift_trajectory!(workset, -(M + 1))
 nominal_trajectory(workset).u .= circshift(deepcopy(nominal_trajectory(workset).u), 1)
-plotting_callback(workset)
+display(plotting_callback(workset))
+nominal_trajectory(workset).x[end]
 
 # Smooting
+#=
 initial_jt_state = vcat(x0, p0)
 jt_noise_estimate = map(w -> vcat(w, zeros(2)), nominal_trajectory(workset).u)
 
@@ -178,70 +212,6 @@ IterativeLQR.set_initial_state!(jt_workset, initial_jt_state)
 IterativeLQR.set_initial_inputs!(jt_workset, jt_noise_estimate)
 
 ## dynamics, running cost, and final cost
-function jt_dynamics!(ynew, y, w, k)
-    @views begin
-        xnew = ynew[1:4]
-        pnew = ynew[5:6]
-
-        x = y[1:4]
-        p = y[5:6]
-
-        wx = w[1:4]
-        wp = w[5:6]
-    end
-
-    f!(xnew, x, u[k], wx, p)
-    pnew .= p + wp
-end
-
-function jt_running_cost(y, w, k)
-    invΣwp = k == 1 ? diagm([1e-8, 1e-6]) : diagm([1e-3, 1e-1])
-    # invΣwp = diagm([1e-2, 1e-2])
-
-    @views begin
-        x = y[1:4]
-
-        wx = w[1:4]
-        wp = w[5:6]
-    end
-
-    dz = z[k] - h(x, μv)
-    dw = μw - wx
-
-    return 0.5 * (dz' * invΣv * dz + dw' * invΣw * dw + wp' * invΣwp * wp)
-end
-
-function jt_final_cost(y, k)
-    x = y[1:4]
-    dz = z[k] - h(x, μv)
-    return 0.5 * dz' * invΣv * dz
-end
-
-## plotting callback
-function jt_plotting_callback(workset, k0=0)
-    range = 0:workset.N
-
-    states = mapreduce(x -> x', vcat, nominal_trajectory(workset).x)
-    state_labels = ["x₁", "x₂", "x₃", "x₄", "p₁", "p₂"]
-    state_plot = plot(range, states, label=permutedims(state_labels))
-
-    errors = mapreduce(
-        (x_, x_ref_) -> (x_ - vcat(x_ref_, p_accurate))',
-        vcat,
-        nominal_trajectory(workset).x, circshift(x, -k0)
-    )
-    error_labels = ["Δx₁", "Δx₂", "Δx₃", "Δx₄", "Δp₁", "Δp₂"]
-    error_plot = plot(range, errors, label=permutedims(error_labels))
-
-    dstrb_labels = ["w₁", "w₂", "w₃", "w₄"]
-    dstrbs = mapreduce(w -> w', vcat, nominal_trajectory(workset).u)[:, 1:2]
-    dstrb_plot = plot(range, vcat(dstrbs, dstrbs[end, :]'), label=permutedims(dstrb_labels), seriestype=:steppost)
-
-    plt = plot(state_plot, error_plot, dstrb_plot, layout=(3, 1))
-    display(plt)
-
-    return plt
-end
 
 ## estimation
 IterativeLQR.iLQR!(
@@ -253,3 +223,4 @@ IterativeLQR.iLQR!(
 )
 
 nominal_trajectory(jt_workset).x[end]
+=#
