@@ -1,7 +1,7 @@
 using Revise
 
 using IterativeLQR
-using IterativeLQR: nominal_trajectory, active_trajectory, Workset
+using IterativeLQR: nominal_trajectory
 using RungeKutta
 using BrachiationRobotODE
 
@@ -109,7 +109,7 @@ IterativeLQR.set_initial_inputs!(workset, noise_estimate)
 
 M = 20 # observation horizon
 
-function dynamics!(x̂new, x̂, û, k, k0=0)
+function dynamics!(x̂new, x̂, û, k, n=0)
     @views begin
         xnew = x̂new[1:4]
         pnew = x̂new[5:6]
@@ -120,31 +120,31 @@ function dynamics!(x̂new, x̂, û, k, k0=0)
         q = û[5:6]
     end
 
-    f!(xnew, x, u[k+k0], w, p)
+    f!(xnew, x, u[k+n], w, p)
     pnew .= p + q
 end
 
-function running_cost(x̂, û, k, invΣq, k0=0)
+function running_cost(x̂, û, k, invΣq, n=0)
     @views begin
         x = x̂[1:4]
         w = û[1:4]
         q = û[5:6]
     end
 
-    dz = z[k+k0] - h(x, μv)
+    dz = z[k+n] - h(x, μv)
     dw = μw - w
 
     return 0.5 * (dz' * invΣv * dz + dw' * invΣw * dw + q' * invΣq * q)
 end
 
-function final_cost(x̂, k, k0=0)
+function final_cost(x̂, k, n=0)
     x = x̂[1:4]
-    dz = z[k+k0] - h(x, μv)
+    dz = z[k+n] - h(x, μv)
     return 0.5 * dz' * invΣv * dz
 end
 
 ## plotting callback
-function plotting_callback(workset, k0=0)
+function plotting_callback(workset, n=0)
     range = 0:workset.N
 
     states = mapreduce(x -> x', vcat, nominal_trajectory(workset).x)
@@ -154,7 +154,7 @@ function plotting_callback(workset, k0=0)
     errors = mapreduce(
         (x_, x_ref_) -> (x_ - vcat(x_ref_, p_accurate))',
         vcat,
-        nominal_trajectory(workset).x, circshift(x, -k0)
+        nominal_trajectory(workset).x, circshift(x, -n)
     )
     error_labels = ["Δx₁", "Δx₂", "Δx₃", "Δx₄", "Δp₁", "Δp₂"]
     error_plot = plot(range, errors, label=permutedims(error_labels))
@@ -172,25 +172,25 @@ end
 for i in 1:N
     if i > M
         IterativeLQR.circshift_trajectory!(workset, -1)
-        n = M
-        k0 = i - M
+        H = M
+        n = i - M
     else
-        n = i
-        k0 = 0
+        H = i
+        n = 0
     end
 
     invΣq = diagm([1e2, 1e2])
 
-    dyn!(xnew, x, w, k) = dynamics!(xnew, x, w, k, k0)
-    run(x, w, k) = running_cost(x, w, k, invΣq, k0)
-    fin(x, k) = final_cost(x, k, k0)
+    dyn!(xnew, x, w, k) = dynamics!(xnew, x, w, k, n)
+    run(x, w, k) = running_cost(x, w, k, invΣq, n)
+    fin(x, k) = final_cost(x, k, n)
 
     IterativeLQR.iLQR!(
         workset,
         dyn!, (fx, fu, x, w, k) -> dynamics_diff!(dyn!, fx, fu, x, w, k),
         run, (lx, lu, lxx, lxu, luu, x, w, k) -> running_cost_diff!(run, lx, lu, lxx, lxu, luu, x, w, k),
         fin, (Φx, Φxx, x, k) -> final_cost_diff!(fin, Φx, Φxx, x, k),
-        verbose=false, plotting_callback=workset -> plotting_callback(workset, k0), maxiter=5, N=n
+        verbose=false, plotting_callback=workset -> plotting_callback(workset, n), maxiter=5, N=H
     )
 end
 
