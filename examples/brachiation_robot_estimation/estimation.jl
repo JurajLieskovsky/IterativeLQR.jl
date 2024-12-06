@@ -1,7 +1,7 @@
 using Revise
 
 using IterativeLQR
-using IterativeLQR: nominal_trajectory
+using IterativeLQR: nominal_trajectory, DataFrames
 using RungeKutta
 using BrachiationRobotODE
 
@@ -9,6 +9,8 @@ using LinearAlgebra
 using Plots
 using Infiltrator
 using ForwardDiff
+using DataFrames, CSV
+using Interpolations
 
 # dynamics of the adaptive system
 function f!(xnew, x, u, w, p)
@@ -23,10 +25,8 @@ function h(x, v)
     return x[1:3] + v
 end
 
-# Horizon, initial state, and inputs
-N = 300
-x0 = [pi / 4, 0, 0, 0]
-p_accurate = [0.67, 0.72]
+# parameter guess
+p0 = [0.67, 0.72]
 
 # Noise models
 ## process
@@ -36,10 +36,35 @@ invΣw = inv(Σw)
 
 ## measurement
 μv = zeros(3)
-Σv = 1e-4 * I(3)
+Σv = 1e-6 * I(3)
 invΣv = inv(Σv)
 
-# Controller
+# random noise
+noise(μ, Σ) = μ + sqrt.(diag(Σ)) .* (rand(length(μ)) .- 0.5)
+# noise(μ, _) = zeros(length(μ))
+
+# Reference trajectory
+## Raw data
+df = DataFrame(CSV.File("brachiation_robot_estimation/results/csv/brachiation.csv"))
+dropmissing!(df)
+
+## Interpolation
+tstep = 5e-3
+df_interp = DataFrame(:time => 369.481:tstep:386)
+
+for col in names(df, Not(:time))
+    interpolation = LinearInterpolation(df[!, :time], df[!, col])
+    df_interp[!, col] = interpolation.(df_interp[!, :time])
+end
+
+z = [[row[col] for col in [:theta,:gamma,:theta_dot]] for row in eachrow(df_interp)]
+u = [[row[:u]] for row in eachrow(df_interp)]
+
+x0 = vcat(z[1],0)
+
+## Simulated
+#=
+### Controller
 setpoint(θ, θ̇) = pi / 2 * (1 + sign(sin(θ) * θ̇))
 
 function controller(x)
@@ -49,11 +74,11 @@ function controller(x)
     return -P * (q[2] - γ_des) - D * q̇[2]
 end
 
-# random noise
-noise(μ, Σ) = μ + sqrt.(diag(Σ)) .* (rand(length(μ)) .- 0.5)
-# noise(μ, _) = zeros(length(μ))
+### Horizon and initial state
+N = 300
+x0 = [pi / 4, 0, 0, 0]
 
-# Reference trajectory
+### Trajectory
 x = [zeros(BrachiationRobotODE.nx) for _ in 1:N+1]
 z = [zeros(3) for _ in 1:N+1]
 u = [zeros(BrachiationRobotODE.nu) for _ in 1:N]
@@ -66,6 +91,7 @@ for i in 1:N
     f!(x[i+1], x[i], u[i], noise(μw, Σw), p_accurate)
     z[i+1] .= h(x[i+1], noise(μv, Σv))
 end
+=#
 
 # Differentiation functions
 function dynamics_diff!(dynamics!, fx, fu, x, w, k)
@@ -99,7 +125,8 @@ function final_cost_diff!(final_cost, Φx, Φxx, x, k)
 end
 
 # Moving horizon estimation
-p0 = p_accurate .* [1.2, 0.8] # false assumption on parameters
+N = nrow(df_interp)-1
+
 initial_state = vcat(x0, p0)
 noise_estimate = [vcat(μw, zeros(2)) for _ in 1:N]
 
@@ -179,7 +206,7 @@ for i in 1:N
         n = 0
     end
 
-    invΣq = diagm([1e2, 1e2])
+    invΣq = diagm([1e6, 1e6])
 
     dyn!(xnew, x, w, k) = dynamics!(xnew, x, w, k, n)
     run(x, w, k) = running_cost(x, w, k, invΣq, n)
