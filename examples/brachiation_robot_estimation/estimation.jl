@@ -211,7 +211,7 @@ for i in 1:N
         n = 0
     end
 
-    invΣq = diagm([1e6, 1e6])
+    invΣq = diagm([1e4, 1e4])
 
     dyn!(xnew, x, w, k) = dynamics!(xnew, x, w, k, n)
     run(x, w, k) = running_cost(x, w, k, invΣq, n)
