@@ -19,7 +19,7 @@ dropmissing!(df)
 
 ## Interpolation
 tstep = 5e-3
-df_interp = DataFrame(:time => 369.481:tstep:372) # 386
+df_interp = DataFrame(:time => 369.481:tstep:375) # 386
 
 for col in names(df, Not(:time))
     interpolation = LinearInterpolation(df[!, :time], df[!, col])
@@ -37,7 +37,7 @@ N = nrow(df_interp) - 1
 
 # dynamics and measurements of the adaptive system
 function f!(xnew, x, u, w, p)
-    model = BrachiationRobotODE.Model(9.81, p[1], 0.25, 0.02, p[2], p[3], 0.02, 0.28, p[4], 0, 0)
+    model = BrachiationRobotODE.Model(9.81, p[1], 0.25, 0.02, p[2], p[3], 0.02, 0.28, p[4], p[5], 0)
     tsit5 = RungeKutta.Tsit5()
     RungeKutta.f!(xnew, tsit5, (ẋ_, x_, u_) -> BrachiationRobotODE.f!(model, ẋ_, x_, u_), x, u, tstep)
     xnew .+= w
@@ -48,7 +48,7 @@ function h(x, v)
     return x[1:3] + v
 end
 
-p0 = [0.67, 0.72, 2.5e-3, 0.1] # parameter guess
+p0 = [0.67, 0.72, 2.5e-3, 0.01, 0.01] # parameter guess
 
 # Noise models
 ## process
@@ -137,9 +137,9 @@ end
 
 # Moving horizon estimation
 initial_state = vcat(x0, p0)
-noise_estimate = [vcat(μw, zeros(4)) for _ in 1:N]
+noise_estimate = [vcat(μw, zeros(5)) for _ in 1:N]
 
-workset = IterativeLQR.Workset{Float64}(8, 8, N)
+workset = IterativeLQR.Workset{Float64}(9, 9, N)
 IterativeLQR.set_initial_state!(workset, initial_state)
 IterativeLQR.set_initial_inputs!(workset, noise_estimate)
 
@@ -148,12 +148,12 @@ M = 40 # observation horizon
 function dynamics!(x̂new, x̂, û, k, n=0)
     @views begin
         xnew = x̂new[1:4]
-        pnew = x̂new[5:8]
+        pnew = x̂new[5:9]
 
         x = x̂[1:4]
-        p = x̂[5:8]
+        p = x̂[5:9]
         w = û[1:4]
-        q = û[5:8]
+        q = û[5:9]
     end
 
     f!(xnew, x, u[k+n], w, p)
@@ -164,7 +164,7 @@ function running_cost(x̂, û, k, invΣq, n=0)
     @views begin
         x = x̂[1:4]
         w = û[1:4]
-        q = û[5:8]
+        q = û[5:9]
     end
 
     dz = z[k+n] - h(x, μv)
@@ -184,7 +184,7 @@ function plotting_callback(workset, n=0)
     range = 0:workset.N
 
     states = mapreduce(x -> x', vcat, nominal_trajectory(workset).x)
-    state_labels = ["x₁", "x₂", "x₃", "x₄", "p₁", "p₂", "p₃", "p₄"]
+    state_labels = ["x₁", "x₂", "x₃", "x₄", "p₁", "p₂", "p₃", "p₄", "p₅"]
     state_plot = plot(range, states, label=permutedims(state_labels))
 
     errors = mapreduce(
@@ -195,7 +195,7 @@ function plotting_callback(workset, n=0)
     error_labels = ["Δz₁", "Δz₂", "Δz₃"]
     error_plot = plot(range, errors, label=permutedims(error_labels))
 
-    dstrb_labels = ["w₁", "w₂", "w₃", "w₄", "q₁", "q₂", "q₃", "q₄"]
+    dstrb_labels = ["w₁", "w₂", "w₃", "w₄", "q₁", "q₂", "q₃", "q₄", "q₅"]
     dstrbs = mapreduce(w -> w', vcat, nominal_trajectory(workset).u)
     dstrb_plot = plot(range, vcat(dstrbs, dstrbs[end, :]'), label=permutedims(dstrb_labels), seriestype=:steppost)
 
@@ -215,7 +215,7 @@ for i in 1:N
         n = 0
     end
 
-    invΣq = diagm([1e6, 1e6, 1e8, 1e7])
+    invΣq = diagm([1e6, 1e6, 1e8, 1e7, 1e7])
 
     dyn!(xnew, x, w, k) = dynamics!(xnew, x, w, k, n)
     run(x, w, k) = running_cost(x, w, k, invΣq, n)
@@ -240,15 +240,15 @@ nominal_trajectory(workset).x[end]
 println("Press any key to continue...")
 read(stdin, Char)
 
-pf = nominal_trajectory(workset).x[end][5:8]
+pf = nominal_trajectory(workset).x[end][5:9]
 
 x_sim[1] .= x0
 z_sim[1] .= h(x0, μv)
 
 for i in 1:N
     u_sim[i] .= controller(x_sim[i])
-    f!(x_sim[i+1], x_sim[i], u_sim[i], noise(μw, Σw), pf)
-    z_sim[i+1] .= h(x_sim[i+1], noise(μv, Σv))
+    f!(x_sim[i+1], x_sim[i], u_sim[i], μw, pf)
+    z_sim[i+1] .= h(x_sim[i+1], μv)
 end
 
 # display trajectory comparison and wait for user input to continue
