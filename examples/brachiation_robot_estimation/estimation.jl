@@ -12,42 +12,14 @@ using ForwardDiff
 using DataFrames, CSV
 using Interpolations
 
-# dynamics of the adaptive system
-tstep = 5e-3
-
-function f!(xnew, x, u, w, p)
-    model = BrachiationRobotODE.Model(9.81, p[1], 0.25, 0.02, p[2], 6e-2, 0.02, 0.28, 0, 0, 0)
-    tsit5 = RungeKutta.Tsit5()
-    RungeKutta.f!(xnew, tsit5, (ẋ_, x_, u_) -> BrachiationRobotODE.f!(model, ẋ_, x_, u_), x, u, tstep)
-    xnew .+= w
-    return nothing
-end
-
-function h(x, v)
-    return x[1:3] + v
-end
-
-# parameter guess
-p0 = [0.67, 0.72]
-
-# Noise models
-## process
-μw = zeros(BrachiationRobotODE.nx)
-Σw = diagm([1e-5, 1e-4, 1e-4, 1e-3])
-invΣw = inv(Σw)
-
-## measurement
-μv = zeros(3)
-Σv = diagm([1e-4, 1e-4, 1e2])
-invΣv = inv(Σv)
-
 # Reference trajectory
 ## Raw data
 df = DataFrame(CSV.File("brachiation_robot_estimation/results/csv/brachiation.csv"))
 dropmissing!(df)
 
 ## Interpolation
-df_interp = DataFrame(:time => 369.481:tstep:386)
+tstep = 5e-3
+df_interp = DataFrame(:time => 369.481:tstep:375) # 386
 
 for col in names(df, Not(:time))
     interpolation = LinearInterpolation(df[!, :time], df[!, col])
@@ -62,9 +34,34 @@ u = [[row[:u]] for row in eachrow(df_interp)]
 x0 = vcat(z[1], 0)
 N = nrow(df_interp) - 1
 
-# plot(mapreduce(z -> z', vcat, z))
+plot(mapreduce(z -> z', vcat, z))
 
-#=
+# dynamics and measurements of the adaptive system
+function f!(xnew, x, u, w, p)
+    model = BrachiationRobotODE.Model(9.81, p[1], 0.25, 0.02, p[2], 6e-2, 0.02, 0.28, 0, 0, 0)
+    tsit5 = RungeKutta.Tsit5()
+    RungeKutta.f!(xnew, tsit5, (ẋ_, x_, u_) -> BrachiationRobotODE.f!(model, ẋ_, x_, u_), x, u, tstep)
+    xnew .+= w
+    return nothing
+end
+
+function h(x, v)
+    return x[1:3] + v
+end
+
+p0 = [0.67, 0.72] # parameter guess
+
+# Noise models
+## process
+μw = zeros(BrachiationRobotODE.nx)
+Σw = diagm([1e-5, 1e-4, 1e-4, 1e-3])
+invΣw = inv(Σw)
+
+## measurement
+μv = zeros(3)
+Σv = diagm([5e-4, 1e-4, 5e-2])
+invΣv = inv(Σv)
+
 # Simulated trajectory
 ## Controller
 setpoint(θ, θ̇) = pi / 2 * (1 + sign(sin(θ) * θ̇))
@@ -77,8 +74,8 @@ function controller(x)
 end
 
 ## random noise
-# noise(μ, Σ) = μ + sqrt.(diag(Σ)) .* (rand(length(μ)) .- 0.5)
-noise(μ, _) = zeros(length(μ))
+noise(μ, Σ) = μ + sqrt.(diag(Σ)) .* (rand(length(μ)) .- 0.5)
+# noise(μ, _) = zeros(length(μ))
 
 ## trajectory
 x_sim = [zeros(BrachiationRobotODE.nx) for _ in 1:N+1]
@@ -94,8 +91,11 @@ for i in 1:N
     z_sim[i+1] .= h(x_sim[i+1], noise(μv, Σv))
 end
 
-# plot!(mapreduce(z -> z', vcat, z_sim))
-=#
+plot!(mapreduce(z -> z', vcat, z_sim))
+
+# Wait for user input to continue
+println("Press any key to continue...")
+read(stdin, Char)
 
 # Differentiation functions
 function dynamics_diff!(dynamics!, fx, fu, x, w, k)
