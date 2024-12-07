@@ -37,7 +37,7 @@ N = nrow(df_interp) - 1
 
 # dynamics and measurements of the adaptive system
 function f!(xnew, x, u, w, p)
-    model = BrachiationRobotODE.Model(9.81, p[1], 0.25, 0.02, p[2], 6e-2, 0.02, 0.28, 0, 0, 0)
+    model = BrachiationRobotODE.Model(9.81, p[1], 0.25, 0.02, p[2], 2.5e-3, 0.02, 0.28, 0, 0, 0)
     tsit5 = RungeKutta.Tsit5()
     RungeKutta.f!(xnew, tsit5, (ẋ_, x_, u_) -> BrachiationRobotODE.f!(model, ẋ_, x_, u_), x, u, tstep)
     xnew .+= w
@@ -67,7 +67,7 @@ setpoint(θ, θ̇) = pi / 2 * (1 + sign(sin(θ) * θ̇))
 
 function controller(x)
     q, q̇ = x[1:2], x[3:4]
-    P, D = 15, 1.4
+    P, D = 1.5, 0.1
     γ_des = setpoint(q[1], q̇[1])
     return -P * (q[2] - γ_des) - D * q̇[2]
 end
@@ -215,7 +215,7 @@ for i in 1:N
         n = 0
     end
 
-    invΣq = diagm([1e4, 1e4])
+    invΣq = diagm([1e5, 1e5])
 
     dyn!(xnew, x, w, k) = dynamics!(xnew, x, w, k, n)
     run(x, w, k) = running_cost(x, w, k, invΣq, n)
