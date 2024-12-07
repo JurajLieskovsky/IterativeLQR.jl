@@ -53,7 +53,7 @@ p0 = [0.67, 0.72, 2.5e-3] # parameter guess
 # Noise models
 ## process
 μw = zeros(BrachiationRobotODE.nx)
-Σw = diagm([1e-5, 1e-4, 1e-4, 1e-3])
+Σw = diagm([1e-7, 1e-6, 1e-5, 1e-4])
 invΣw = inv(Σw)
 
 ## measurement
@@ -235,3 +235,30 @@ IterativeLQR.circshift_trajectory!(workset, -(M + 1))
 nominal_trajectory(workset).u .= circshift(deepcopy(nominal_trajectory(workset).u), 1)
 display(plotting_callback(workset))
 nominal_trajectory(workset).x[end]
+
+# Post simulation
+println("Press any key to continue...")
+read(stdin, Char)
+
+pf = nominal_trajectory(workset).x[end][5:7]
+
+x_sim[1] .= x0
+z_sim[1] .= h(x0, μv)
+
+for i in 1:N
+    u_sim[i] .= controller(x_sim[i])
+    f!(x_sim[i+1], x_sim[i], u_sim[i], noise(μw, Σw), pf)
+    z_sim[i+1] .= h(x_sim[i+1], noise(μv, Σv))
+end
+
+# display trajectory comparison and wait for user input to continue
+data_plot = plot(layout=(2,1))
+
+output_labels = ["z₁" "z₂" "z₃"]
+plot!(data_plot, mapreduce(z_ -> z_', vcat, z), label=output_labels, subplot=1)
+plot!(data_plot, mapreduce(z_ -> z_', vcat, z_sim), label=output_labels .* "_sim", subplot=1)
+
+plot!(data_plot, mapreduce(u_ -> u_', vcat, u), label="u", subplot=2)
+plot!(data_plot, mapreduce(u_ -> u_', vcat, u_sim), label="u_sim", subplot=2)
+
+display(data_plot)
