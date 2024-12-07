@@ -19,14 +19,14 @@ dropmissing!(df)
 
 ## Interpolation
 tstep = 5e-3
-df_interp = DataFrame(:time => 369.481:tstep:372) # 386
+df_interp = DataFrame(:time => 369.481:tstep:373) # 386
 
 for col in names(df, Not(:time))
     interpolation = LinearInterpolation(df[!, :time], df[!, col])
     df_interp[!, col] = interpolation.(df_interp[!, :time])
 end
 
-df_interp[!, :theta_dot] .*= pi/180
+df_interp[!, :theta_dot] .*= pi / 180
 
 z = [[row[col] for col in [:theta, :gamma, :theta_dot]] for row in eachrow(df_interp)]
 u = [[row[:u]] for row in eachrow(df_interp)]
@@ -54,12 +54,10 @@ p0 = [0.67, 0.72, 2.5e-3, 0.01, 0.01, 0.01] # parameter guess
 ## process
 μw = zeros(BrachiationRobotODE.nx)
 Σw = diagm([1e-7, 1e-6, 1e-6, 1e-4])
-invΣw = inv(Σw)
 
 ## measurement
 μv = zeros(3)
 Σv = diagm([1e-4, 1e-4, 1e-3])
-invΣv = inv(Σv)
 
 # Simulated trajectory
 ## Controller
@@ -91,7 +89,7 @@ for i in 1:N
 end
 
 # display trajectory comparison and wait for user input to continue
-data_plot = plot(layout=(2,1))
+data_plot = plot(layout=(2, 1))
 
 output_labels = ["z₁" "z₂" "z₃"]
 plot!(data_plot, mapreduce(z_ -> z_', vcat, z), label=output_labels, subplot=1)
@@ -160,7 +158,7 @@ function dynamics!(x̂new, x̂, û, k, n=0)
     pnew .= p + q
 end
 
-function running_cost(x̂, û, k, invΣq, n=0)
+function running_cost(x̂, û, k, invΣw, invΣv, invΣq, n=0)
     @views begin
         x = x̂[1:4]
         w = û[1:4]
@@ -173,7 +171,7 @@ function running_cost(x̂, û, k, invΣq, n=0)
     return 0.5 * (dz' * invΣv * dz + dw' * invΣw * dw + q' * invΣq * q)
 end
 
-function final_cost(x̂, k, n=0)
+function final_cost(x̂, k, invΣv, n=0)
     x = x̂[1:4]
     dz = z[k+n] - h(x, μv)
     return 0.5 * dz' * invΣv * dz
@@ -219,11 +217,14 @@ for i in 1:N
         n = 0
     end
 
-    invΣq = diagm([1e6, 1e6, 1e8, 1e8, 1e8, 1e8])
+    β = 1e-5
+    invΣw = β * inv(Σw)
+    invΣv = β * inv(Σv)
+    invΣq = β * diagm([3e5, 1e5, 2e10, 5e8, 3e8, 1e5])
 
     dyn!(xnew, x, w, k) = dynamics!(xnew, x, w, k, n)
-    run(x, w, k) = running_cost(x, w, k, invΣq, n)
-    fin(x, k) = final_cost(x, k, n)
+    run(x, w, k) = running_cost(x, w, k, invΣw, invΣv, invΣq, n)
+    fin(x, k) = final_cost(x, k, invΣv, n)
 
     IterativeLQR.iLQR!(
         workset,
@@ -257,7 +258,7 @@ for i in 1:N
 end
 
 # display trajectory comparison and wait for user input to continue
-data_plot = plot(layout=(2,1))
+data_plot = plot(layout=(2, 1))
 
 output_labels = ["z₁" "z₂" "z₃"]
 plot!(data_plot, mapreduce(z_ -> z_', vcat, z), label=output_labels, subplot=1)
