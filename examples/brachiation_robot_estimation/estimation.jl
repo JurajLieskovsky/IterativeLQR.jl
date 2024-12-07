@@ -13,10 +13,12 @@ using DataFrames, CSV
 using Interpolations
 
 # dynamics of the adaptive system
+tstep = 5e-3
+
 function f!(xnew, x, u, w, p)
     model = BrachiationRobotODE.Model(9.81, p[1], 0.25, 0.02, p[2], 6e-2, 0.02, 0.28, 0, 0, 0)
     tsit5 = RungeKutta.Tsit5()
-    RungeKutta.f!(xnew, tsit5, (ẋ_, x_, u_) -> BrachiationRobotODE.f!(model, ẋ_, x_, u_), x, u, 1e-2)
+    RungeKutta.f!(xnew, tsit5, (ẋ_, x_, u_) -> BrachiationRobotODE.f!(model, ẋ_, x_, u_), x, u, tstep)
     xnew .+= w
     return nothing
 end
@@ -36,12 +38,8 @@ invΣw = inv(Σw)
 
 ## measurement
 μv = zeros(3)
-Σv = 1e-6 * I(3)
+Σv = diagm([1e-4, 1e-4, 1e2])
 invΣv = inv(Σv)
-
-# random noise
-noise(μ, Σ) = μ + sqrt.(diag(Σ)) .* (rand(length(μ)) .- 0.5)
-# noise(μ, _) = zeros(length(μ))
 
 # Reference trajectory
 ## Raw data
@@ -49,7 +47,6 @@ df = DataFrame(CSV.File("brachiation_robot_estimation/results/csv/brachiation.cs
 dropmissing!(df)
 
 ## Interpolation
-tstep = 5e-3
 df_interp = DataFrame(:time => 369.481:tstep:386)
 
 for col in names(df, Not(:time))
@@ -57,14 +54,19 @@ for col in names(df, Not(:time))
     df_interp[!, col] = interpolation.(df_interp[!, :time])
 end
 
-z = [[row[col] for col in [:theta,:gamma,:theta_dot]] for row in eachrow(df_interp)]
+df_interp[!, :theta_dot] .*= pi/180
+
+z = [[row[col] for col in [:theta, :gamma, :theta_dot]] for row in eachrow(df_interp)]
 u = [[row[:u]] for row in eachrow(df_interp)]
 
-x0 = vcat(z[1],0)
+x0 = vcat(z[1], 0)
+N = nrow(df_interp) - 1
 
-## Simulated
+# plot(mapreduce(z -> z', vcat, z))
+
 #=
-### Controller
+# Simulated trajectory
+## Controller
 setpoint(θ, θ̇) = pi / 2 * (1 + sign(sin(θ) * θ̇))
 
 function controller(x)
@@ -74,23 +76,25 @@ function controller(x)
     return -P * (q[2] - γ_des) - D * q̇[2]
 end
 
-### Horizon and initial state
-N = 300
-x0 = [pi / 4, 0, 0, 0]
+## random noise
+# noise(μ, Σ) = μ + sqrt.(diag(Σ)) .* (rand(length(μ)) .- 0.5)
+noise(μ, _) = zeros(length(μ))
 
-### Trajectory
-x = [zeros(BrachiationRobotODE.nx) for _ in 1:N+1]
-z = [zeros(3) for _ in 1:N+1]
-u = [zeros(BrachiationRobotODE.nu) for _ in 1:N]
+## trajectory
+x_sim = [zeros(BrachiationRobotODE.nx) for _ in 1:N+1]
+z_sim = [zeros(3) for _ in 1:N+1]
+u_sim = [zeros(BrachiationRobotODE.nu) for _ in 1:N]
 
-x[1] .= x0
-z[1] .= h(x0, μv)
+x_sim[1] .= x0
+z_sim[1] .= h(x0, μv)
 
 for i in 1:N
-    u[i] .= controller(x[i])
-    f!(x[i+1], x[i], u[i], noise(μw, Σw), p_accurate)
-    z[i+1] .= h(x[i+1], noise(μv, Σv))
+    u_sim[i] .= controller(x_sim[i])
+    f!(x_sim[i+1], x_sim[i], u_sim[i], noise(μw, Σw), p0)
+    z_sim[i+1] .= h(x_sim[i+1], noise(μv, Σv))
 end
+
+# plot!(mapreduce(z -> z', vcat, z_sim))
 =#
 
 # Differentiation functions
@@ -125,8 +129,6 @@ function final_cost_diff!(final_cost, Φx, Φxx, x, k)
 end
 
 # Moving horizon estimation
-N = nrow(df_interp)-1
-
 initial_state = vcat(x0, p0)
 noise_estimate = [vcat(μw, zeros(2)) for _ in 1:N]
 
@@ -217,7 +219,7 @@ for i in 1:N
         dyn!, (fx, fu, x, w, k) -> dynamics_diff!(dyn!, fx, fu, x, w, k),
         run, (lx, lu, lxx, lxu, luu, x, w, k) -> running_cost_diff!(run, lx, lu, lxx, lxu, luu, x, w, k),
         fin, (Φx, Φxx, x, k) -> final_cost_diff!(fin, Φx, Φxx, x, k),
-        verbose=false, plotting_callback=workset -> plotting_callback(workset, n), maxiter=5, N=H
+        verbose=true, plotting_callback=workset -> plotting_callback(workset, n), maxiter=5, N=H
     )
 end
 
