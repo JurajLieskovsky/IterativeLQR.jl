@@ -14,7 +14,7 @@ using Interpolations
 
 # Reference trajectory
 ## Raw data
-df = DataFrame(CSV.File("brachiation_robot_estimation/results/csv/brachiation.csv"))
+df = CSV.File("brachiation_robot_estimation/results/csv/brachiation.csv", silencewarnings=true) |> DataFrame
 dropmissing!(df)
 
 ## Interpolation
@@ -187,8 +187,8 @@ function plotting_callback(workset, n=0)
     state_labels = ["x₁", "x₂", "x₃", "x₄"]
     state_plot = plot(range, states, label=permutedims(state_labels))
 
-    params = mapreduce(x -> x[5:end]', vcat, nominal_trajectory(workset).x)
-    param_labels = ["p₁", "p₂", "p₃", "p₄", "p₅", "p₆"]
+    params = mapreduce(x -> ((x[5:end] - p0) ./ p0)', vcat, nominal_trajectory(workset).x)
+    param_labels = ["Δp₁/p₁₀", "Δp₂/p₂₀", "Δp₃/p₃₀", "Δp₄/p₄₀", "Δp₅/p₅₀", "Δp₆/p₆₀"]
     param_plot = plot(range, params, label=permutedims(param_labels))
 
     errors = mapreduce(
