@@ -67,7 +67,7 @@ setpoint(θ, θ̇) = pi / 2 * (1 + sign(sin(θ) * θ̇))
 
 function controller(x)
     q, q̇ = x[1:2], x[3:4]
-    P, D = 10, 1.1
+    P, D = 15, 1.4
     γ_des = setpoint(q[1], q̇[1])
     return -P * (q[2] - γ_des) - D * q̇[2]
 end
