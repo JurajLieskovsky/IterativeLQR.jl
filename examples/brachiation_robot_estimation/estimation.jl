@@ -34,7 +34,6 @@ u = [[row[:u]] for row in eachrow(df_interp)]
 x0 = vcat(z[1], 0)
 N = nrow(df_interp) - 1
 
-plot(mapreduce(z -> z', vcat, z))
 
 # dynamics and measurements of the adaptive system
 function f!(xnew, x, u, w, p)
@@ -91,9 +90,13 @@ for i in 1:N
     z_sim[i+1] .= h(x_sim[i+1], noise(μv, Σv))
 end
 
-plot!(mapreduce(z -> z', vcat, z_sim))
+# display trajectory comparison and wait for user input to continue
+data_plot = plot()
+output_labels = ["z₁" "z₂" "z₃"]
+plot!(data_plot, mapreduce(z_ -> z_', vcat, z), label=output_labels)
+plot!(data_plot, mapreduce(z_ -> z_', vcat, z_sim), label=output_labels .* "_sim")
+display(data_plot)
 
-# Wait for user input to continue
 println("Press any key to continue...")
 read(stdin, Char)
 
