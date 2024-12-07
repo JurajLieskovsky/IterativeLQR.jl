@@ -91,12 +91,16 @@ for i in 1:N
 end
 
 # display trajectory comparison and wait for user input to continue
-data_plot = plot()
-output_labels = ["z₁" "z₂" "z₃"]
-plot!(data_plot, mapreduce(z_ -> z_', vcat, z), label=output_labels)
-plot!(data_plot, mapreduce(z_ -> z_', vcat, z_sim), label=output_labels .* "_sim")
-display(data_plot)
+data_plot = plot(layout=(2,1))
 
+output_labels = ["z₁" "z₂" "z₃"]
+plot!(data_plot, mapreduce(z_ -> z_', vcat, z), label=output_labels, subplot=1)
+plot!(data_plot, mapreduce(z_ -> z_', vcat, z_sim), label=output_labels .* "_sim", subplot=1)
+
+plot!(data_plot, mapreduce(u_ -> u_', vcat, u), label="u", subplot=2)
+plot!(data_plot, mapreduce(u_ -> u_', vcat, u_sim), label="u_sim", subplot=2)
+
+display(data_plot)
 println("Press any key to continue...")
 read(stdin, Char)
 
