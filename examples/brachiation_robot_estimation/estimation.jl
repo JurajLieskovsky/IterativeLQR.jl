@@ -19,7 +19,7 @@ dropmissing!(df)
 
 ## Interpolation
 tstep = 5e-3
-df_interp = DataFrame(:time => 369.481:tstep:375) # 386
+df_interp = DataFrame(:time => 369.481:tstep:372) # 386
 
 for col in names(df, Not(:time))
     interpolation = LinearInterpolation(df[!, :time], df[!, col])
@@ -53,12 +53,12 @@ p0 = [0.67, 0.72, 2.5e-3, 0.01, 0.01] # parameter guess
 # Noise models
 ## process
 μw = zeros(BrachiationRobotODE.nx)
-Σw = diagm([1e-7, 1e-6, 1e-5, 1e-4])
+Σw = diagm([1e-7, 1e-6, 1e-6, 1e-4])
 invΣw = inv(Σw)
 
 ## measurement
 μv = zeros(3)
-Σv = diagm([2e-4, 1e-4, 5e-2])
+Σv = diagm([1e-4, 1e-4, 1e-3])
 invΣv = inv(Σv)
 
 # Simulated trajectory
@@ -241,6 +241,7 @@ println("Press any key to continue...")
 read(stdin, Char)
 
 pf = nominal_trajectory(workset).x[end][5:9]
+display(pf)
 
 x_sim[1] .= x0
 z_sim[1] .= h(x0, μv)
