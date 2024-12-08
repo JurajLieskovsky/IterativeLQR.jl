@@ -13,13 +13,13 @@ using DataFrames, CSV
 using Interpolations
 
 # Reference trajectory
-## Raw data
+## raw data
 df = CSV.File("brachiation_robot_estimation/results/csv/brachiation.csv", silencewarnings=true) |> DataFrame
 dropmissing!(df)
 
-## Interpolation
+## interpolation
 tstep = 5e-3
-df_interp = DataFrame(:time => 369.481:tstep:372) # 386
+df_interp = DataFrame(:time => 369.481:tstep:375) # 386
 
 for col in names(df, Not(:time))
     interpolation = LinearInterpolation(df[!, :time], df[!, col])
@@ -58,8 +58,13 @@ p0 = [0.67, 0.72, 2.5e-3, 0.01, 0.01, 0.01] # parameter guess
 μv = zeros(3)
 Σv = diagm([1e-4, 1e-4, 1e-3])
 
-# adaption rate
-Σq = diagm([3e-6, 1e-6, 2e-11, 5e-9, 3e-9, 1e-6])
+# Adaption rate
+Σq = diagm([3e-6, 4e-6, 2e-11, 5e-9, 3e-9, 4e-6])
+
+# Arrays for storing simulated trajectories
+x_sim = [zeros(BrachiationRobotODE.nx) for _ in 1:N+1]
+z_sim = [zeros(3) for _ in 1:N+1]
+u_sim = [zeros(BrachiationRobotODE.nu) for _ in 1:N]
 
 # Controller
 setpoint(θ, θ̇) = pi / 2 * (1 + sign(sin(θ) * θ̇))
@@ -70,11 +75,6 @@ function controller(x)
     γ_des = setpoint(q[1], q̇[1])
     return -P * (q[2] - γ_des) - D * q̇[2]
 end
-
-# Arrays for storing simulated trajectories
-x_sim = [zeros(BrachiationRobotODE.nx) for _ in 1:N+1]
-z_sim = [zeros(3) for _ in 1:N+1]
-u_sim = [zeros(BrachiationRobotODE.nu) for _ in 1:N]
 
 # Simulated trajectory with initial guesses
 x_sim[1] .= x0
@@ -89,7 +89,7 @@ for i in 1:N
     z_sim[i+1] .= h(x_sim[i+1], noise(μv, Σv))
 end
 
-# display trajectory comparison and wait for user input to continue
+# Trajectory comparison and wait for user input to continue
 data_plot = plot(layout=(2, 1))
 
 output_labels = ["z₁" "z₂" "z₃"]
@@ -142,7 +142,7 @@ workset = IterativeLQR.Workset{Float64}(10, 10, N)
 IterativeLQR.set_initial_state!(workset, initial_state)
 IterativeLQR.set_initial_inputs!(workset, noise_estimate)
 
-M = 40 # observation horizon
+M = 20 # observation horizon
 
 function dynamics!(x̂new, x̂, û, k, n=0)
     @views begin
@@ -241,17 +241,20 @@ end
 IterativeLQR.circshift_trajectory!(workset, -(M + 1))
 nominal_trajectory(workset).u .= circshift(deepcopy(nominal_trajectory(workset).u), 1)
 
-# Print intermediate estimates
+# Printing of intermediate estimates and wait for user input
 println("Adapted parameters after MHE")
 display(nominal_trajectory(workset).x[end][5:end])
 display(plotting_callback(workset))
 
+println("Press any key to continue...")
+read(stdin, Char)
+
 # Whole horizon smoothing
 begin
-    β = 1e-5
+    local β = 1e-5
 
-    invΣw = β * inv(Σw)
-    invΣv = β * inv(Σv)
+    local invΣw = β * inv(Σw)
+    local invΣv = β * inv(Σv)
 
     function invΣq(k)
         if k == 1
@@ -274,7 +277,7 @@ begin
     )
 end
 
-# Print smoothed estimates and wait for input
+# Printing of smoothed estimates and wait for input
 println("Adapted parameters after smoothing")
 pf = nominal_trajectory(workset).x[end][5:end]
 display(pf)
