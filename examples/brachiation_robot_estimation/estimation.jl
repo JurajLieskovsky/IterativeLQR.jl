@@ -19,7 +19,7 @@ dropmissing!(df)
 
 ## Interpolation
 tstep = 5e-3
-df_interp = DataFrame(:time => 369.481:tstep:373) # 386
+df_interp = DataFrame(:time => 369.481:tstep:372) # 386
 
 for col in names(df, Not(:time))
     interpolation = LinearInterpolation(df[!, :time], df[!, col])
@@ -50,17 +50,18 @@ end
 
 p0 = [0.67, 0.72, 2.5e-3, 0.01, 0.01, 0.01] # parameter guess
 
-# Noise models
-## process
+# Process noise
 μw = zeros(BrachiationRobotODE.nx)
 Σw = diagm([1e-7, 1e-6, 1e-6, 1e-4])
 
-## measurement
+# Measurement noise
 μv = zeros(3)
 Σv = diagm([1e-4, 1e-4, 1e-3])
 
-# Simulated trajectory
-## Controller
+# adaption rate
+Σq = diagm([3e-6, 1e-6, 2e-11, 5e-9, 3e-9, 1e-6])
+
+# Controller
 setpoint(θ, θ̇) = pi / 2 * (1 + sign(sin(θ) * θ̇))
 
 function controller(x)
@@ -70,17 +71,17 @@ function controller(x)
     return -P * (q[2] - γ_des) - D * q̇[2]
 end
 
-## random noise
-noise(μ, Σ) = μ + sqrt.(diag(Σ)) .* (rand(length(μ)) .- 0.5)
-# noise(μ, _) = zeros(length(μ))
-
-## trajectory
+# Arrays for storing simulated trajectories
 x_sim = [zeros(BrachiationRobotODE.nx) for _ in 1:N+1]
 z_sim = [zeros(3) for _ in 1:N+1]
 u_sim = [zeros(BrachiationRobotODE.nu) for _ in 1:N]
 
+# Simulated trajectory with initial guesses
 x_sim[1] .= x0
 z_sim[1] .= h(x0, μv)
+
+noise(μ, Σ) = μ + sqrt.(diag(Σ)) .* (rand(length(μ)) .- 0.5)
+# noise(μ, _) = zeros(length(μ))
 
 for i in 1:N
     u_sim[i] .= controller(x_sim[i])
@@ -207,6 +208,7 @@ function plotting_callback(workset, n=0)
     return plt
 end
 
+## estimation
 for i in 1:N
     if i > M
         IterativeLQR.circshift_trajectory!(workset, -1)
@@ -220,7 +222,7 @@ for i in 1:N
     β = 1e-5
     invΣw = β * inv(Σw)
     invΣv = β * inv(Σv)
-    invΣq = β * diagm([3e5, 1e5, 2e10, 5e8, 3e8, 1e5])
+    invΣq = β * inv(Σq)
 
     dyn!(xnew, x, w, k) = dynamics!(xnew, x, w, k, n)
     run(x, w, k) = running_cost(x, w, k, invΣw, invΣv, invΣq, n)
@@ -238,16 +240,49 @@ end
 ## horizon shift counter-action
 IterativeLQR.circshift_trajectory!(workset, -(M + 1))
 nominal_trajectory(workset).u .= circshift(deepcopy(nominal_trajectory(workset).u), 1)
+
+# Print intermediate estimates
+println("Adapted parameters after MHE")
+display(nominal_trajectory(workset).x[end][5:end])
 display(plotting_callback(workset))
-nominal_trajectory(workset).x[end]
 
-# Post simulation
-println("Press any key to continue...")
-read(stdin, Char)
+# Whole horizon smoothing
+begin
+    β = 1e-5
 
+    invΣw = β * inv(Σw)
+    invΣv = β * inv(Σv)
+
+    function invΣq(k)
+        if k == 1
+            return 1e-2 * β * inv(Σq)
+        else
+            return 1e2 * β * inv(Σq)
+        end
+    end
+
+    dyn!(xnew, x, w, k) = dynamics!(xnew, x, w, k)
+    run(x, w, k) = running_cost(x, w, k, invΣw, invΣv, invΣq(k))
+    fin(x, k) = final_cost(x, k, invΣv)
+
+    IterativeLQR.iLQR!(
+        workset,
+        dyn!, (fx, fu, x, w, k) -> dynamics_diff!(dyn!, fx, fu, x, w, k),
+        run, (lx, lu, lxx, lxu, luu, x, w, k) -> running_cost_diff!(run, lx, lu, lxx, lxu, luu, x, w, k),
+        fin, (Φx, Φxx, x, k) -> final_cost_diff!(fin, Φx, Φxx, x, k),
+        verbose=true, plotting_callback=workset -> plotting_callback(workset), maxiter=20, μ=1e1
+    )
+end
+
+# Print smoothed estimates and wait for input
+println("Adapted parameters after smoothing")
 pf = nominal_trajectory(workset).x[end][5:end]
 display(pf)
 
+println("Press any key to continue...")
+read(stdin, Char)
+
+# Post simulation
 x_sim[1] .= x0
 z_sim[1] .= h(x0, μv)
 
