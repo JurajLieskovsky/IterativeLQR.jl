@@ -233,7 +233,7 @@ for i in 1:N
         dyn!, (fx, fu, x, w, k) -> dynamics_diff!(dyn!, fx, fu, x, w, k),
         run, (lx, lu, lxx, lxu, luu, x, w, k) -> running_cost_diff!(run, lx, lu, lxx, lxu, luu, x, w, k),
         fin, (Φx, Φxx, x, k) -> final_cost_diff!(fin, Φx, Φxx, x, k),
-        verbose=true, plotting_callback=workset -> plotting_callback(workset, n), maxiter=5, N=H
+        verbose=false, plotting_callback=workset -> plotting_callback(workset, n), maxiter=5, N=H
     )
 end
 
@@ -273,7 +273,7 @@ begin
         dyn!, (fx, fu, x, w, k) -> dynamics_diff!(dyn!, fx, fu, x, w, k),
         run, (lx, lu, lxx, lxu, luu, x, w, k) -> running_cost_diff!(run, lx, lu, lxx, lxu, luu, x, w, k),
         fin, (Φx, Φxx, x, k) -> final_cost_diff!(fin, Φx, Φxx, x, k),
-        verbose=true, plotting_callback=workset -> plotting_callback(workset), maxiter=20, μ=1e1
+        verbose=true, plotting_callback=plotting_callback, maxiter=20, μ=1e1
     )
 end
 
