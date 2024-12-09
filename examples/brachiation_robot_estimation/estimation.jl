@@ -37,7 +37,7 @@ N = nrow(df_interp) - 1
 
 # dynamics and measurements of the adaptive system
 function f!(xnew, x, u, w, p)
-    model = BrachiationRobotODE.Model(9.81, p[1], 0.25, 0.02, p[2], p[3], 0.02, 0.28, p[4], p[5], p[6])
+    model = BrachiationRobotODE.Model(9.81, 1.473-p[2], p[1], 0.00, p[2], p[3], 0.02, 0.262, p[4], p[5], p[6])
     tsit5 = RungeKutta.Tsit5()
     RungeKutta.f!(xnew, tsit5, (ẋ_, x_, u_) -> BrachiationRobotODE.f!(model, ẋ_, x_, u_), x, u, tstep)
     xnew .+= w
@@ -48,7 +48,7 @@ function h(x, v)
     return x[1:3] + v
 end
 
-p0 = [0.67, 0.72, 2.5e-3, 0.01, 0.01, 0.01] # parameter guess
+p0 = [0.3, 0.8, 2.5e-3, 0.01, 0.01, 0.01] # parameter guess
 
 # Process noise
 μw = zeros(BrachiationRobotODE.nx)
@@ -59,7 +59,7 @@ p0 = [0.67, 0.72, 2.5e-3, 0.01, 0.01, 0.01] # parameter guess
 Σv = diagm([1e-4, 1e-4, 1e-3])
 
 # Adaption rate
-Σq = diagm([3e-6, 4e-6, 2e-11, 5e-9, 3e-9, 4e-6])
+Σq = diagm([3e-6, 4e-6, 2e-11, 5e-9, 3e-9, 1e-6])
 
 # Arrays for storing simulated trajectories
 x_sim = [zeros(BrachiationRobotODE.nx) for _ in 1:N+1]
@@ -250,11 +250,10 @@ println("Press any key to continue...")
 read(stdin, Char)
 
 # Whole horizon smoothing
-begin
-    local β = 1e-5
+let β = 1e-5
 
-    local invΣw = β * inv(Σw)
-    local invΣv = β * inv(Σv)
+    invΣw = β * inv(Σw)
+    invΣv = β * inv(Σv)
 
     function invΣq(k)
         if k == 1
