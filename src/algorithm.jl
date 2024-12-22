@@ -58,21 +58,21 @@ function backward_pass!(workset, μ, regularization)
             q̃ux = qux + fu[k]' * μI * fx[k]
         end
 
-        Δu[k] .= -q̃uu \ qu
-        Δux[k] .= -q̃uu \ q̃ux
+        F = lu!(-q̃uu)
+        Δu[k] = F \ qu
+        Δux[k] = F \ q̃ux
 
         # cost-to-go model
         vx[k] .= qx + Δux[k]' * qu + Δux[k]' * quu * Δu[k] + qux' * Δu[k]
         vxx[k] .= qxx + Δux[k]' * quu * Δux[k] + Δux[k]' * qux + qux' * Δux[k]
 
         # expected improvement
-        Δv[k] = Δu[k]' * qu + Δu[k]' * quu * Δu[k]
+        Δv[k][1] = Δu[k]' * qu
+        Δv[k][2] = 0.5 * Δu[k]' * quu * Δu[k]
     end
-
-    return sum(Δv) # expected improvement
 end
 
-function forward_pass!(workset, dynamics!, difference, running_cost, final_cost)
+function forward_pass!(workset, dynamics!, difference, running_cost, final_cost, α)
     @unpack N = workset
     @unpack x, u, l = active_trajectory(workset)
     @unpack Δu, Δux = workset.policy_update
@@ -84,7 +84,7 @@ function forward_pass!(workset, dynamics!, difference, running_cost, final_cost)
     x[1] = x_ref[1]
 
     for k in 1:N
-        u[k] .= u_ref[k] + Δu[k] + Δux[k] * difference(x[k], x_ref[k])
+        u[k] .= u_ref[k] + α * Δu[k] + Δux[k] * difference(x[k], x_ref[k])
 
         try
             dynamics!(x[k+1], x[k], u[k], k)
@@ -152,7 +152,7 @@ function iLQR!(
 
         # forward pass
         for α in α_values
-            successful, J, ΔJ = forward_pass!(workset, dynamics!, state_difference, running_cost, final_cost)
+            successful, J, ΔJ = forward_pass!(workset, dynamics!, state_difference, running_cost, final_cost, α)
 
             # error handling
             if !successful
@@ -161,6 +161,7 @@ function iLQR!(
             end
 
             # iteration's evaluation
+            Δv = mapreduce(Δ -> α * Δ[1] + α^2 * Δ[2], +, workset.value_function.Δv)
             accepted = ΔJ < 0 && ΔJ <= ρ * Δv
 
             # printout
