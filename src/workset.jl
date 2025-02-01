@@ -27,14 +27,14 @@ struct ValueFunction{T}
 end
 
 struct PolicyUpdate{T}
-    Δu::Vector{Vector{T}}
-    Δux::Vector{Matrix{T}}
+    d::Vector{Vector{T}}
+    K::Vector{Matrix{T}}
 
     function PolicyUpdate{T}(ndx, nu, N) where {T}
-        Δu = [Vector{T}(undef, nu) for _ in 1:N]
-        Δux = [Matrix{T}(undef, nu, ndx) for _ in 1:N]
+        d = [Vector{T}(undef, nu) for _ in 1:N]
+        K = [Matrix{T}(undef, nu, ndx) for _ in 1:N]
 
-        return new(Δu, Δux)
+        return new(d, K)
     end
 end
 

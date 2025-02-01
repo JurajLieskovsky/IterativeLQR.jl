@@ -30,7 +30,7 @@ function backward_pass!(workset, μ, regularization)
     @unpack fx, fu = workset.dynamics_derivatives
     @unpack lx, lu, lxx, lxu, luu = workset.cost_derivatives
     @unpack Δv, vx, vxx = workset.value_function
-    @unpack Δu, Δux = workset.policy_update
+    @unpack d, K = workset.policy_update
 
     if regularization == :state
         μI = μ * I(workset.nx)
@@ -59,23 +59,23 @@ function backward_pass!(workset, μ, regularization)
         end
 
         F = lu!(-q̃uu)
-        Δu[k] = F \ qu
-        Δux[k] = F \ q̃ux
+        d[k] = F \ qu
+        K[k] = F \ q̃ux
 
         # cost-to-go model
-        vx[k] .= qx + Δux[k]' * qu + Δux[k]' * quu * Δu[k] + qux' * Δu[k]
-        vxx[k] .= qxx + Δux[k]' * quu * Δux[k] + Δux[k]' * qux + qux' * Δux[k]
+        vx[k] .= qx + K[k]' * qu + K[k]' * quu * d[k] + qux' * d[k]
+        vxx[k] .= qxx + K[k]' * quu * K[k] + K[k]' * qux + qux' * K[k]
 
         # expected improvement
-        Δv[k][1] = Δu[k]' * qu
-        Δv[k][2] = 0.5 * Δu[k]' * quu * Δu[k]
+        Δv[k][1] = d[k]' * qu
+        Δv[k][2] = 0.5 * d[k]' * quu * d[k]
     end
 end
 
 function forward_pass!(workset, dynamics!, difference, running_cost, final_cost, α)
     @unpack N = workset
     @unpack x, u, l = active_trajectory(workset)
-    @unpack Δu, Δux = workset.policy_update
+    @unpack d, K = workset.policy_update
 
     x_ref = nominal_trajectory(workset).x
     u_ref = nominal_trajectory(workset).u
@@ -84,7 +84,7 @@ function forward_pass!(workset, dynamics!, difference, running_cost, final_cost,
     x[1] = x_ref[1]
 
     for k in 1:N
-        u[k] .= u_ref[k] + α * Δu[k] + Δux[k] * difference(x[k], x_ref[k])
+        u[k] .= u_ref[k] + α * d[k] + K[k] * difference(x[k], x_ref[k])
 
         try
             dynamics!(x[k+1], x[k], u[k], k)
@@ -124,7 +124,7 @@ end
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
     maxiter=100, regularization=:input, ρ=0.5,
-    μ=1e-2, μ_dec=3 / 4, μ_inc=4, μ_min=0.0, μ_max=1e4,
+    μ=1e-4, μ_dec=3 / 4, μ_inc=4, μ_min=0.0, μ_max=1e4,
     α_values=1:-0.3:0.1, α_reg_dec=0.7, α_reg_inc=0.1,
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
     state_difference=-,
