@@ -49,11 +49,21 @@ function dynamics_diff!(fx, fu, x, u, _)
         h
     )
 
-    ndx = QuadrotorODE.nz
-    dx = zeros(ndx)
+    nz = QuadrotorODE.nz
+    nu = QuadrotorODE.nu
 
-    fx .= ForwardDiff.jacobian((dznew_, dx_) -> f!(dznew_, x, dx_, u), zeros(ndx), dx)
-    fu .= ForwardDiff.jacobian((dznew_, u_) -> f!(dznew_, x, dx, u_), zeros(ndx), u)
+    arg = vcat(zeros(nz), u)
+    res = zeros(nz)
+    jac = zeros(nz, nz+nu)
+
+    @views begin
+        ForwardDiff.jacobian!(jac, (res_, arg_) -> f!(res_, x, arg_[1:nz], arg_[nz+1:nz+nu]), res, arg)
+
+        fx .= jac[:, 1:nz]
+        fu .= jac[:, nz+1:nz+nu]
+    end
+
+    return nothing
 end
 
 # Running cost

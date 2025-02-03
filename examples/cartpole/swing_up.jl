@@ -26,11 +26,20 @@ f!(dx, x, u) = dx .= CartPoleODE.f(model, x, u)
 tsit5 = RungeKutta.Tsit5()
 dynamics!(dx, x, u, _) = RungeKutta.f!(dx, tsit5, f!, x, u, h)
 
-function dynamics_diff!(dFdx, dFdu, x, u, k)
-    F = similar(x)
+function dynamics_diff!(fx, fu, x, u, k)
+    nx = CartPoleODE.nx
+    nu = CartPoleODE.nu
 
-    ForwardDiff.jacobian!(dFdx, (xnew, x_) -> dynamics!(xnew, x_, u, k), F, x)
-    ForwardDiff.jacobian!(dFdu, (xnew, u_) -> dynamics!(xnew, x, u_, k), F, u)
+    arg = vcat(x, u)
+    res = zeros(nx)
+    jac = zeros(nx, nx+nu)
+
+    @views begin
+        ForwardDiff.jacobian!(jac, (xnew, arg) -> dynamics!(xnew, arg[1:nx], arg[nx+1:nx+nu], k), res, arg)
+
+        fx .= jac[:, 1:nx]
+        fu .= jac[:, nx+1:nx+nu]
+    end
 
     return nothing
 end
@@ -89,7 +98,7 @@ end
 # Trajectory optimization
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    verbose=true, logging=true, plotting_callback=plotting_callback, maxiter=200
+    verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
 df[!, :bwd] .= N
