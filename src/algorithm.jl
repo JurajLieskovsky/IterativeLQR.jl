@@ -144,6 +144,8 @@ function iLQR!(
         Δv = backward_pass!(workset, δ_value, δ_input)
 
         # forward pass
+        accepted = false
+        
         for α in α_values
             successful, J, ΔJ = forward_pass!(workset, dynamics!, state_difference, running_cost, final_cost, α)
 
@@ -170,6 +172,10 @@ function iLQR!(
                 swap_trajectories!(workset)
                 break
             end
+        end
+
+        if accepted == false
+            break
         end
     end
 
