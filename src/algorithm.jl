@@ -3,11 +3,17 @@ function trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
     @unpack x, u, l = nominal_trajectory(workset)
 
     for k in 1:N
-        dynamics!(x[k+1], x[k], u[k], k)
-        l[k] = running_cost(x[k], u[k], k)
+        try
+            dynamics!(x[k+1], x[k], u[k], k)
+            l[k] = running_cost(x[k], u[k], k)
+        catch
+            return false, NaN
+        end
     end
 
     l[N+1] = final_cost(x[N+1], N + 1)
+
+    return true, sum(l)
 end
 
 function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
@@ -121,19 +127,29 @@ end
 
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
-    maxiter=100, ρ=1e-3, α_values=exp.(0:-0.5:-10),
+    maxiter=100, ρ=1e-4, α_values=exp.(0:-1:-16),
     δ_value=1e-3, δ_input=1e-6,
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
     state_difference=-,
 )
-    # initial trajectory rollout
-    rollout == true && trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
 
     # line count for printing
     line_count = Ref(0)
 
     # dataframe for logging
     dataframe = logging ? iteration_dataframe() : nothing
+
+    # initial trajectory rollout
+    if rollout == true
+        successful, J = trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
+            
+        verbose && print_iteration!(line_count, 0, NaN, J, NaN, NaN, successful)
+        logging && log_iteration!(dataframe, 0, NaN, J, NaN, NaN, successful)
+
+        if successful == false
+            return nothing
+        end
+    end
 
     # algorithm
     for i in 1:maxiter
