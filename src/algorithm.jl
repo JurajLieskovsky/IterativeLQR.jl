@@ -100,7 +100,7 @@ end
 function print_iteration!(line_count, i, α, J, ΔJ, Δv, accepted)
     line_count[] % 10 == 0 && @printf(
         "%-9s %-9s %-9s %-9s %-9s %-9s\n",
-        "iter", "α", "∑lₖ", "∑Δlₖ", "∑Δvₖ", "accepted"
+        "iter", "α", "J", "ΔJ", "ΔV", "accepted"
     )
     @printf(
         "%-9i %-9.3g %-9.3g %-9.3g %-9.3g %-9s\n",
