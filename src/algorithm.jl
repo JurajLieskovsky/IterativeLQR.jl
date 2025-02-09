@@ -51,6 +51,7 @@ function backward_pass!(workset, δ_value, δ_input)
         qu = lu[k] + fu[k]' * vx[k+1]
 
         if δ_value > 0
+            vxx[k+1] .= 0.5 * (vxx[k+1] + vxx[k+1]')
             vxx[k+1] .= regularize(vxx[k+1], δ_value)
         end
 
@@ -59,6 +60,7 @@ function backward_pass!(workset, δ_value, δ_input)
         qux = lxu[k]' + fu[k]' * vxx[k+1] * fx[k]
 
         if δ_input > 0
+            quu .= 0.5 * (quu + quu')
             quu .= regularize(quu, δ_input)
         end
 
@@ -142,7 +144,7 @@ function iLQR!(
     # initial trajectory rollout
     if rollout == true
         successful, J = trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
-            
+
         verbose && print_iteration!(line_count, 0, NaN, J, NaN, NaN, successful)
         logging && log_iteration!(dataframe, 0, NaN, J, NaN, NaN, successful)
 
@@ -161,7 +163,7 @@ function iLQR!(
 
         # forward pass
         accepted = false
-        
+
         for α in α_values
             successful, J, ΔJ = forward_pass!(workset, dynamics!, state_difference, running_cost, final_cost, α)
 
