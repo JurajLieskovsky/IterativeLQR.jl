@@ -35,7 +35,6 @@ function regularize(A, δ)
     λ, V = eigen(A)
     λ_reg = map(e -> e < δ ? δ : e, λ)
     return V * diagm(λ_reg) * V'
-    # return map((e, v) -> v * e * v', λ, eachcol(V))
 end
 
 function backward_pass!(workset, δ_value, δ_input)
