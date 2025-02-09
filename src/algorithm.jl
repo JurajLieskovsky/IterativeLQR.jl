@@ -25,6 +25,18 @@ function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cos
     final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
 end
 
+function regularize(A)
+    λ, v = eigen(A)
+
+    δ = 1e-3
+
+    for i in 1:length(λ)
+        λ[i] = λ[i] > δ ? λ[i] : δ
+    end
+
+    v * diagm(λ) * v'
+end
+
 function backward_pass!(workset, μ, regularization)
     @unpack N = workset
     @unpack fx, fu = workset.dynamics_derivatives
@@ -43,9 +55,23 @@ function backward_pass!(workset, μ, regularization)
         qx = lx[k] + fx[k]' * vx[k+1]
         qu = lu[k] + fu[k]' * vx[k+1]
 
+        if regularization == :eigen
+            vxx[k+1] .= regularize(vxx[k+1])
+        end
+
+        λ, v = eigen(vxx[k+1])
+        if any(λ .< 0)
+            display(k)
+            display("negative value function")
+        end
+
         qxx = lxx[k] + fx[k]' * vxx[k+1] * fx[k]
         quu = luu[k] + fu[k]' * vxx[k+1] * fu[k]
         qux = lxu[k]' + fu[k]' * vxx[k+1] * fx[k]
+
+        # force symmeticity
+        qxx .= 0.5 * (qxx + qxx')
+        quu .= 0.5 * (quu + quu')
 
         # controls
         if regularization == :input
@@ -56,6 +82,35 @@ function backward_pass!(workset, μ, regularization)
             # regularization equivalent to vxx[k+1] += μI proposed by Y.Tassa
             q̃uu = quu + fu[k]' * μI * fu[k]
             q̃ux = qux + fu[k]' * μI * fx[k]
+        elseif regularization == :eigen
+
+            if any(isnan.(quu) .| isinf.(quu))
+                display(k)
+                display(quu)
+            end
+
+            # q̃uu = regularize(quu)
+            q̃uu = quu
+            q̃ux = qux
+        elseif regularization == :full
+            A = [qxx qux'; qux quu]
+            B = regularize(A)
+
+            qxx .= B[1:4,1:4]
+            q̃ux = B[5:5,1:4]
+            q̃uu = B[5:5,5:5]
+        end
+
+        λ, v = eigen(q̃uu)
+        if any(λ .< 0)
+            display("negative input hessian")
+        end
+
+        A = [qxx q̃ux'; q̃ux q̃uu]
+        A = 0.5 * (A + A')
+        λ, v = eigen(A)
+        if any(λ .< 0)
+            display("negative hessian")
         end
 
         F = lu!(-q̃uu)
@@ -65,6 +120,16 @@ function backward_pass!(workset, μ, regularization)
         # cost-to-go model
         vx[k] .= qx + K[k]' * qu + K[k]' * quu * d[k] + qux' * d[k]
         vxx[k] .= qxx + K[k]' * quu * K[k] + K[k]' * qux + qux' * K[k]
+
+        if any(isnan.(vxx[k]) .| isinf.(vxx[k]))
+            display(k)
+            display(q̃uu)
+            display(qu)
+            display(q̃ux)
+            display(d[k])
+            display(K[k])
+            display(vxx[k])
+        end
 
         # expected improvement
         Δv[k][1] = d[k]' * qu
@@ -123,9 +188,9 @@ end
 
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
-    maxiter=100, regularization=:input, ρ=0.5,
-    μ=1e-4, μ_dec=3 / 4, μ_inc=4, μ_min=0.0, μ_max=1e4,
-    α_values=1:-0.3:0.1, α_reg_dec=0.7, α_reg_inc=0.1,
+    maxiter=50, regularization=:state, ρ=1e-3,
+    μ=1e-2, μ_dec=3 / 4, μ_inc=4, μ_min=0.0, μ_max=1e4,
+    α_values=exp.(0:-0.5:-10), α_reg_dec=0.7, α_reg_inc=1e-3,
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
     state_difference=-,
 )
@@ -154,14 +219,18 @@ function iLQR!(
         for α in α_values
             successful, J, ΔJ = forward_pass!(workset, dynamics!, state_difference, running_cost, final_cost, α)
 
+            # expected improvement
+            Δv = mapreduce(Δ -> α * Δ[1], +, workset.value_function.Δv)
+
             # error handling
             if !successful
+                verbose && print_iteration!(line_count, i, μ, α, J, ΔJ, Δv, false)
+                logging && log_iteration!(dataframe, i, μ, α, J, ΔJ, Δv, false)
                 μ = increase_μ(μ)
                 continue
             end
 
             # iteration's evaluation
-            Δv = mapreduce(Δ -> α * Δ[1] + α^2 * Δ[2], +, workset.value_function.Δv)
             accepted = ΔJ < 0 && ΔJ <= ρ * Δv
 
             # printout
@@ -188,7 +257,7 @@ function iLQR!(
         end
 
         # termination condition
-        μ >= μ_max && break
+        # μ >= μ_max && break
     end
 
     if logging == true
