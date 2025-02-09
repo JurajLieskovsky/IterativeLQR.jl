@@ -32,7 +32,7 @@ function regularize(A, δ)
     # return map((e, v) -> v * e * v', λ, eachcol(V))
 end
 
-function backward_pass!(workset, value_reg, input_reg, δ)
+function backward_pass!(workset, δ_value, δ_input)
     @unpack N = workset
     @unpack fx, fu = workset.dynamics_derivatives
     @unpack lx, lu, lxx, lxu, luu = workset.cost_derivatives
@@ -44,16 +44,16 @@ function backward_pass!(workset, value_reg, input_reg, δ)
         qx = lx[k] + fx[k]' * vx[k+1]
         qu = lu[k] + fu[k]' * vx[k+1]
 
-        if value_reg == true
-            vxx[k+1] .= regularize(vxx[k+1], δ)
+        if δ_value > 0
+            vxx[k+1] .= regularize(vxx[k+1], δ_value)
         end
 
         qxx = lxx[k] + fx[k]' * vxx[k+1] * fx[k]
         quu = luu[k] + fu[k]' * vxx[k+1] * fu[k]
         qux = lxu[k]' + fu[k]' * vxx[k+1] * fx[k]
 
-        if input_reg == true
-            quu .= regularize(quu, δ)
+        if δ_input > 0
+            quu .= regularize(quu, δ_input)
         end
 
         F = lu!(-quu)
@@ -121,8 +121,8 @@ end
 
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
-    maxiter=100, ρ=1e-4, α_values=exp.(0:-0.5:-10),
-    value_reg=true, input_reg=false, δ=1e-3,
+    maxiter=100, ρ=1e-3, α_values=exp.(0:-0.5:-10),
+    δ_value=1e-3, δ_input=1e-6,
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
     state_difference=-,
 )
@@ -141,7 +141,7 @@ function iLQR!(
         differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
 
         # backward pass
-        Δv = backward_pass!(workset, value_reg, input_reg, δ)
+        Δv = backward_pass!(workset, δ_value, δ_input)
 
         # forward pass
         for α in α_values
