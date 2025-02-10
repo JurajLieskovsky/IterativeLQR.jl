@@ -49,7 +49,7 @@ function backward_pass!(workset, δ_value, δ_input)
         qx = lx[k] + fx[k]' * vx[k+1]
         qu = lu[k] + fu[k]' * vx[k+1]
 
-        if δ_value > 0
+        if δ_value >= 0
             vxx[k+1] .= 0.5 * (vxx[k+1] + vxx[k+1]')
             vxx[k+1] .= regularize(vxx[k+1], δ_value)
         end
@@ -58,7 +58,7 @@ function backward_pass!(workset, δ_value, δ_input)
         quu = luu[k] + fu[k]' * vxx[k+1] * fu[k]
         qux = lxu[k]' + fu[k]' * vxx[k+1] * fx[k]
 
-        if δ_input > 0
+        if δ_input >= 0
             quu .= 0.5 * (quu + quu')
             quu .= regularize(quu, δ_input)
         end
@@ -129,7 +129,7 @@ end
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
     maxiter=100, ρ=1e-4, α_values=exp.(0:-1:-16),
-    δ_value=1e-3, δ_input=1e-6,
+    δ_value=0.0, δ_input=1e-3,
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
     state_difference=-,
 )
