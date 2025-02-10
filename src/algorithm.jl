@@ -149,7 +149,7 @@ end
 
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
-    maxiter=100, regularization=:input, ρ=0.5,
+    maxiter=100, regularization=:state, ρ=0.5,
     μ=1e-4, μ_dec=3 / 4, μ_inc=4, μ_min=0.0, μ_max=1e4,
     α_values=1:-0.3:0.1, α_reg_dec=0.7, α_reg_inc=0.1,
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
@@ -174,10 +174,7 @@ function iLQR!(
         differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
 
         # backward pass
-        if regularization == :input
-            regularize!(workset.value_function.vxx[workset.N+1])
-        end
-
+        regularize!(workset.value_function.vxx[workset.N+1])
         successful = backward_pass!(workset, μ, regularization)
 
         if !successful
