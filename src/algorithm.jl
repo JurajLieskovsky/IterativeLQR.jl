@@ -25,6 +25,16 @@ function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cos
     final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
 end
 
+function posdef!(A)
+    A .= 0.5 * (A + A')
+    λ, _ = eigen(A)
+    if any(λ .<= 0)
+        return false
+    else
+        return true
+    end
+end
+
 function backward_pass!(workset, μ, regularization)
     @unpack N = workset
     @unpack fx, fu = workset.dynamics_derivatives
@@ -32,13 +42,18 @@ function backward_pass!(workset, μ, regularization)
     @unpack Δv, vx, vxx = workset.value_function
     @unpack d, K = workset.policy_update
 
-    if regularization == :state
-        μI = μ * I(workset.nx)
-    elseif regularization == :input
-        μI = μ * I(workset.nu)
-    end
-
     for k in N:-1:1
+        # value function hessian regularization
+        if regularization == :state
+            μI = μ * I(workset.ndx)
+            vxx[k+1] += μI
+        end
+
+        # break if vxx is not positive-definite
+        if !posdef!(vxx[k+1])
+            return false
+        end
+
         # perturbed argument
         qx = lx[k] + fx[k]' * vx[k+1]
         qu = lu[k] + fu[k]' * vx[k+1]
@@ -47,20 +62,22 @@ function backward_pass!(workset, μ, regularization)
         quu = luu[k] + fu[k]' * vxx[k+1] * fu[k]
         qux = lxu[k]' + fu[k]' * vxx[k+1] * fx[k]
 
-        # controls
+        # input hessian regularization (standard regularization as proposed by D.Q.Mayne)
         if regularization == :input
-            # standard regularization as proposed by D.Q.Mayne
+            μI = μ * I(workset.nu)
             q̃uu = quu + μI
-            q̃ux = qux
-        elseif regularization == :state
-            # regularization equivalent to vxx[k+1] += μI proposed by Y.Tassa
-            q̃uu = quu + fu[k]' * μI * fu[k]
-            q̃ux = qux + fu[k]' * μI * fx[k]
+        else
+            q̃uu = quu
         end
 
-        F = lu!(-q̃uu)
-        d[k] = F \ qu
-        K[k] = F \ q̃ux
+        # break if quu is not positive-definite
+        if !posdef!(q̃uu)
+            return false
+        end
+
+        # controls
+        d[k] = -q̃uu \ qu
+        K[k] = -q̃uu \ qux
 
         # cost-to-go model
         vx[k] .= qx + K[k]' * qu + K[k]' * quu * d[k] + qux' * d[k]
@@ -70,6 +87,8 @@ function backward_pass!(workset, μ, regularization)
         Δv[k][1] = d[k]' * qu
         Δv[k][2] = 0.5 * d[k]' * quu * d[k]
     end
+
+    return true
 end
 
 function forward_pass!(workset, dynamics!, difference, running_cost, final_cost, α)
@@ -120,6 +139,13 @@ iteration_dataframe() = DataFrame(
 function log_iteration!(dataframe, i, μ, α, J, ΔJ, Δv, accepted)
     push!(dataframe, (i, μ, α, J, ΔJ, Δv, accepted))
 end
+ 
+function regularize!(A, δ=1e-5)
+    λ, v = eigen(A)
+    λ .= map(e -> e < δ ? δ : e, λ)
+    A .= v * diagm(λ) * v'
+    return nothing
+end
 
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
@@ -148,7 +174,19 @@ function iLQR!(
         differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
 
         # backward pass
-        Δv = backward_pass!(workset, μ, regularization)
+        if regularization == :input
+            regularize!(workset.value_function.vxx[workset.N+1])
+        end
+
+        successful = backward_pass!(workset, μ, regularization)
+
+        if !successful
+            verbose && print_iteration!(line_count, i, μ, NaN, NaN, NaN, NaN, false)
+            logging && log_iteration!(dataframe, i, μ, NaN, NaN, NaN, NaN, false)
+
+            μ = increase_μ(μ)
+            continue
+        end
 
         # forward pass
         for α in α_values
@@ -156,7 +194,9 @@ function iLQR!(
 
             # error handling
             if !successful
-                μ = increase_μ(μ)
+                if α == α_values[end]
+                    μ = increase_μ(μ)
+                end
                 continue
             end
 
