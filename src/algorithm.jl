@@ -49,27 +49,27 @@ function backward_pass!(workset, δ_value, δ_input)
         qx = lx[k] + fx[k]' * vx[k+1]
         qu = lu[k] + fu[k]' * vx[k+1]
 
-        if δ_value >= 0
-            vxx[k+1] .= 0.5 * (vxx[k+1] + vxx[k+1]')
-            vxx[k+1] .= regularize(vxx[k+1], δ_value)
-        end
-
         qxx = lxx[k] + fx[k]' * vxx[k+1] * fx[k]
         quu = luu[k] + fu[k]' * vxx[k+1] * fu[k]
         qux = lxu[k]' + fu[k]' * vxx[k+1] * fx[k]
 
-        if δ_input >= 0
-            quu .= 0.5 * (quu + quu')
-            quu .= regularize(quu, δ_input)
+        if δ_input > 0
+            q̃uu = regularize(Symmetric(quu), δ_input)
+        else
+            q̃uu = quu
         end
 
-        F = lu!(-quu)
-        d[k] = F \ qu
-        K[k] = F \ qux
+        F = cholesky(Symmetric(q̃uu))
+        d[k] = -(F \ qu)
+        K[k] = -(F \ qux)
 
         # cost-to-go model
         vx[k] .= qx + K[k]' * qu + K[k]' * quu * d[k] + qux' * d[k]
         vxx[k] .= qxx + K[k]' * quu * K[k] + K[k]' * qux + qux' * K[k]
+
+        if δ_value >= 0
+            vxx[k] .= regularize(Symmetric(vxx[k]), δ_value)
+        end
 
         # expected improvement
         Δv[k][1] = d[k]' * qu
@@ -133,7 +133,6 @@ function iLQR!(
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
     state_difference=-,
 )
-
     # line count for printing
     line_count = Ref(0)
 
@@ -185,7 +184,7 @@ function iLQR!(
 
             # solution copying and regularization parameter adjustment
             if accepted
-                (plotting_callback !== nothing) && plotting_callback(workset)
+                (plotting_callback === nothing) || plotting_callback(workset)
                 swap_trajectories!(workset)
                 break
             end
