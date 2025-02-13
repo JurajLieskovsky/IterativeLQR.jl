@@ -53,7 +53,7 @@ function backward_pass!(workset, δ_value, δ_input)
         quu = luu[k] + fu[k]' * vxx[k+1] * fu[k]
         qux = lxu[k]' + fu[k]' * vxx[k+1] * fx[k]
 
-        if δ_input > 0
+        if !isnan(δ_input)
             q̃uu = regularize(Symmetric(quu), δ_input)
         else
             q̃uu = quu
@@ -67,7 +67,7 @@ function backward_pass!(workset, δ_value, δ_input)
         vx[k] .= qx + K[k]' * qu + K[k]' * quu * d[k] + qux' * d[k]
         vxx[k] .= qxx + K[k]' * quu * K[k] + K[k]' * qux + qux' * K[k]
 
-        if δ_value >= 0
+        if !isnan(δ_value)
             vxx[k] .= regularize(Symmetric(vxx[k]), δ_value)
         end
 
@@ -157,7 +157,7 @@ function iLQR!(
         differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
 
         # backward pass
-        if δ_last >= 0
+        if !isnan(δ_last)
             workset.value_function.vxx[end] .= regularize(Symmetric(workset.value_function.vxx[end]), δ_last)
         end
 
