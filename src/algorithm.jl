@@ -67,7 +67,7 @@ function backward_pass!(workset, δ)
 
         # cost-to-go model
         vx[k] .= qx + K[k]' * qu + K[k]' * q̃uu * d[k] + q̃ux' * d[k]
-        vxx[k] .= q̃xx + K[k]' * q̃uu * K[k] + K[k]' * q̃ux + q̃ux' * K[k]
+        vxx[k] .= q̃xx - K[k]' * q̃uu * K[k]
 
         # expected improvement
         Δv[k][1] = d[k]' * qu
