@@ -44,34 +44,35 @@ function backward_pass!(workset, δ)
     @unpack lx, lu, lxx, lxu, luu = workset.cost_derivatives
     @unpack Δv, vx, vxx = workset.value_function
     @unpack d, K = workset.policy_update
+    @unpack H, qxx, quu, qux, qxu = workset.subproblem_hessian
 
     for k in N:-1:1
-        # perturbed argument
+        # gradient
         qx = lx[k] + fx[k]' * vx[k+1]
         qu = lu[k] + fu[k]' * vx[k+1]
 
-        qxx = lxx[k] + fx[k]' * vxx[k+1] * fx[k]
-        quu = luu[k] + fu[k]' * vxx[k+1] * fu[k]
-        qux = lxu[k]' + fu[k]' * vxx[k+1] * fx[k]
+        # hessian
+        qxx .= lxx[k] + fx[k]' * vxx[k+1] * fx[k]
+        quu .= luu[k] + fu[k]' * vxx[k+1] * fu[k]
+        qux .= lxu[k]' + fu[k]' * vxx[k+1] * fx[k]
+        qxu .= qux'
 
-        A = [qxx qux'; qux quu]
-        regularize!(A, δ)
+        # problem regularization
+        tmp = copy(quu) # held for expected improvement calculation
+        regularize!(H, δ)
 
-        q̃xx = A[1:ndx, 1:ndx]
-        q̃ux = A[ndx+1:ndx+nu, 1:ndx]
-        q̃uu = A[ndx+1:ndx+nu, ndx+1:ndx+nu]
-
-        F = cholesky(Symmetric(q̃uu))
+        # control update
+        F = cholesky(Symmetric(quu))
         d[k] = -(F \ qu)
-        K[k] = -(F \ q̃ux)
+        K[k] = -(F \ qux)
 
         # cost-to-go model
-        vx[k] .= qx + K[k]' * qu + K[k]' * q̃uu * d[k] + q̃ux' * d[k]
-        vxx[k] .= q̃xx - K[k]' * q̃uu * K[k]
+        vx[k] .= qx + K[k]' * qu + K[k]' * quu * d[k] + qux' * d[k]
+        vxx[k] .= qxx - K[k]' * quu * K[k]
 
         # expected improvement
         Δv[k][1] = d[k]' * qu
-        Δv[k][2] = 0.5 * d[k]' * quu * d[k]
+        Δv[k][2] = 0.5 * d[k]' * tmp * d[k]
     end
 end
 
