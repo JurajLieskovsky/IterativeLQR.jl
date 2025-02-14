@@ -31,14 +31,15 @@ function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cos
     final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
 end
 
-function regularize(A, δ)
+function regularize!(A, δ)
     λ, V = eigen(A)
     λ_reg = map(e -> e < δ ? δ : e, λ)
-    return V * diagm(λ_reg) * V'
+    A .= V * diagm(λ_reg) * V'
+    return nothing
 end
 
-function backward_pass!(workset, δ_value, δ_input)
-    @unpack N = workset
+function backward_pass!(workset, δ)
+    @unpack N, ndx, nu = workset
     @unpack fx, fu = workset.dynamics_derivatives
     @unpack lx, lu, lxx, lxu, luu = workset.cost_derivatives
     @unpack Δv, vx, vxx = workset.value_function
@@ -53,22 +54,25 @@ function backward_pass!(workset, δ_value, δ_input)
         quu = luu[k] + fu[k]' * vxx[k+1] * fu[k]
         qux = lxu[k]' + fu[k]' * vxx[k+1] * fx[k]
 
-        if !isnan(δ_input)
-            q̃uu = regularize(Symmetric(quu), δ_input)
-        else
-            q̃uu = quu
-        end
+        A = [qxx qux'; qux quu]
+        regularize!(A, δ)
+
+        q̃xx = A[1:ndx, 1:ndx]
+        q̃ux = A[ndx+1:ndx+nu, 1:ndx]
+        q̃uu = A[ndx+1:ndx+nu, ndx+1:ndx+nu]
 
         F = cholesky(Symmetric(q̃uu))
         d[k] = -(F \ qu)
-        K[k] = -(F \ qux)
+        K[k] = -(F \ q̃ux)
 
         # cost-to-go model
-        vx[k] .= qx + K[k]' * qu + K[k]' * quu * d[k] + qux' * d[k]
-        vxx[k] .= qxx + K[k]' * quu * K[k] + K[k]' * qux + qux' * K[k]
+        vx[k] .= qx + K[k]' * qu + K[k]' * q̃uu * d[k] + q̃ux' * d[k]
+        vxx[k] .= q̃xx + K[k]' * q̃uu * K[k] + K[k]' * q̃ux + q̃ux' * K[k]
 
-        if !isnan(δ_value)
-            vxx[k] .= regularize(Symmetric(vxx[k]), δ_value)
+        λ, _ = eigen(vxx[k])
+
+        if any(λ .< 0)
+            display("negative definite")
         end
 
         # expected improvement
@@ -128,8 +132,7 @@ end
 
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
-    maxiter=100, ρ=1e-4, α_values=exp.(0:-1:-16),
-    δ_value=0, δ_input=-1, δ_last=0,
+    maxiter=100, ρ=1e-4, δ=1e-5, α_values=exp.(0:-1:-16),
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
     state_difference=-,
 )
@@ -157,11 +160,7 @@ function iLQR!(
         differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
 
         # backward pass
-        if !isnan(δ_last)
-            workset.value_function.vxx[end] .= regularize(Symmetric(workset.value_function.vxx[end]), δ_last)
-        end
-
-        Δv = backward_pass!(workset, δ_value, δ_input)
+        Δv = backward_pass!(workset, δ)
 
         # forward pass
         accepted = false
