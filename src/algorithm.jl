@@ -69,12 +69,6 @@ function backward_pass!(workset, δ)
         vx[k] .= qx + K[k]' * qu + K[k]' * q̃uu * d[k] + q̃ux' * d[k]
         vxx[k] .= q̃xx + K[k]' * q̃uu * K[k] + K[k]' * q̃ux + q̃ux' * K[k]
 
-        λ, _ = eigen(vxx[k])
-
-        if any(λ .< 0)
-            display("negative definite")
-        end
-
         # expected improvement
         Δv[k][1] = d[k]' * qu
         Δv[k][2] = 0.5 * d[k]' * quu * d[k]
