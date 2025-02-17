@@ -126,7 +126,7 @@ end
 
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
-    maxiter=100, ρ=1e-4, δ=1e-5, α_values=exp.(0:-1:-15),
+    maxiter=500, ρ=1e-4, δ=1e-5, α_values=exp.(0:-1:-15),
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
     state_difference=-,
 )
@@ -163,7 +163,7 @@ function iLQR!(
             successful, J, ΔJ = forward_pass!(workset, dynamics!, state_difference, running_cost, final_cost, α)
 
             # expected improvement
-            Δv = mapreduce(Δ -> α * Δ[1], +, workset.value_function.Δv)
+            Δv = mapreduce(Δ -> α * Δ[1] + α^2 * Δ[2], +, workset.value_function.Δv)
 
             # error handling
             if !successful
