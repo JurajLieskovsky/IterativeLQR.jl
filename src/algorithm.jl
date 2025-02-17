@@ -126,7 +126,7 @@ end
 
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
-    maxiter=500, ρ=1e-4, δ=1e-5, α_values=exp.(0:-1:-15),
+    maxiter=100, ρ=1e-4, δ=1e-5, α_values=exp.(0:-1:-15),
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
     state_difference=-,
 )
