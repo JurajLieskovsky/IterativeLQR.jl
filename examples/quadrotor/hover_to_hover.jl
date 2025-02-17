@@ -12,8 +12,8 @@ using Plots
 using DataFrames, CSV
 
 # Horizon and timestep
-T = 2
-N = 200
+T = 3.5
+N = 350
 h = T / N
 
 # Target state
@@ -67,7 +67,7 @@ function dynamics_diff!(fx, fu, x, u, _)
 end
 
 # Running cost
-running_cost(_, u, _) = 1e-3 * h * u' * u
+running_cost(_, u, _) = h * (1e-4 * u' * u - 1e-4 * sum(log.(u)))
 
 function running_cost_diff!(lx, lu, lxx, lxu, luu, x, u, k)
     ∇x!(grad, dx, u) = ForwardDiff.gradient!(grad, (dx_) -> running_cost(QuadrotorODE.incremented_state(x, dx_), u, k), dx)
