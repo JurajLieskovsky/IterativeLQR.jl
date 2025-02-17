@@ -12,15 +12,15 @@ using Plots
 using DataFrames, CSV
 
 # Horizon and timestep
-T = 3.5
-N = 350
+T = 4
+N = 400
 h = T / N
 
 # Target state
 xₜ = vcat([0, 0, 2], [1, 0, 0, 0], zeros(3), zeros(3))
 
 # Initial state and inputs
-x₀ = vcat([5, -5, 1], [1, 0, 0, 0], zeros(3), zeros(3))
+x₀ = vcat([6, -6, 1], [1, 0, 0, 0], zeros(3), zeros(3))
 u₀ = 9.81 / 4 * ones(4)
 us₀ = [u₀ for _ in 1:N]
 
@@ -54,7 +54,7 @@ function dynamics_diff!(fx, fu, x, u, _)
 
     arg = vcat(zeros(nz), u)
     res = zeros(nz)
-    jac = zeros(nz, nz+nu)
+    jac = zeros(nz, nz + nu)
 
     @views begin
         ForwardDiff.jacobian!(jac, (res_, arg_) -> f!(res_, x, arg_[1:nz], arg_[nz+1:nz+nu]), res, arg)
@@ -67,7 +67,7 @@ function dynamics_diff!(fx, fu, x, u, _)
 end
 
 # Running cost
-running_cost(_, u, _) = h * (1e-4 * u' * u - 1e-4 * sum(log.(u)))
+running_cost(_, u) = h * (2e-2 * u' * u - 1e-1 * sum(log.(u)))
 
 function running_cost_diff!(lx, lu, lxx, lxu, luu, x, u, k)
     ∇x!(grad, dx, u) = ForwardDiff.gradient!(grad, (dx_) -> running_cost(QuadrotorODE.incremented_state(x, dx_), u, k), dx)
