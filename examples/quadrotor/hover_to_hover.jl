@@ -67,7 +67,7 @@ function dynamics_diff!(fx, fu, x, u, _)
 end
 
 # Running cost
-running_cost(_, u) = h * (2e-2 * u' * u - 1e-1 * sum(log.(u)))
+running_cost(_, u, _) = h * (2e-2 * u' * u - 1e-1 * sum(log.(u)))
 
 function running_cost_diff!(lx, lu, lxx, lxu, luu, x, u, k)
     ∇x!(grad, dx, u) = ForwardDiff.gradient!(grad, (dx_) -> running_cost(QuadrotorODE.incremented_state(x, dx_), u, k), dx)
