@@ -66,8 +66,8 @@ function backward_pass!(workset, δ)
         K[k] = -(F \ qux)
 
         # cost-to-go model
-        vx[k] .= qx + K[k]' * qu + K[k]' * quu * d[k] + qux' * d[k]
-        vxx[k] .= qxx - K[k]' * quu * K[k]
+        vx[k] .= qx + K[k]' * qu
+        vxx[k] .= qxx + K[k]' * qux
 
         # expected improvement
         Δv[k][1] = d[k]' * qu
