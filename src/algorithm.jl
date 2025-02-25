@@ -42,8 +42,7 @@ function backward_pass!(workset, δ)
     @unpack N, ndx, nu = workset
     @unpack Δv, vx, vxx = workset.value_function
     @unpack d, K = workset.policy_update
-    @unpack g, qx, qu = workset.subproblem_gradient
-    @unpack H, qxx, quu, qux, qxu = workset.subproblem_hessian
+    @unpack g, qx, qu, H, qxx, quu, qux = workset.subproblem_objective_derivatives
 
     jac = workset.dynamics_derivatives.jac
     grad = workset.cost_derivatives.grad

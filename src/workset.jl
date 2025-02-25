@@ -78,33 +78,29 @@ struct CostDerivatives{T}
     end
 end
 
-struct SubproblemHessian{T}
+struct SubproblemObjectiveDerivatives{T}
+    g::Vector{T}
+    qx::SubArray{T,1,Vector{T},Tuple{UnitRange{Int64}},true}
+    qu::SubArray{T,1,Vector{T},Tuple{UnitRange{Int64}},true}
+
     H::Matrix{T}
     qxx::SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}
     quu::SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}
     qux::SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}
     qxu::SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}
 
-    function SubproblemHessian{T}(ndx, nu) where {T}
+    function SubproblemObjectiveDerivatives{T}(ndx, nu) where {T}
+        g = zeros(ndx + nu)
+        qx = view(g, 1:ndx)
+        qu = view(g, ndx+1:ndx+nu)
+
         H = zeros(ndx + nu, ndx + nu)
         qxx = view(H, 1:ndx, 1:ndx)
         quu = view(H, ndx+1:ndx+nu, ndx+1:ndx+nu)
         qux = view(H, ndx+1:ndx+nu, 1:ndx)
         qxu = view(H, 1:ndx, ndx+1:ndx+nu)
-        return new(H, qxx, quu, qux, qxu)
-    end
-end
 
-struct SubproblemGradient{T}
-    g::Vector{T}
-    qx::SubArray{T,1,Vector{T},Tuple{UnitRange{Int64}},true}
-    qu::SubArray{T,1,Vector{T},Tuple{UnitRange{Int64}},true}
-
-    function SubproblemGradient{T}(ndx, nu) where {T}
-        g = zeros(ndx + nu)
-        qx = view(g, 1:ndx)
-        qu = view(g, ndx+1:ndx+nu)
-        return new(g, qx, qu)
+        return new(g, qx, qu, H, qxx, quu, qux, qxu)
     end
 end
 
@@ -120,8 +116,7 @@ struct Workset{T}
     policy_update::PolicyUpdate{T}
     dynamics_derivatives::DynamicsDerivatives{T}
     cost_derivatives::CostDerivatives{T}
-    subproblem_hessian::SubproblemHessian{T}
-    subproblem_gradient::SubproblemGradient{T}
+    subproblem_objective_derivatives::SubproblemObjectiveDerivatives{T}
 
     function Workset{T}(nx, nu, N, ndx=nothing) where {T}
         ndx = ndx !== nothing ? ndx : nx
@@ -132,10 +127,9 @@ struct Workset{T}
         dynamics_derivatives = DynamicsDerivatives{T}(ndx, nu, N)
         cost_derivatives = CostDerivatives{T}(ndx, nu, N)
 
-        subproblem_hessian = SubproblemHessian{T}(ndx, nu)
-        subproblem_gradient = SubproblemGradient{T}(ndx, nu)
+        subproblem_objective_derivatives = SubproblemObjectiveDerivatives{T}(ndx, nu)
 
-        return new(N, nx, ndx, nu, 1, 2, trajectory, value_function, policy_update, dynamics_derivatives, cost_derivatives, subproblem_hessian, subproblem_gradient)
+        return new(N, nx, ndx, nu, 1, 2, trajectory, value_function, policy_update, dynamics_derivatives, cost_derivatives, subproblem_objective_derivatives)
     end
 end
 
