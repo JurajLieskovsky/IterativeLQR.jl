@@ -99,11 +99,6 @@ function final_cost_diff!(Φx, Φxx, x, k)
     return nothing
 end
 
-# Workset
-workset = IterativeLQR.Workset{Float64}(13, 4, N, 12)
-IterativeLQR.set_initial_state!(workset, x₀)
-IterativeLQR.set_initial_inputs!(workset, us₀)
-
 # Plotting callback
 function plotting_callback(workset)
     range = 0:workset.N
@@ -123,6 +118,11 @@ function plotting_callback(workset)
 
     return plt
 end
+
+# Workset
+workset = IterativeLQR.Workset{Float64}(13, 4, N, 12)
+IterativeLQR.set_initial_state!(workset, x₀)
+IterativeLQR.set_initial_inputs!(workset, us₀)
 
 # Trajectory optimization
 df = IterativeLQR.iLQR!(
