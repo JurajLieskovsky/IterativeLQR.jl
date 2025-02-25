@@ -42,7 +42,7 @@ function backward_pass!(workset, δ)
     @unpack N, ndx, nu = workset
     @unpack Δv, vx, vxx = workset.value_function
     @unpack d, K = workset.policy_update
-    @unpack G, qx, qu = workset.subproblem_gradient
+    @unpack g, qx, qu = workset.subproblem_gradient
     @unpack H, qxx, quu, qux, qxu = workset.subproblem_hessian
 
     jac = workset.dynamics_derivatives.jac
@@ -51,7 +51,7 @@ function backward_pass!(workset, δ)
 
     for k in N:-1:1
         # gradient and hessian of the argument
-        G .= grad[k] + jac[k]' * vx[k+1]
+        g .= grad[k] + jac[k]' * vx[k+1]
         H .= hess[k] + jac[k]' * vxx[k+1] * jac[k]
 
         # problem regularization

@@ -96,15 +96,15 @@ struct SubproblemHessian{T}
 end
 
 struct SubproblemGradient{T}
-    G::Vector{T}
+    g::Vector{T}
     qx::SubArray{T,1,Vector{T},Tuple{UnitRange{Int64}},true}
     qu::SubArray{T,1,Vector{T},Tuple{UnitRange{Int64}},true}
 
     function SubproblemGradient{T}(ndx, nu) where {T}
-        G = zeros(ndx + nu)
-        qx = view(G, 1:ndx)
-        qu = view(G, ndx+1:ndx+nu)
-        return new(G, qx, qu)
+        g = zeros(ndx + nu)
+        qx = view(g, 1:ndx)
+        qu = view(g, ndx+1:ndx+nu)
+        return new(g, qx, qu)
     end
 end
 
