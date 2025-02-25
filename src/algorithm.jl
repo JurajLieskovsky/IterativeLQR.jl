@@ -20,12 +20,13 @@ function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cos
     @unpack N = workset
     @unpack x, u = nominal_trajectory(workset)
     @unpack fx, fu = workset.dynamics_derivatives
-    @unpack lx, lu, lxx, lxu, luu = workset.cost_derivatives
+    @unpack lx, lu, lxx, lux, lxu, luu = workset.cost_derivatives
     @unpack vx, vxx = workset.value_function
 
     for k in 1:N
         dynamics_diff!(fx[k], fu[k], x[k], u[k], k)
         running_cost_diff!(lx[k], lu[k], lxx[k], lxu[k], luu[k], x[k], u[k], k)
+        lux[k] .= lxu[k]'
     end
 
     final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
@@ -39,22 +40,19 @@ end
 
 function backward_pass!(workset, δ)
     @unpack N, ndx, nu = workset
-    @unpack fx, fu = workset.dynamics_derivatives
-    @unpack lx, lu, lxx, lxu, luu = workset.cost_derivatives
     @unpack Δv, vx, vxx = workset.value_function
     @unpack d, K = workset.policy_update
+    @unpack G, qx, qu = workset.subproblem_gradient
     @unpack H, qxx, quu, qux, qxu = workset.subproblem_hessian
 
-    for k in N:-1:1
-        # gradient
-        qx = lx[k] + fx[k]' * vx[k+1]
-        qu = lu[k] + fu[k]' * vx[k+1]
+    jac = workset.dynamics_derivatives.jac
+    grad = workset.cost_derivatives.grad
+    hess = workset.cost_derivatives.hess
 
-        # hessian
-        qxx .= lxx[k] + fx[k]' * vxx[k+1] * fx[k]
-        quu .= luu[k] + fu[k]' * vxx[k+1] * fu[k]
-        qux .= lxu[k]' + fu[k]' * vxx[k+1] * fx[k]
-        qxu .= qux'
+    for k in N:-1:1
+        # gradient and hessian of the argument
+        G .= grad[k] + jac[k]' * vx[k+1]
+        H .= hess[k] + jac[k]' * vxx[k+1] * jac[k]
 
         # problem regularization
         tmp = copy(quu) # held for expected improvement calculation

@@ -39,34 +39,42 @@ struct PolicyUpdate{T}
 end
 
 struct DynamicsDerivatives{T}
-    fx::Vector{Matrix{T}}
-    fu::Vector{Matrix{T}}
+    jac::Vector{Matrix{T}}
+    fx::Vector{SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}}
+    fu::Vector{SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}}
 
     function DynamicsDerivatives{T}(ndx, nu, N) where {T}
-        fx = [Matrix{T}(undef, ndx, ndx) for _ in 1:N]
-        fu = [Matrix{T}(undef, ndx, nu) for _ in 1:N]
+        jac = [Matrix{T}(undef, ndx, ndx + nu) for _ in 1:N]
+        fx = [view(jac[k], 1:ndx, 1:ndx) for k in 1:N]
+        fu = [view(jac[k], 1:ndx, ndx+1:ndx+nu) for k in 1:N]
 
-        return new(fx, fu)
+        return new(jac, fx, fu)
     end
 end
 
 struct CostDerivatives{T}
-    lx::Vector{Vector{T}}
-    lu::Vector{Vector{T}}
+    grad::Vector{Vector{T}}
+    lx::Vector{SubArray{T,1,Vector{T},Tuple{UnitRange{Int64}},true}}
+    lu::Vector{SubArray{T,1,Vector{T},Tuple{UnitRange{Int64}},true}}
 
-    lxx::Vector{Matrix{T}}
-    lxu::Vector{Matrix{T}}
-    luu::Vector{Matrix{T}}
+    hess::Vector{Matrix{T}}
+    lxx::Vector{SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}}
+    luu::Vector{SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}}
+    lux::Vector{SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}}
+    lxu::Vector{SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}}
 
     function CostDerivatives{T}(ndx, nu, N) where {T}
-        lx = [Vector{T}(undef, ndx) for _ in 1:N]
-        lu = [Vector{T}(undef, nu) for _ in 1:N]
+        grad = [Vector{T}(undef, ndx + nu) for _ in 1:N]
+        lx = [view(grad[k], 1:ndx) for k in 1:N]
+        lu = [view(grad[k], ndx+1:ndx+nu) for k in 1:N]
 
-        lxx = [Matrix{T}(undef, ndx, ndx) for _ in 1:N]
-        lxu = [Matrix{T}(undef, ndx, nu) for _ in 1:N]
-        luu = [Matrix{T}(undef, nu, nu) for _ in 1:N]
+        hess = [Matrix{T}(undef, ndx + nu, ndx + nu) for _ in 1:N]
+        lxx = [view(hess[k], 1:ndx, 1:ndx) for k in 1:N]
+        luu = [view(hess[k], ndx+1:ndx+nu, ndx+1:ndx+nu) for k in 1:N]
+        lux = [view(hess[k], ndx+1:ndx+nu, 1:ndx) for k in 1:N]
+        lxu = [view(hess[k], 1:ndx, ndx+1:ndx+nu) for k in 1:N]
 
-        return new(lx, lu, lxx, lxu, luu)
+        return new(grad, lx, lu, hess, lxx, luu, lux, lxu)
     end
 end
 
@@ -87,6 +95,19 @@ struct SubproblemHessian{T}
     end
 end
 
+struct SubproblemGradient{T}
+    G::Vector{T}
+    qx::SubArray{T,1,Vector{T},Tuple{UnitRange{Int64}},true}
+    qu::SubArray{T,1,Vector{T},Tuple{UnitRange{Int64}},true}
+
+    function SubproblemGradient{T}(ndx, nu) where {T}
+        G = zeros(ndx + nu)
+        qx = view(G, 1:ndx)
+        qu = view(G, ndx+1:ndx+nu)
+        return new(G, qx, qu)
+    end
+end
+
 struct Workset{T}
     N::Int64
     nx::Int64
@@ -100,6 +121,7 @@ struct Workset{T}
     dynamics_derivatives::DynamicsDerivatives{T}
     cost_derivatives::CostDerivatives{T}
     subproblem_hessian::SubproblemHessian{T}
+    subproblem_gradient::SubproblemGradient{T}
 
     function Workset{T}(nx, nu, N, ndx=nothing) where {T}
         ndx = ndx !== nothing ? ndx : nx
@@ -111,8 +133,9 @@ struct Workset{T}
         cost_derivatives = CostDerivatives{T}(ndx, nu, N)
 
         subproblem_hessian = SubproblemHessian{T}(ndx, nu)
+        subproblem_gradient = SubproblemGradient{T}(ndx, nu)
 
-        return new(N, nx, ndx, nu, 1, 2, trajectory, value_function, policy_update, dynamics_derivatives, cost_derivatives, subproblem_hessian)
+        return new(N, nx, ndx, nu, 1, 2, trajectory, value_function, policy_update, dynamics_derivatives, cost_derivatives, subproblem_hessian, subproblem_gradient)
     end
 end
 
