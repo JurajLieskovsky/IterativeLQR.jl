@@ -32,12 +32,6 @@ function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cos
     final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
 end
 
-function regularize(A, δ)
-    λ, V = eigen(A)
-    λ_reg = map(e -> e < δ ? δ : e, λ)
-    return V * diagm(λ_reg) * V'
-end
-
 function backward_pass!(workset, δ)
     @unpack N, ndx, nu = workset
     @unpack Δv, vx, vxx = workset.value_function
@@ -53,10 +47,14 @@ function backward_pass!(workset, δ)
         g .= grad[k] + jac[k]' * vx[k+1]
         H .= hess[k] + jac[k]' * vxx[k+1] * jac[k]
 
-        # problem regularization
-        tmp = copy(quu) # held for expected improvement calculation
-        H .= regularize(Symmetric(H), δ)
+        # hold quu for expected improvement calculation
+        tmp = copy(quu)
 
+        # problem regularization
+        λ, V = eigen(H)
+        λ_reg = map(e -> e < δ ? δ : e, λ)
+        H .= V * diagm(λ_reg) * V'
+        
         # control update
         F = cholesky(Symmetric(quu))
         d[k] = -(F \ qu)
