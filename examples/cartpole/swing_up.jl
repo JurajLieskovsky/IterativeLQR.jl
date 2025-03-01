@@ -47,13 +47,13 @@ function running_cost_diff!(grad, hess, x, u, k)
     nx = CartPoleODE.nx
     nu = CartPoleODE.nu
 
-    arg = vcat(x, u)
+    H = DiffResults.DiffResult(0.0, (grad, hess))
 
-    H = DiffResults.HessianResult(arg)
-    ForwardDiff.hessian!(H, arg -> running_cost(arg[1:nx], arg[nx+1:nx+nu], k), arg)
-
-    grad .= H.derivs[1]
-    hess .= H.derivs[2]
+    @views ForwardDiff.hessian!(
+        H,
+        arg -> running_cost(arg[1:nx], arg[nx+1:nx+nu], k),
+        vcat(x, u)
+    )
 
     return nothing
 end
