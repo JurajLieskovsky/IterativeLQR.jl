@@ -26,7 +26,7 @@ f!(dx, x, u) = dx .= CartPoleODE.f(model, x, u)
 tsit5 = RungeKutta.Tsit5()
 dynamics!(dx, x, u, _) = RungeKutta.f!(dx, tsit5, f!, x, u, h)
 
-function stacked_dynamics_diff!(jac, x, u, k)
+function dynamics_diff!(jac, x, u, k)
     nx = CartPoleODE.nx
     nu = CartPoleODE.nu
 
@@ -96,8 +96,8 @@ IterativeLQR.set_initial_state!(workset, x₀)
 IterativeLQR.set_initial_inputs!(workset, us₀)
 
 df = IterativeLQR.iLQR!(
-    workset, dynamics!, stacked_dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    stacked_derivatives=true, verbose=true, logging=true, plotting_callback=plotting_callback
+    workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!, stacked_derivatives=true,
+    verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
 df[!, :bwd] .= N
