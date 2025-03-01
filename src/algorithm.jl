@@ -47,7 +47,7 @@ function stacked_diff!(workset, dynamics_diff!, running_cost_diff!, final_cost_d
     final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
 end
 
-function backward_pass!(workset, δ)
+function backward_pass!(workset, δ, regularization)
     @unpack N, ndx, nu = workset
     @unpack Δv, vx, vxx = workset.value_function
     @unpack d, K = workset.policy_update
@@ -67,7 +67,14 @@ function backward_pass!(workset, δ)
 
         # problem regularization
         λ, V = eigen(H)
-        λ_reg = map(e -> e < δ ? δ : e, λ)
+
+        if regularization == :min
+            λ_reg = map(e -> e < δ ? δ : e, λ)
+        elseif regularization == :holy
+            λ_max = maximum(abs.(λ))
+            λ_reg = map(e -> e < δ * λ_max ? λ_max : e, λ)
+        end
+
         H .= V * diagm(λ_reg) * V'
         
         # control update
@@ -136,9 +143,9 @@ end
 
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
-    maxiter=100, ρ=1e-4, δ=1e-3, α_values=exp.(0:-1:-15),
+    maxiter=100, ρ=1e-4, δ=eps(), α_values=exp.(0:-0.5:-15),
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
-    stacked_derivatives=false, state_difference=-,
+    stacked_derivatives=false, state_difference=-, regularization=:min
 )
     # line count for printing
     line_count = Ref(0)
@@ -168,7 +175,7 @@ function iLQR!(
         end
 
         # backward pass
-        Δv = backward_pass!(workset, δ)
+        Δv = backward_pass!(workset, δ, regularization)
 
         # forward pass
         accepted = false
