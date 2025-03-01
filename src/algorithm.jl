@@ -66,7 +66,7 @@ function backward_pass!(workset, δ, regularization)
         tmp = copy(quu)
 
         # problem regularization
-        λ, V = eigen(H)
+        λ, V = eigen(Symmetric(H))
 
         if regularization == :min
             λ_reg = map(e -> e < δ ? δ : e, λ)
