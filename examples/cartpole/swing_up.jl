@@ -5,7 +5,7 @@ using IterativeLQR: nominal_trajectory
 using RungeKutta
 using CartPoleODE
 
-using ForwardDiff
+using ForwardDiff, DiffResults
 using Plots
 using DataFrames, CSV
 
@@ -25,20 +25,16 @@ f!(dx, x, u) = dx .= CartPoleODE.f(model, x, u)
 tsit5 = RungeKutta.Tsit5()
 dynamics!(dx, x, u, _) = RungeKutta.f!(dx, tsit5, f!, x, u, h)
 
-function dynamics_diff!(fx, fu, x, u, k)
+function stacked_dynamics_diff!(jac, x, u, k)
     nx = CartPoleODE.nx
     nu = CartPoleODE.nu
 
-    arg = vcat(x, u)
-    res = zeros(nx)
-    jac = zeros(nx, nx + nu)
-
-    @views begin
-        ForwardDiff.jacobian!(jac, (xnew, arg) -> dynamics!(xnew, arg[1:nx], arg[nx+1:nx+nu], k), res, arg)
-
-        fx .= jac[:, 1:nx]
-        fu .= jac[:, nx+1:nx+nu]
-    end
+    @views ForwardDiff.jacobian!(
+        jac,
+        (xnew, arg) -> dynamics!(xnew, arg[1:nx], arg[nx+1:nx+nu], k),
+        zeros(nx),
+        vcat(x, u)
+    )
 
     return nothing
 end
@@ -46,13 +42,17 @@ end
 # Running cost
 running_cost(_, u, _) = 1e-2 * h * u[1]^2
 
-function running_cost_diff!(dLdx, dLdu, ddLdxx, ddLdxu, ddLduu, x, u, k)
-    ∇xL!(grad, x0, u0) = ForwardDiff.gradient!(grad, (x_) -> running_cost(x_, u0, k), x0)
-    ∇uL!(grad, x0, u0) = ForwardDiff.gradient!(grad, (u_) -> running_cost(x0, u_, k), u0)
+function running_cost_diff!(grad, hess, x, u, k)
+    nx = CartPoleODE.nx
+    nu = CartPoleODE.nu
 
-    ForwardDiff.jacobian!(ddLdxx, (grad, x_) -> ∇xL!(grad, x_, u), dLdx, x)
-    ForwardDiff.jacobian!(ddLdxu, (grad, u_) -> ∇xL!(grad, x, u_), dLdx, u)
-    ForwardDiff.jacobian!(ddLduu, (grad, u_) -> ∇uL!(grad, x, u_), dLdu, u)
+    arg = vcat(x, u)
+
+    H = DiffResults.HessianResult(arg)
+    ForwardDiff.hessian!(H, arg -> running_cost(arg[1:nx], arg[nx+1:nx+nu], k), arg)
+
+    grad .= H.derivs[1]
+    hess .= H.derivs[2]
 
     return nothing
 end
@@ -95,8 +95,8 @@ IterativeLQR.set_initial_state!(workset, x₀)
 IterativeLQR.set_initial_inputs!(workset, us₀)
 
 df = IterativeLQR.iLQR!(
-    workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    verbose=true, logging=true, plotting_callback=plotting_callback
+    workset, dynamics!, stacked_dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
+    stacked_derivatives=true, verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
 df[!, :bwd] .= N
