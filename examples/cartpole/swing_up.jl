@@ -15,9 +15,8 @@ N = 150
 h = T / N
 
 # Initial state and inputs
-x₀ = zeros(4)
-us₀ = [[1e-3] for _ in 1:N]
-# us₀ = [[1e-4 * 2 * pi * k / N] for k in 0:N-1]
+x₀ = [0, pi * 1e-3, 0, 0]
+us₀ = [zeros(1) for _ in 1:N]
 
 # Dynamics
 model = CartPoleODE.Model(9.81, 1, 0.1, 0.2)
@@ -32,7 +31,7 @@ function dynamics_diff!(fx, fu, x, u, k)
 
     arg = vcat(x, u)
     res = zeros(nx)
-    jac = zeros(nx, nx+nu)
+    jac = zeros(nx, nx + nu)
 
     @views begin
         ForwardDiff.jacobian!(jac, (xnew, arg) -> dynamics!(xnew, arg[1:nx], arg[nx+1:nx+nu], k), res, arg)
@@ -71,11 +70,6 @@ function final_cost_diff!(dΦdx, ddΦdxx, x, k)
     return nothing
 end
 
-# iLQR workset and initial guess
-workset = IterativeLQR.Workset{Float64}(4, 1, N)
-IterativeLQR.set_initial_state!(workset, x₀)
-IterativeLQR.set_initial_inputs!(workset, us₀)
-
 # Plotting callback
 function plotting_callback(workset)
     range = 0:workset.N
@@ -96,6 +90,10 @@ function plotting_callback(workset)
 end
 
 # Trajectory optimization
+workset = IterativeLQR.Workset{Float64}(4, 1, N)
+IterativeLQR.set_initial_state!(workset, x₀)
+IterativeLQR.set_initial_inputs!(workset, us₀)
+
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
     verbose=true, logging=true, plotting_callback=plotting_callback

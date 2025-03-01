@@ -119,12 +119,11 @@ function plotting_callback(workset)
     return plt
 end
 
-# Workset
+# Trajectory optimization
 workset = IterativeLQR.Workset{Float64}(13, 4, N, 12)
 IterativeLQR.set_initial_state!(workset, x₀)
 IterativeLQR.set_initial_inputs!(workset, us₀)
 
-# Trajectory optimization
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
     verbose=true, logging=true, plotting_callback=plotting_callback, state_difference=QuadrotorODE.state_difference
