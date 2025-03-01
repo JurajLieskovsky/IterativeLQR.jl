@@ -59,7 +59,7 @@ function running_cost_diff!(grad, hess, x, u, k)
 end
 
 # Final cost
-final_cost(x, _) = 1e2 * (1 + cos(x[2])) + 1e1 * x[1]^2 + 1e2 * x[3]^2 + 1e2 * x[4]^2
+final_cost(x, _) = 1e2 * (x[1]^2 + (x[2] - pi)^2 + x[3]^2 + x[4]^2)
 
 function final_cost_diff!(dΦdx, ddΦdxx, x, k)
     result = DiffResults.HessianResult(x)
