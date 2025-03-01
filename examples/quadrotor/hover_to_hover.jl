@@ -39,7 +39,7 @@ dynamics!(xnew, x, u, _) = RungeKutta.f!(
     h
 )
 
-function dynamics_diff!(fx, fu, x, u, _)
+function dynamics_diff!(jac, x, u, _)
     f!(dznew, x, dz, u) = RungeKutta.f!(
         dznew,
         tsit5,
@@ -52,32 +52,28 @@ function dynamics_diff!(fx, fu, x, u, _)
     nz = QuadrotorODE.nz
     nu = QuadrotorODE.nu
 
-    arg = vcat(zeros(nz), u)
-    res = zeros(nz)
-    jac = zeros(nz, nz + nu)
-
-    @views begin
-        ForwardDiff.jacobian!(jac, (res_, arg_) -> f!(res_, x, arg_[1:nz], arg_[nz+1:nz+nu]), res, arg)
-
-        fx .= jac[:, 1:nz]
-        fu .= jac[:, nz+1:nz+nu]
-    end
-
-    return nothing
+    @views ForwardDiff.jacobian!(
+        jac,
+        (dznew, arg) -> f!(dznew, x, arg[1:nz], arg[nz+1:nz+nu]),
+        zeros(nz),
+        vcat(zeros(nz), u)
+    )
 end
 
 # Running cost
 running_cost(_, u, _) = h * (2e-2 * u' * u - 1e-1 * sum(log.(u)))
 
-function running_cost_diff!(lx, lu, lxx, lxu, luu, x, u, k)
-    ∇x!(grad, dx, u) = ForwardDiff.gradient!(grad, (dx_) -> running_cost(QuadrotorODE.incremented_state(x, dx_), u, k), dx)
-    ∇u!(grad, dx, u) = ForwardDiff.gradient!(grad, (u_) -> running_cost(QuadrotorODE.incremented_state(x, dx), u_, k), u)
+function running_cost_diff!(grad, hess, x, u, k)
+    nz = QuadrotorODE.nz
+    nu = QuadrotorODE.nu
 
-    dx = zeros(QuadrotorODE.nz)
+    H = DiffResults.DiffResult(0.0, (grad, hess))
 
-    ForwardDiff.jacobian!(lxx, (grad, dx_) -> ∇x!(grad, dx_, u), lx, dx)
-    ForwardDiff.jacobian!(lxu, (grad, u_) -> ∇x!(grad, dx, u_), lx, u)
-    ForwardDiff.jacobian!(luu, (grad, u_) -> ∇u!(grad, dx, u_), lu, u)
+    @views ForwardDiff.hessian!(
+        H,
+        arg -> running_cost(QuadrotorODE.incremented_state(x, arg[1:nz]), arg[nz+1:nz+nu], k),
+        vcat(zeros(nz), u)
+    )
 
     return nothing
 end
@@ -125,7 +121,7 @@ IterativeLQR.set_initial_state!(workset, x₀)
 IterativeLQR.set_initial_inputs!(workset, us₀)
 
 df = IterativeLQR.iLQR!(
-    workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
+    workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!, stacked_derivatives=true,
     verbose=true, logging=true, plotting_callback=plotting_callback, state_difference=QuadrotorODE.state_difference
 )
 
