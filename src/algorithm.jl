@@ -32,6 +32,21 @@ function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cos
     final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
 end
 
+function stacked_diff!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
+    @unpack N = workset
+    @unpack x, u = nominal_trajectory(workset)
+    @unpack jac = workset.dynamics_derivatives
+    @unpack grad, hess = workset.cost_derivatives
+    @unpack vx, vxx = workset.value_function
+
+    for k in 1:N
+        dynamics_diff!(jac[k], x[k], u[k], k)
+        running_cost_diff!(grad[k], hess[k], x[k], u[k], k)
+    end
+
+    final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
+end
+
 function backward_pass!(workset, δ)
     @unpack N, ndx, nu = workset
     @unpack Δv, vx, vxx = workset.value_function
@@ -52,6 +67,7 @@ function backward_pass!(workset, δ)
 
         # problem regularization
         λ, V = eigen(H)
+        δ = minimum(view(λ, λ .> 0))
         λ_reg = map(e -> e < δ ? δ : e, λ)
         H .= V * diagm(λ_reg) * V'
         
@@ -121,9 +137,9 @@ end
 
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
-    maxiter=100, ρ=1e-4, δ=1e-5, α_values=exp.(0:-1:-15),
+    maxiter=100, ρ=1e-4, δ=1e-4, α_values=exp.(0:-1:-15),
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
-    state_difference=-,
+    stacked_derivatives=false, state_difference=-,
 )
     # line count for printing
     line_count = Ref(0)
@@ -146,7 +162,11 @@ function iLQR!(
     # algorithm
     for i in 1:maxiter
         # nominal trajectory differentiation
-        differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
+        if !stacked_derivatives
+            differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
+        else
+            stacked_diff!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
+        end
 
         # backward pass
         Δv = backward_pass!(workset, δ)
