@@ -93,12 +93,26 @@ end
 # Trajectory optimization
 workset = IterativeLQR.Workset{Float64}(4, 1, N)
 IterativeLQR.set_initial_state!(workset, x₀)
-IterativeLQR.set_initial_inputs!(workset, us₀)
 
+IterativeLQR.set_initial_inputs!(workset, us₀)
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!, stacked_derivatives=true,
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
+
+# Benchmark
+opt = filter(row -> row.accepted, df).J[end]
+iter = df.i[findfirst(J -> (J - opt) < 1e-3 * opt, df.J)] 
+
+bench = @benchmark begin 
+    IterativeLQR.set_initial_inputs!(workset, us₀)
+    IterativeLQR.iLQR!(
+        workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!, stacked_derivatives=true,
+        verbose=false, maxiter=iter, δ=1e-3, regularization=:min
+    )
+end
+
+display(bench)
 
 df[!, :bwd] .= N
 df[!, :fwd] .= N

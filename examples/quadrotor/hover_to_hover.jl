@@ -125,6 +125,21 @@ df = IterativeLQR.iLQR!(
     verbose=true, logging=true, plotting_callback=plotting_callback, state_difference=QuadrotorODE.state_difference
 )
 
+# Benchmark
+opt = filter(row -> row.accepted, df).J[end]
+iter = df.i[findfirst(J -> (J - opt) < 1e-3 * opt, df.J)] 
+
+bench = @benchmark begin 
+    IterativeLQR.set_initial_inputs!(workset, us₀)
+    IterativeLQR.iLQR!(
+        workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!, stacked_derivatives=true,
+        verbose=false, maxiter=iter,
+        state_difference=QuadrotorODE.state_difference
+    )
+end
+
+display(bench)
+
 # Visualization
 vis = (@isdefined vis) ? vis : Visualizer()
 render(vis)
