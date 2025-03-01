@@ -8,6 +8,7 @@ using CartPoleODE
 using ForwardDiff, DiffResults
 using Plots
 using DataFrames, CSV
+using Infiltrator
 
 # Horizon and timestep
 T = 2
