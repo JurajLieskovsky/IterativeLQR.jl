@@ -67,7 +67,6 @@ function backward_pass!(workset, δ)
 
         # problem regularization
         λ, V = eigen(H)
-        # δ = minimum(view(λ, λ .> 0))
         λ_reg = map(e -> e < δ ? δ : e, λ)
         H .= V * diagm(λ_reg) * V'
         
