@@ -157,7 +157,7 @@ function iLQR!(
             successful, J = trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
         end
 
-        verbose && print_iteration!(line_count, 0, NaN, J, NaN, NaN, successful, NaN, NaN, rlt)
+        verbose && print_iteration!(line_count, 0, NaN, J, NaN, NaN, successful, NaN, NaN, rlt * 1e3)
         logging && log_iteration!(dataframe, 0, NaN, J, NaN, NaN, successful)
 
         if successful == false
@@ -196,7 +196,7 @@ function iLQR!(
 
             # error handling
             if !successful
-                verbose && print_iteration!(line_count, i, α, J, ΔJ, Δv, false, diff, bwd, fwd)
+                verbose && print_iteration!(line_count, i, α, J, ΔJ, Δv, false, diff * 1e3, bwd * 1e3, fwd * 1e3)
                 logging && log_iteration!(dataframe, i, α, J, ΔJ, Δv, false)
                 continue
             end
@@ -205,7 +205,7 @@ function iLQR!(
             accepted = ΔJ < 0 && ΔJ <= ρ * Δv
 
             # printout
-            verbose && print_iteration!(line_count, i, α, J, ΔJ, Δv, accepted, diff, bwd, fwd)
+            verbose && print_iteration!(line_count, i, α, J, ΔJ, Δv, accepted, diff * 1e3, bwd * 1e3, fwd * 1e3)
             logging && log_iteration!(dataframe, i, α, J, ΔJ, Δv, accepted)
 
             # solution copying and regularization parameter adjustment
