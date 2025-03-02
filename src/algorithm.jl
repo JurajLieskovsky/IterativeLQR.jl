@@ -70,12 +70,12 @@ function backward_pass!(workset, δ, regularization)
 
         if regularization == :min
             λ_reg = map(e -> e < δ ? δ : e, λ)
+            H .= V * diagm(λ_reg) * V'
         elseif regularization == :holy
-            λ_max = maximum(abs.(λ))
-            λ_reg = map(e -> e < δ * λ_max ? λ_max : e, λ)
+            F = cholesky(Positive, H)
+            H .= F.L * F.L'
         end
 
-        H .= V * diagm(λ_reg) * V'
         
         # control update
         F = cholesky(Symmetric(quu))

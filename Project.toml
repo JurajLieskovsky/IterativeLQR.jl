@@ -9,9 +9,11 @@ DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Infiltrator = "5903a43b-9cc3-4c30-8d17-598619ec4e9b"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Parameters = "d96e819e-fc66-5662-9728-84c9c7592b0a"
+PositiveFactorizations = "85a6dd25-e78a-55b7-8502-1745935b8125"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 
 [compat]
 CSV = "0.10.15"
 DataFrames = "1.7.0"
 Infiltrator = "1.8.6"
+PositiveFactorizations = "0.2.4"
