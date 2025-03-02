@@ -74,7 +74,7 @@ function backward_pass!(workset, δ, regularization)
             F = cholesky(Positive, H)
             H .= F.L * F.L'
         end
-        
+
         # control update
         F = cholesky(Symmetric(quu))
         d[k] = -(F \ qu)
@@ -141,7 +141,7 @@ end
 
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
-    maxiter=100, ρ=1e-4, δ=eps(), α_values=exp.(0:-0.5:-15),
+    maxiter=100, ρ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16),
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
     stacked_derivatives=false, state_difference=-, regularization=:min
 )
