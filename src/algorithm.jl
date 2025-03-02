@@ -119,14 +119,14 @@ function forward_pass!(workset, dynamics!, difference, running_cost, final_cost,
     return true, sum(l), sum(l) - sum(l_ref)
 end
 
-function print_iteration!(line_count, i, α, J, ΔJ, Δv, accepted)
+function print_iteration!(line_count, i, α, J, ΔJ, Δv, accepted, diff, bwd, fwd)
     line_count[] % 10 == 0 && @printf(
-        "%-9s %-9s %-9s %-9s %-9s %-9s\n",
-        "iter", "α", "J", "ΔJ", "ΔV", "accepted"
+        "%-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s\n",
+        "iter", "α", "J", "ΔJ", "ΔV", "accepted", "diff", "bwd", "fwd"
     )
     @printf(
-        "%-9i %-9.3g %-9.3g %-9.3g %-9.3g %-9s\n",
-        i, α, J, ΔJ, Δv, accepted
+        "%-9i %-9.3g %-9.3g %-9.3g %-9.3g %-9s %-9.3g %-9.3g %-9.3g\n",
+        i, α, J, ΔJ, Δv, accepted, diff, bwd, fwd
     )
     line_count[] += 1
 end
@@ -155,9 +155,11 @@ function iLQR!(
 
     # initial trajectory rollout
     if rollout == true
-        successful, J = trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
+        rlt = @elapsed begin
+            successful, J = trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
+        end
 
-        verbose && print_iteration!(line_count, 0, NaN, J, NaN, NaN, successful)
+        verbose && print_iteration!(line_count, 0, NaN, J, NaN, NaN, successful, NaN, NaN, rlt)
         logging && log_iteration!(dataframe, 0, NaN, J, NaN, NaN, successful)
 
         if successful == false
@@ -168,27 +170,35 @@ function iLQR!(
     # algorithm
     for i in 1:maxiter
         # nominal trajectory differentiation
-        if !stacked_derivatives
-            differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
-        else
-            stacked_diff!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
+
+        diff = @elapsed begin
+            if !stacked_derivatives
+                differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
+            else
+                stacked_diff!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
+            end
         end
 
         # backward pass
-        Δv = backward_pass!(workset, δ, regularization)
+        bwd = @elapsed begin
+            Δv = backward_pass!(workset, δ, regularization)
+        end
 
         # forward pass
         accepted = false
 
         for α in α_values
-            successful, J, ΔJ = forward_pass!(workset, dynamics!, state_difference, running_cost, final_cost, α)
+
+            fwd = @elapsed begin
+                successful, J, ΔJ = forward_pass!(workset, dynamics!, state_difference, running_cost, final_cost, α)
+            end
 
             # expected improvement
             Δv = mapreduce(Δ -> α * Δ[1] + α^2 * Δ[2], +, workset.value_function.Δv)
 
             # error handling
             if !successful
-                verbose && print_iteration!(line_count, i, α, J, ΔJ, Δv, false)
+                verbose && print_iteration!(line_count, i, α, J, ΔJ, Δv, false, diff, bwd, fwd)
                 logging && log_iteration!(dataframe, i, α, J, ΔJ, Δv, false)
                 continue
             end
@@ -197,7 +207,7 @@ function iLQR!(
             accepted = ΔJ < 0 && ΔJ <= ρ * Δv
 
             # printout
-            verbose && print_iteration!(line_count, i, α, J, ΔJ, Δv, accepted)
+            verbose && print_iteration!(line_count, i, α, J, ΔJ, Δv, accepted, diff, bwd, fwd)
             logging && log_iteration!(dataframe, i, α, J, ΔJ, Δv, accepted)
 
             # solution copying and regularization parameter adjustment
