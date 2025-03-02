@@ -66,16 +66,14 @@ function backward_pass!(workset, δ, regularization)
         tmp = copy(quu)
 
         # problem regularization
-        λ, V = eigen(Symmetric(H))
-
         if regularization == :min
+            λ, V = eigen(Symmetric(H))
             λ_reg = map(e -> e < δ ? δ : e, λ)
             H .= V * diagm(λ_reg) * V'
         elseif regularization == :holy
             F = cholesky(Positive, H)
             H .= F.L * F.L'
         end
-
         
         # control update
         F = cholesky(Symmetric(quu))
