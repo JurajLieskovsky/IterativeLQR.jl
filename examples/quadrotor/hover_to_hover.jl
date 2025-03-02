@@ -10,6 +10,7 @@ using LinearAlgebra
 using ForwardDiff
 using Plots
 using DataFrames, CSV
+using BenchmarkTools
 
 # Horizon and timestep
 T = 4
