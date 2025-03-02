@@ -23,7 +23,7 @@ function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cos
     @unpack lx, lu, lxx, lux, lxu, luu = workset.cost_derivatives
     @unpack vx, vxx = workset.value_function
 
-    for k in 1:N
+    @threads for k in 1:N
         dynamics_diff!(fx[k], fu[k], x[k], u[k], k)
         running_cost_diff!(lx[k], lu[k], lxx[k], lxu[k], luu[k], x[k], u[k], k)
         lux[k] .= lxu[k]'
@@ -39,7 +39,7 @@ function stacked_diff!(workset, dynamics_diff!, running_cost_diff!, final_cost_d
     @unpack grad, hess = workset.cost_derivatives
     @unpack vx, vxx = workset.value_function
 
-    for k in 1:N
+    @threads for k in 1:N
         dynamics_diff!(jac[k], x[k], u[k], k)
         running_cost_diff!(grad[k], hess[k], x[k], u[k], k)
     end
