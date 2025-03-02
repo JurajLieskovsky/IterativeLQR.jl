@@ -2,7 +2,7 @@ function trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
     @unpack N = workset
     @unpack x, u, l = nominal_trajectory(workset)
 
-    for k in 1:N
+    @inbounds for k in 1:N
         try
             dynamics!(x[k+1], x[k], u[k], k)
             l[k] = running_cost(x[k], u[k], k)
@@ -57,7 +57,7 @@ function backward_pass!(workset, δ, regularization)
     grad = workset.cost_derivatives.grad
     hess = workset.cost_derivatives.hess
 
-    for k in N:-1:1
+    @inbounds for k in N:-1:1
         # gradient and hessian of the argument
         g .= grad[k] + jac[k]' * vx[k+1]
         H .= hess[k] + jac[k]' * vxx[k+1] * jac[k]
@@ -101,7 +101,7 @@ function forward_pass!(workset, dynamics!, difference, running_cost, final_cost,
 
     x[1] = x_ref[1]
 
-    for k in 1:N
+    @inbounds for k in 1:N
         u[k] .= u_ref[k] + α * d[k] + K[k] * difference(x[k], x_ref[k])
 
         try
