@@ -23,7 +23,9 @@ us₀ = [zeros(1) for _ in 1:N]
 model = CartPoleODE.Model(9.81, 1, 0.1, 0.2)
 
 function dynamics!(xnew, x, u, _)
-    xnew .= x + h * CartPoleODE.f(model, x, u)
+    CartPoleODE.f!(model, xnew, x, u)
+    xnew .*= h
+    xnew .+= x
 
     return nothing
 end
