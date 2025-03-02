@@ -2,7 +2,6 @@ using Revise
 
 using IterativeLQR
 using IterativeLQR: nominal_trajectory
-using RungeKutta
 using CartPoleODE
 
 using ForwardDiff, DiffResults
@@ -12,7 +11,7 @@ using Infiltrator
 
 # Horizon and timestep
 T = 2
-N = 150
+N = 200
 h = T / N
 
 # Initial state and inputs
@@ -21,10 +20,12 @@ us₀ = [zeros(1) for _ in 1:N]
 
 # Dynamics
 model = CartPoleODE.Model(9.81, 1, 0.1, 0.2)
-f!(dx, x, u) = dx .= CartPoleODE.f(model, x, u)
 
-tsit5 = RungeKutta.Tsit5()
-dynamics!(dx, x, u, _) = RungeKutta.f!(dx, tsit5, f!, x, u, h)
+function dynamics!(xnew, x, u, _)
+    xnew .= x + h * CartPoleODE.f(model, x, u)
+
+    return nothing
+end
 
 function dynamics_diff!(jac, x, u, k)
     nx = CartPoleODE.nx
@@ -96,7 +97,7 @@ IterativeLQR.set_initial_state!(workset, x₀)
 
 IterativeLQR.set_initial_inputs!(workset, us₀)
 df = IterativeLQR.iLQR!(
-    workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!, stacked_derivatives=true,
+    workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!, stacked_derivatives=true, regularization=:holy,
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
@@ -107,8 +108,8 @@ iter = df.i[findfirst(J -> (J - opt) < 1e-3 * opt, df.J)]
 bench = @benchmark begin 
     IterativeLQR.set_initial_inputs!(workset, us₀)
     IterativeLQR.iLQR!(
-        workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!, stacked_derivatives=true,
-        verbose=false, maxiter=iter, δ=1e-3, regularization=:min
+        workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!, stacked_derivatives=true, regularization=:holy,
+        verbose=false, maxiter=iter
     )
 end
 

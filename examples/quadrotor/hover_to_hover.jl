@@ -2,7 +2,6 @@ using Revise
 
 using IterativeLQR
 using IterativeLQR: nominal_trajectory, active_trajectory
-using RungeKutta
 using QuadrotorODE
 using MeshCatBenchmarkMechanisms
 
@@ -29,36 +28,26 @@ us₀ = [u₀ for _ in 1:N]
 a = 0.3
 quadrotor = QuadrotorODE.System([0, 0, -9.81], 1, I(3), a, 0.1)
 
-tsit5 = RungeKutta.Tsit5()
+function dynamics!(xnew, x, u, _)
+    xnew .= x + h * QuadrotorODE.dynamics(quadrotor, x, u)
+    return nothing
+end
 
-dynamics!(xnew, x, u, _) = RungeKutta.f!(
-    xnew,
-    tsit5,
-    (xnew_, x_, u_) -> xnew_ .= QuadrotorODE.dynamics(quadrotor, x_, u_),
-    x,
-    u,
-    h
-)
 
 function dynamics_diff!(jac, x, u, _)
-    f!(dznew, x, dz, u) = RungeKutta.f!(
-        dznew,
-        tsit5,
-        (dznew_, dz_, u_) -> dznew_ .= QuadrotorODE.tangential_dynamics(quadrotor, x, dz_, u_),
-        dz,
-        u,
-        h
-    )
-
     nz = QuadrotorODE.nz
     nu = QuadrotorODE.nu
 
     @views ForwardDiff.jacobian!(
         jac,
-        (dznew, arg) -> f!(dznew, x, arg[1:nz], arg[nz+1:nz+nu]),
-        zeros(nz),
+        arg -> QuadrotorODE.tangential_dynamics(quadrotor, x, arg[1:nz], arg[nz+1:nz+nu]),
         vcat(zeros(nz), u)
     )
+
+    jac .*= h
+    jac[1:nz,1:nz] += I(nz)
+
+    return nothing
 end
 
 # Running cost
