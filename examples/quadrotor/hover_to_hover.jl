@@ -27,7 +27,7 @@ us₀ = [u₀ for _ in 1:N]
 
 # Dynamics
 a = 0.3
-quadrotor = QuadrotorODE.System([0, 0, -9.81], 1, I(3), a, 0.01)
+quadrotor = QuadrotorODE.System([0, 0, -9.81], 1, I(3), a, 0.1)
 
 tsit5 = RungeKutta.Tsit5()
 
