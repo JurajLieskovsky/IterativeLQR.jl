@@ -30,6 +30,7 @@ quadrotor = QuadrotorODE.System([0, 0, -9.81], 1, I(3), a, 0.1)
 
 function dynamics!(xnew, x, u, _)
     xnew .= x + h * QuadrotorODE.dynamics(quadrotor, x, u)
+    QuadrotorODE.normalize_state!(xnew)
     return nothing
 end
 
