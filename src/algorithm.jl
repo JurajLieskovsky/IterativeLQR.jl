@@ -30,6 +30,8 @@ function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cos
     end
 
     final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
+
+    return nothing
 end
 
 function stacked_diff!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
@@ -45,6 +47,8 @@ function stacked_diff!(workset, dynamics_diff!, running_cost_diff!, final_cost_d
     end
 
     final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
+
+    return nothing
 end
 
 function backward_pass!(workset, δ, regularization)
@@ -92,6 +96,8 @@ function backward_pass!(workset, δ, regularization)
         Δv[k][1] = d[k]' * qu
         Δv[k][2] = 0.5 * d[k]' * tmp * d[k]
     end
+
+    return nothing
 end
 
 function forward_pass!(workset, dynamics!, difference, running_cost, final_cost, α)
@@ -172,7 +178,6 @@ function iLQR!(
     # algorithm
     for i in 1:maxiter
         # nominal trajectory differentiation
-
         diff = @elapsed begin
             if !stacked_derivatives
                 differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
@@ -183,7 +188,7 @@ function iLQR!(
 
         # backward pass
         bwd = @elapsed begin
-            Δv = backward_pass!(workset, δ, regularization)
+            backward_pass!(workset, δ, regularization)
         end
 
         # forward pass
