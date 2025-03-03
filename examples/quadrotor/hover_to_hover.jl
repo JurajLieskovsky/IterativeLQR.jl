@@ -46,7 +46,7 @@ function dynamics_diff!(jac, x, u, _)
     )
 
     jac .*= h
-    jac[1:nz,1:nz] += I(nz)
+    view(jac, diagind(jac)) .+= 1
 
     return nothing
 end
@@ -76,13 +76,12 @@ function final_cost(x, _)
 end
 
 function final_cost_diff!(Φx, Φxx, x, k)
-    dz = zeros(12)
-    result = DiffResults.HessianResult(dz)
-    ForwardDiff.hessian!(result, dz_ -> final_cost(QuadrotorODE.incremented_state(x, dz_), k), dz)
-
-    Φx .= result.derivs[1]
-    Φxx .= result.derivs[2]
-
+    H = DiffResults.DiffResult(0.0, (Φx, Φxx))
+    ForwardDiff.hessian!(
+        H,
+        dz -> final_cost(QuadrotorODE.incremented_state(x, dz), k),
+        zeros(QuadrotorODE.nz)
+    )
     return nothing
 end
 

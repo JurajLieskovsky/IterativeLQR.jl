@@ -65,13 +65,9 @@ end
 # Final cost
 final_cost(x, _) = 1e2 * (x[1]^2 + (x[2] - pi)^2 + x[3]^2 + x[4]^2)
 
-function final_cost_diff!(dΦdx, ddΦdxx, x, k)
-    result = DiffResults.HessianResult(x)
-    ForwardDiff.hessian!(result, x -> final_cost(x, k), x)
-
-    dΦdx .= result.derivs[1]
-    ddΦdxx .= result.derivs[2]
-
+function final_cost_diff!(Φx, Φxx, x, k)
+    H = DiffResults.DiffResult(0.0, (Φx, Φxx))
+    ForwardDiff.hessian!(H, x -> final_cost(x, k), x)
     return nothing
 end
 
