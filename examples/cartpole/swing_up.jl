@@ -3,6 +3,7 @@ using Revise
 using IterativeLQR
 using IterativeLQR: nominal_trajectory
 using CartPoleODE
+using MeshCatBenchmarkMechanisms
 
 using ForwardDiff, DiffResults
 using Plots
@@ -113,3 +114,22 @@ display(@benchmark begin
         verbose=false, maxiter=iter
     )
 end)
+
+# Visualization
+(@isdefined vis) || (vis = Visualizer())
+render(vis)
+
+## cart-pole
+MeshCatBenchmarkMechanisms.set_cartpole!(vis, 0.1, 0.05, 0.05, model.l, 0.02)
+
+## initial configuration
+MeshCatBenchmarkMechanisms.set_cartpole_state!(vis, nominal_trajectory(workset).x[1])
+
+## animation
+anim = MeshCatBenchmarkMechanisms.Animation(vis, fps=1/h)
+for (i, x) in enumerate(nominal_trajectory(workset).x)
+    atframe(anim, i) do
+        MeshCatBenchmarkMechanisms.set_cartpole_state!(vis, x)
+    end
+end
+setanimation!(vis, anim, play=false)
