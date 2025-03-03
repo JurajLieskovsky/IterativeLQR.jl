@@ -142,8 +142,7 @@ MeshCatBenchmarkMechanisms.set_quadrotor_state!(vis, nominal_trajectory(workset)
 MeshCatBenchmarkMechanisms.set_target_position!(vis, xₜ[1:3])
 
 ## animation
-fps = 100
-anim = MeshCatBenchmarkMechanisms.Animation(vis, fps=fps)
+anim = MeshCatBenchmarkMechanisms.Animation(vis, fps=1/h)
 for (i, x) in enumerate(nominal_trajectory(workset).x)
     atframe(anim, i) do
         MeshCatBenchmarkMechanisms.set_quadrotor_state!(vis, x)
