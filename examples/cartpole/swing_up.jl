@@ -96,7 +96,8 @@ IterativeLQR.set_initial_state!(workset, x₀)
 
 IterativeLQR.set_initial_inputs!(workset, us₀)
 df = IterativeLQR.iLQR!(
-    workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!, stacked_derivatives=true, regularization=:holy,
+    workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
+    stacked_derivatives=true, regularization=:holy,
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
@@ -107,7 +108,8 @@ iter = df.i[findfirst(J -> (J - opt) < 1e-3 * opt, df.J)]
 bench = @benchmark begin 
     IterativeLQR.set_initial_inputs!(workset, us₀)
     IterativeLQR.iLQR!(
-        workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!, stacked_derivatives=true, regularization=:holy,
+        workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
+        stacked_derivatives=true, regularization=:holy,
         verbose=false, maxiter=iter
     )
 end
