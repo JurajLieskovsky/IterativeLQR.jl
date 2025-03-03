@@ -143,7 +143,7 @@ function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
     maxiter=100, ρ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16),
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
-    stacked_derivatives=false, state_difference=-, regularization=:min
+    stacked_derivatives=false, state_difference=-, regularization=:holy
 )
     # line count for printing
     line_count = Ref(0)
