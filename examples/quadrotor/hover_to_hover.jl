@@ -120,16 +120,14 @@ df = IterativeLQR.iLQR!(
 opt = filter(row -> row.accepted, df).J[end]
 iter = df.i[findfirst(J -> (J - opt) < 1e-3 * opt, df.J)]
 
-bench = @benchmark begin
+display(@benchmark begin
     IterativeLQR.set_initial_inputs!(workset, us₀)
     IterativeLQR.iLQR!(
         workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
         stacked_derivatives=true, state_difference=QuadrotorODE.state_difference, regularization=:holy,
         verbose=false, maxiter=iter
     )
-end
-
-display(bench)
+end)
 
 # Visualization
 vis = (@isdefined vis) ? vis : Visualizer()
@@ -152,7 +150,3 @@ for (i, x) in enumerate(nominal_trajectory(workset).x)
     end
 end
 setanimation!(vis, anim, play=false);
-
-df[!, :bwd] .= N
-df[!, :fwd] .= N
-CSV.write("quadrotor/results/ilqr-iterations.csv", df)
