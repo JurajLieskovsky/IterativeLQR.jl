@@ -95,10 +95,10 @@ workset = IterativeLQR.Workset{Float64}(4, 1, N)
 IterativeLQR.set_initial_state!(workset, x₀)
 
 IterativeLQR.set_initial_inputs!(workset, us₀)
-df = IterativeLQR.iLQR!(
+IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
     stacked_derivatives=true, regularization=:holy,
-    verbose=true, logging=true, plotting_callback=plotting_callback
+    verbose=true, plotting_callback=plotting_callback
 )
 
 # Benchmark
