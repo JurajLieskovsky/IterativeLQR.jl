@@ -152,7 +152,7 @@ function iLQR!(
     dataframe = logging ? iteration_dataframe() : nothing
 
     # initial trajectory rollout
-    if rollout == true
+    if rollout
         rlt = @elapsed begin
             successful, J = trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
         end
@@ -160,7 +160,7 @@ function iLQR!(
         verbose && print_iteration!(line_count, 0, NaN, J, NaN, NaN, successful, NaN, NaN, rlt * 1e3)
         logging && log_iteration!(dataframe, 0, NaN, J, NaN, NaN, successful)
 
-        if successful == false
+        if !successful
             return nothing
         end
     end
@@ -216,12 +216,12 @@ function iLQR!(
             end
         end
 
-        if accepted == false
+        if !accepted
             break
         end
     end
 
-    if logging == true
+    if logging
         return dataframe
     else
         return nothing
