@@ -117,9 +117,9 @@ df = IterativeLQR.iLQR!(
 
 # Benchmark
 opt = filter(row -> row.accepted, df).J[end]
-iter = df.i[findfirst(J -> (J - opt) < 1e-3 * opt, df.J)] 
+iter = df.i[findfirst(J -> (J - opt) < 1e-3 * opt, df.J)]
 
-bench = @benchmark begin 
+bench = @benchmark begin
     IterativeLQR.set_initial_inputs!(workset, us₀)
     IterativeLQR.iLQR!(
         workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!, stacked_derivatives=true,
