@@ -11,14 +11,24 @@ using DataFrames, CSV
 using Infiltrator
 using BenchmarkTools
 
-# Horizon and timestep
-T = 2
-N = 200
-h = T / N
+problem = :swingup
+# problem = :reposition
 
-# Initial state and inputs
-x₀ = [0, pi * 1e-3, 0, 0]
+# Horizon length, initial state and inputs
+if problem == :swingup
+    T = 2
+    x₀ = [0, 1e-3, 0, 0]
+    N = 200
+elseif problem == :reposition
+    T = 1
+    x₀ = [-1, pi, 0, 0]
+    N = 100
+end
+
 us₀ = [zeros(1) for _ in 1:N]
+
+# Horizon and timestep
+h = T / N
 
 # Dynamics
 model = CartPoleODE.Model(9.81, 1, 0.1, 0.2)
@@ -64,7 +74,7 @@ function running_cost_diff!(grad, hess, x, u, k)
 end
 
 # Final cost
-final_cost(x, _) = 1e2 * (x[1]^2 + (x[2] - pi)^2 + x[3]^2 + x[4]^2)
+final_cost(x, _) = 1e3 * (x[1]^2 + (x[2] - pi)^2 + x[3]^2 + x[4]^2)
 
 function final_cost_diff!(Φx, Φxx, x, k)
     H = DiffResults.DiffResult(0.0, (Φx, Φxx))
@@ -103,17 +113,17 @@ df = IterativeLQR.iLQR!(
 )
 
 # Benchmark
-opt = filter(row -> row.accepted, df).J[end]
-iter = df.i[findfirst(J -> (J - opt) < 1e-3 * opt, df.J)] 
+# opt = filter(row -> row.accepted, df).J[end]
+# iter = df.i[findfirst(J -> (J - opt) < 1e-3 * opt, df.J)]
 
-display(@benchmark begin 
-    IterativeLQR.set_initial_inputs!(workset, us₀)
-    IterativeLQR.iLQR!(
-        workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-        stacked_derivatives=true, regularization=:holy,
-        verbose=false, maxiter=iter
-    )
-end)
+# display(@benchmark begin
+#     IterativeLQR.set_initial_inputs!(workset, us₀)
+#     IterativeLQR.iLQR!(
+#         workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
+#         stacked_derivatives=true, regularization=:holy,
+#         verbose=false, maxiter=iter
+#     )
+# end)
 
 # Visualization
 (@isdefined vis) || (vis = Visualizer())
@@ -126,7 +136,7 @@ MeshCatBenchmarkMechanisms.set_cartpole!(vis, 0.1, 0.05, 0.05, model.l, 0.02)
 MeshCatBenchmarkMechanisms.set_cartpole_state!(vis, nominal_trajectory(workset).x[1])
 
 ## animation
-anim = MeshCatBenchmarkMechanisms.Animation(vis, fps=1/h)
+anim = MeshCatBenchmarkMechanisms.Animation(vis, fps=1 / h)
 for (i, x) in enumerate(nominal_trajectory(workset).x)
     atframe(anim, i) do
         MeshCatBenchmarkMechanisms.set_cartpole_state!(vis, x)
