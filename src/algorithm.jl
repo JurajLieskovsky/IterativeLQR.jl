@@ -16,7 +16,11 @@ function trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
     return true, sum(l)
 end
 
-function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
+function differentiation!(
+    workset, dynamics_diff!, running_cost_diff!, final_cost_diff!,
+    δ, conditions, regularization
+)
+
     @unpack N = workset
     @unpack x, u = nominal_trajectory(workset)
     @unpack fx, fu = workset.dynamics_derivatives
@@ -27,6 +31,21 @@ function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cos
         dynamics_diff!(fx[k], fu[k], x[k], u[k], k)
         running_cost_diff!(lx[k], lu[k], lxx[k], lxu[k], luu[k], x[k], u[k], k)
         lux[k] .= lxu[k]'
+
+        if conditions == :lqr
+            if regularization == :min
+                λ, V = eigen(Symmetric(hess[k]))
+                λ_reg = map(e -> e < δ ? δ : e, λ)
+                hess[k] .= V * diagm(λ_reg) * V'
+            elseif regularization == :flip
+                λ, V = eigen(Symmetric(hess[k]))
+                λ_reg = map(e -> e < δ ? max(δ, -e) : e, λ)
+                hess[k] .= V * diagm(λ_reg) * V'
+            elseif regularization == :holy
+                F = cholesky(Positive, hess[k])
+                hess[k] .= F.L * F.L'
+            end
+        end
     end
 
     final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
@@ -34,7 +53,10 @@ function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cos
     return nothing
 end
 
-function stacked_diff!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
+function stacked_diff!(
+    workset, dynamics_diff!, running_cost_diff!, final_cost_diff!,
+    δ, conditions, regularization
+)
     @unpack N = workset
     @unpack x, u = nominal_trajectory(workset)
     @unpack jac = workset.dynamics_derivatives
@@ -44,6 +66,21 @@ function stacked_diff!(workset, dynamics_diff!, running_cost_diff!, final_cost_d
     @threads for k in 1:N
         dynamics_diff!(jac[k], x[k], u[k], k)
         running_cost_diff!(grad[k], hess[k], x[k], u[k], k)
+
+        if conditions == :lqr
+            if regularization == :min
+                λ, V = eigen(Symmetric(hess[k]))
+                λ_reg = map(e -> e < δ ? δ : e, λ)
+                hess[k] .= V * diagm(λ_reg) * V'
+            elseif regularization == :flip
+                λ, V = eigen(Symmetric(hess[k]))
+                λ_reg = map(e -> e < δ ? max(δ, -e) : e, λ)
+                hess[k] .= V * diagm(λ_reg) * V'
+            elseif regularization == :holy
+                F = cholesky(Positive, hess[k])
+                hess[k] .= F.L * F.L'
+            end
+        end
     end
 
     final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
@@ -51,7 +88,7 @@ function stacked_diff!(workset, dynamics_diff!, running_cost_diff!, final_cost_d
     return nothing
 end
 
-function backward_pass!(workset, δ, regularization)
+function backward_pass!(workset, δ, conditions, regularization)
     @unpack N, ndx, nu = workset
     @unpack Δv, vx, vxx = workset.value_function
     @unpack d, K = workset.policy_update
@@ -62,6 +99,7 @@ function backward_pass!(workset, δ, regularization)
     hess = workset.cost_derivatives.hess
 
     @inbounds for k in N:-1:1
+
         # gradient and hessian of the argument
         g .= grad[k] + jac[k]' * vx[k+1]
         H .= hess[k] + jac[k]' * vxx[k+1] * jac[k]
@@ -70,17 +108,19 @@ function backward_pass!(workset, δ, regularization)
         tmp = copy(quu)
 
         # problem regularization
-        if regularization == :min
-            λ, V = eigen(Symmetric(H))
-            λ_reg = map(e -> e < δ ? δ : e, λ)
-            H .= V * diagm(λ_reg) * V'
-        elseif regularization == :flip
-            λ, V = eigen(Symmetric(H))
-            λ_reg = map(e -> e < δ ? max(δ, -e) : e, λ)
-            H .= V * diagm(λ_reg) * V'
-        elseif regularization == :holy
-            F = cholesky(Positive, H)
-            H .= F.L * F.L'
+        if conditions == :nlp
+            if regularization == :min
+                λ, V = eigen(Symmetric(H))
+                λ_reg = map(e -> e < δ ? δ : e, λ)
+                H .= V * diagm(λ_reg) * V'
+            elseif regularization == :flip
+                λ, V = eigen(Symmetric(H))
+                λ_reg = map(e -> e < δ ? max(δ, -e) : e, λ)
+                H .= V * diagm(λ_reg) * V'
+            elseif regularization == :holy
+                F = cholesky(Positive, H)
+                H .= F.L * F.L'
+            end
         end
 
         # control update
@@ -151,9 +191,9 @@ end
 
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
-    maxiter=100, ρ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16),
+    maxiter=200, ρ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16),
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
-    stacked_derivatives=false, state_difference=-, regularization=:holy
+    stacked_derivatives=false, state_difference=-, conditions=:lqr, regularization=:holy
 )
     # line count for printing
     line_count = Ref(0)
@@ -180,15 +220,21 @@ function iLQR!(
         # nominal trajectory differentiation
         diff = @elapsed begin
             if !stacked_derivatives
-                differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
+                differentiation!(
+                    workset, dynamics_diff!, running_cost_diff!, final_cost_diff!,
+                    δ, conditions, regularization
+                )
             else
-                stacked_diff!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
+                stacked_diff!(
+                    workset, dynamics_diff!, running_cost_diff!, final_cost_diff!,
+                    δ, conditions, regularization
+                )
             end
         end
 
         # backward pass
         bwd = @elapsed begin
-            backward_pass!(workset, δ, regularization)
+            backward_pass!(workset, δ, conditions, regularization)
         end
 
         # forward pass
