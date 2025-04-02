@@ -11,19 +11,10 @@ using DataFrames, CSV
 using Infiltrator
 using BenchmarkTools
 
-problem = :swingup
-# problem = :reposition
-
 # Horizon length, initial state and inputs
-if problem == :swingup
-    T = 2
-    x₀ = [0, pi * 1e-3, 0, 0]
-    N = 1000
-elseif problem == :reposition
-    T = 1
-    x₀ = [-1, pi, 0, 0]
-    N = 100
-end
+T = 2
+x₀ = [0, pi * 1e-3, 0, 0]
+N = 200
 
 us₀ = [zeros(1) for _ in 1:N]
 
@@ -56,8 +47,8 @@ function dynamics_diff!(jac, x, u, k)
 end
 
 # Running cost
-# running_cost(x, u, _) = 1e1 * (1 + cos(x[2])) + 1e-1 * x[4]^2 + 1e2 * x[1]^2 + 1e-3 * u[1]^2
-running_cost(_, u, _) = 1e-3 * h * u[1]^2
+# running_cost(_, u, _) = 1e-2 * h * u[1]^2
+running_cost(x, u, _) = 1 + cos(x[2]) + 1e1 * x[1]^2 + 3e-2 * u[1]^2
 
 function running_cost_diff!(grad, hess, x, u, k)
     nx = CartPoleODE.nx
@@ -75,8 +66,8 @@ function running_cost_diff!(grad, hess, x, u, k)
 end
 
 # Final cost
-final_cost(x, _) = 1e2 * (x[1]^2 + (x[2] - pi)^2) + 1e0 * (x[3]^2 + x[4]^2)
-# final_cost(_, _) = 0
+# final_cost(x, _) = 1e3 * (x[1]^2 + (x[2] - pi)^2) + 1e0 * (x[3]^2 + x[4]^2)
+final_cost(_, _) = 0
 
 function final_cost_diff!(Φx, Φxx, x, k)
     H = DiffResults.DiffResult(0.0, (Φx, Φxx))
@@ -110,7 +101,7 @@ IterativeLQR.set_initial_state!(workset, x₀)
 IterativeLQR.set_initial_inputs!(workset, us₀)
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    stacked_derivatives=true, regularization=:none,
+    stacked_derivatives=true, regularization=:min,
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
@@ -122,7 +113,7 @@ display(@benchmark begin
     IterativeLQR.set_initial_inputs!(workset, us₀)
     IterativeLQR.iLQR!(
         workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-        stacked_derivatives=true, regularization=:none,
+        stacked_derivatives=true, regularization=:min,
         verbose=false, maxiter=iter
     )
 end)

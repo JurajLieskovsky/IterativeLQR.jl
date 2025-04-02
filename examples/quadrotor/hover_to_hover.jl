@@ -112,7 +112,7 @@ IterativeLQR.set_initial_inputs!(workset, us₀)
 
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    stacked_derivatives=true, state_difference=QuadrotorODE.state_difference, regularization=:holy,
+    stacked_derivatives=true, state_difference=QuadrotorODE.state_difference, regularization=:min,
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
@@ -124,7 +124,7 @@ display(@benchmark begin
     IterativeLQR.set_initial_inputs!(workset, us₀)
     IterativeLQR.iLQR!(
         workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-        stacked_derivatives=true, state_difference=QuadrotorODE.state_difference, regularization=:holy,
+        stacked_derivatives=true, state_difference=QuadrotorODE.state_difference, regularization=:min,
         verbose=false, maxiter=iter
     )
 end)
