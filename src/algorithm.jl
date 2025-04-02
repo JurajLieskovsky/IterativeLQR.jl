@@ -16,11 +16,7 @@ function trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
     return true, sum(l)
 end
 
-function differentiation!(
-    workset, dynamics_diff!, running_cost_diff!, final_cost_diff!,
-    δ, conditions, regularization
-)
-
+function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
     @unpack N = workset
     @unpack x, u = nominal_trajectory(workset)
     @unpack fx, fu = workset.dynamics_derivatives
@@ -31,21 +27,6 @@ function differentiation!(
         dynamics_diff!(fx[k], fu[k], x[k], u[k], k)
         running_cost_diff!(lx[k], lu[k], lxx[k], lxu[k], luu[k], x[k], u[k], k)
         lux[k] .= lxu[k]'
-
-        if conditions == :lqr
-            if regularization == :min
-                λ, V = eigen(Symmetric(hess[k]))
-                λ_reg = map(e -> e < δ ? δ : e, λ)
-                hess[k] .= V * diagm(λ_reg) * V'
-            elseif regularization == :flip
-                λ, V = eigen(Symmetric(hess[k]))
-                λ_reg = map(e -> e < δ ? max(δ, -e) : e, λ)
-                hess[k] .= V * diagm(λ_reg) * V'
-            elseif regularization == :holy
-                F = cholesky(Positive, hess[k])
-                hess[k] .= F.L * F.L'
-            end
-        end
     end
 
     final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
@@ -53,10 +34,7 @@ function differentiation!(
     return nothing
 end
 
-function stacked_diff!(
-    workset, dynamics_diff!, running_cost_diff!, final_cost_diff!,
-    δ, conditions, regularization
-)
+function stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
     @unpack N = workset
     @unpack x, u = nominal_trajectory(workset)
     @unpack jac = workset.dynamics_derivatives
@@ -66,21 +44,6 @@ function stacked_diff!(
     @threads for k in 1:N
         dynamics_diff!(jac[k], x[k], u[k], k)
         running_cost_diff!(grad[k], hess[k], x[k], u[k], k)
-
-        if conditions == :lqr
-            if regularization == :min
-                λ, V = eigen(Symmetric(hess[k]))
-                λ_reg = map(e -> e < δ ? δ : e, λ)
-                hess[k] .= V * diagm(λ_reg) * V'
-            elseif regularization == :flip
-                λ, V = eigen(Symmetric(hess[k]))
-                λ_reg = map(e -> e < δ ? max(δ, -e) : e, λ)
-                hess[k] .= V * diagm(λ_reg) * V'
-            elseif regularization == :holy
-                F = cholesky(Positive, hess[k])
-                hess[k] .= F.L * F.L'
-            end
-        end
     end
 
     final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
@@ -88,7 +51,49 @@ function stacked_diff!(
     return nothing
 end
 
-function backward_pass!(workset, δ, conditions, regularization)
+function min_regularization(H, δ)
+    λ, V = eigen(Symmetric(H))
+    λ_reg = map(e -> e < δ ? δ : e, λ)
+    H .= V * diagm(λ_reg) * V'
+    return nothing
+end
+
+function flip_regularization(H, δ)
+    λ, V = eigen(Symmetric(H))
+    λ_reg = map(e -> e < δ ? max(δ, -e) : e, λ)
+    H .= V * diagm(λ_reg) * V'
+    return nothing
+end
+
+function holy_regularization(H, _)
+    F = cholesky(Positive, H)
+    H .= F.L * F.L'
+    return nothing
+end
+
+function cost_regularization(workset, type, δ)
+    @unpack N = workset
+    @unpack hess = workset.cost_derivatives
+    @unpack vxx = workset.value_function
+
+    regularization = if type == :min
+        min_regularization
+    elseif type == :flip
+        flip_regularization
+    elseif type == :holy
+        holy_regularization
+    end
+
+    @threads for k in 1:N
+        regularization(hess[k], δ)
+    end
+
+    regularization(vxx[N+1], δ)
+
+    return nothing
+end
+
+function backward_pass!(workset, δ)
     @unpack N, ndx, nu = workset
     @unpack Δv, vx, vxx = workset.value_function
     @unpack d, K = workset.policy_update
@@ -106,22 +111,6 @@ function backward_pass!(workset, δ, conditions, regularization)
 
         # hold quu for expected improvement calculation
         tmp = copy(quu)
-
-        # problem regularization
-        if conditions == :nlp
-            if regularization == :min
-                λ, V = eigen(Symmetric(H))
-                λ_reg = map(e -> e < δ ? δ : e, λ)
-                H .= V * diagm(λ_reg) * V'
-            elseif regularization == :flip
-                λ, V = eigen(Symmetric(H))
-                λ_reg = map(e -> e < δ ? max(δ, -e) : e, λ)
-                H .= V * diagm(λ_reg) * V'
-            elseif regularization == :holy
-                F = cholesky(Positive, H)
-                H .= F.L * F.L'
-            end
-        end
 
         # control update
         F = cholesky(Symmetric(quu))
@@ -167,14 +156,14 @@ function forward_pass!(workset, dynamics!, difference, running_cost, final_cost,
     return true, sum(l), sum(l) - sum(l_ref)
 end
 
-function print_iteration!(line_count, i, α, J, ΔJ, Δv, accepted, diff, bwd, fwd)
+function print_iteration!(line_count, i, α, J, ΔJ, Δv, accepted, diff, reg, bwd, fwd)
     line_count[] % 10 == 0 && @printf(
-        "%-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s\n",
-        "iter", "α", "J", "ΔJ", "ΔV", "accepted", "diff", "bwd", "fwd"
+        "%-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s\n",
+        "iter", "α", "J", "ΔJ", "ΔV", "accepted", "diff", "reg", "bwd", "fwd"
     )
     @printf(
-        "%-9i %-9.3g %-9.3g %-9.3g %-9.3g %-9s %-9.3g %-9.3g %-9.3g\n",
-        i, α, J, ΔJ, Δv, accepted, diff, bwd, fwd
+        "%-9i %-9.3g %-9.3g %-9.3g %-9.3g %-9s %-9.3g %-9.3g %-9.3g %-9.3g\n",
+        i, α, J, ΔJ, Δv, accepted, diff, reg, bwd, fwd
     )
     line_count[] += 1
 end
@@ -193,7 +182,7 @@ function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
     maxiter=200, ρ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16),
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
-    stacked_derivatives=false, state_difference=-, conditions=:lqr, regularization=:holy
+    stacked_derivatives=false, state_difference=-, regularization=:min
 )
     # line count for printing
     line_count = Ref(0)
@@ -207,7 +196,7 @@ function iLQR!(
             successful, J = trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
         end
 
-        verbose && print_iteration!(line_count, 0, NaN, J, NaN, NaN, successful, NaN, NaN, rlt * 1e3)
+        verbose && print_iteration!(line_count, 0, NaN, J, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
         logging && log_iteration!(dataframe, 0, NaN, J, NaN, NaN, successful)
 
         if !successful
@@ -219,22 +208,25 @@ function iLQR!(
     for i in 1:maxiter
         # nominal trajectory differentiation
         diff = @elapsed begin
-            if !stacked_derivatives
-                differentiation!(
-                    workset, dynamics_diff!, running_cost_diff!, final_cost_diff!,
-                    δ, conditions, regularization
-                )
+            if stacked_derivatives
+                stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
             else
-                stacked_diff!(
-                    workset, dynamics_diff!, running_cost_diff!, final_cost_diff!,
-                    δ, conditions, regularization
-                )
+                differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
             end
         end
 
+        # regularization
+        reg = if regularization == :none
+            NaN
+        else
+            @elapsed begin
+                cost_regularization(workset, regularization, δ)
+            end
+        end
+            
         # backward pass
         bwd = @elapsed begin
-            backward_pass!(workset, δ, conditions, regularization)
+            backward_pass!(workset, δ)
         end
 
         # forward pass
@@ -251,7 +243,7 @@ function iLQR!(
 
             # error handling
             if !successful
-                verbose && print_iteration!(line_count, i, α, J, ΔJ, Δv, false, diff * 1e3, bwd * 1e3, fwd * 1e3)
+                verbose && print_iteration!(line_count, i, α, J, ΔJ, Δv, false, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
                 logging && log_iteration!(dataframe, i, α, J, ΔJ, Δv, false)
                 continue
             end
@@ -260,7 +252,7 @@ function iLQR!(
             accepted = ΔJ < 0 && ΔJ <= ρ * Δv
 
             # printout
-            verbose && print_iteration!(line_count, i, α, J, ΔJ, Δv, accepted, diff * 1e3, bwd * 1e3, fwd * 1e3)
+            verbose && print_iteration!(line_count, i, α, J, ΔJ, Δv, accepted, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
             logging && log_iteration!(dataframe, i, α, J, ΔJ, Δv, accepted)
 
             # solution copying and regularization parameter adjustment
