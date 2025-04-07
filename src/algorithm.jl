@@ -198,19 +198,10 @@ function iLQR!(
         end
 
         # regularization
-        reg =
-            if regularization == :none
-                NaN
-            else
-                @elapsed begin
-                    cost_regularization!(workset, regularization_function!)
-                end
-            end
+        reg = (regularization == :none) ? NaN : @elapsed cost_regularization!(workset, regularization_function!)
 
         # backward pass
-        bwd = @elapsed begin
-            backward_pass!(workset)
-        end
+        bwd = @elapsed backward_pass!(workset)
 
         # forward pass
         accepted = false
