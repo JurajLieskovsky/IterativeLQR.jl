@@ -10,6 +10,7 @@ using Base.Threads
 
 include("workset.jl")
 include("trajectory_utils.jl")
+include("regularization_functions.jl")
 include("algorithm.jl")
 
 end # module IterativeLQR

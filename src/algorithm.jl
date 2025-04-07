@@ -51,46 +51,16 @@ function stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, f
     return nothing
 end
 
-function min_regularization!(H, δ)
-    λ, V = eigen(Symmetric(H))
-    λ_reg = map(e -> e < δ ? δ : e, λ)
-    H .= V * diagm(λ_reg) * V'
-    return nothing
-end
-
-function flip_regularization!(H, δ)
-    λ, V = eigen(Symmetric(H))
-    λ_reg = map(e -> e < δ ? max(δ, -e) : e, λ)
-    H .= V * diagm(λ_reg) * V'
-    return nothing
-end
-
-function holy_regularization!(H, _)
-    # the approach is frankly **** for some PSD matrices
-    # therefore the factorization is run only for benchmarking
-    _ = cholesky(Positive, H)
-    # H .= F.L * F.L'
-    return nothing
-end
-
-function cost_regularization!(workset, type, δ)
+function cost_regularization!(workset, regularization_function!)
     @unpack N = workset
     @unpack hess = workset.cost_derivatives
     @unpack vxx = workset.value_function
 
-    regularization = if type == :min
-        min_regularization!
-    elseif type == :flip
-        flip_regularization!
-    elseif type == :holy
-        holy_regularization!
-    end
-
     @threads for k in 1:N
-        regularization(hess[k], δ)
+        regularization_function!(hess[k])
     end
 
-    regularization(vxx[N+1], δ)
+    regularization_function!(vxx[N+1])
 
     return nothing
 end
@@ -192,6 +162,16 @@ function iLQR!(
     # dataframe for logging
     dataframe = logging ? iteration_dataframe() : nothing
 
+    # regularization function
+    regularization_function! =
+        if regularization == :min
+            H -> min_regularization!(H, δ)
+        elseif regularization == :flip
+            H -> flip_regularization!(H, δ)
+        elseif regularization == :holy
+            holy_regularization!
+        end
+
     # initial trajectory rollout
     if rollout
         rlt = @elapsed begin
@@ -218,14 +198,15 @@ function iLQR!(
         end
 
         # regularization
-        reg = if regularization == :none
-            NaN
-        else
-            @elapsed begin
-                cost_regularization!(workset, regularization, δ)
+        reg =
+            if regularization == :none
+                NaN
+            else
+                @elapsed begin
+                    cost_regularization!(workset, regularization_function!)
+                end
             end
-        end
-            
+
         # backward pass
         bwd = @elapsed begin
             backward_pass!(workset)
