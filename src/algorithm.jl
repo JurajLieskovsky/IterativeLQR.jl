@@ -51,37 +51,39 @@ function stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, f
     return nothing
 end
 
-function min_regularization(H, δ)
+function min_regularization!(H, δ)
     λ, V = eigen(Symmetric(H))
     λ_reg = map(e -> e < δ ? δ : e, λ)
     H .= V * diagm(λ_reg) * V'
     return nothing
 end
 
-function flip_regularization(H, δ)
+function flip_regularization!(H, δ)
     λ, V = eigen(Symmetric(H))
     λ_reg = map(e -> e < δ ? max(δ, -e) : e, λ)
     H .= V * diagm(λ_reg) * V'
     return nothing
 end
 
-function holy_regularization(H, _)
-    F = cholesky(Positive, H)
-    H .= F.L * F.L'
+function holy_regularization!(H, _)
+    # the approach is frankly **** for some PSD matrices
+    # therefore the factorization is run only for benchmarking
+    _ = cholesky(Positive, H)
+    # H .= F.L * F.L'
     return nothing
 end
 
-function cost_regularization(workset, type, δ)
+function cost_regularization!(workset, type, δ)
     @unpack N = workset
     @unpack hess = workset.cost_derivatives
     @unpack vxx = workset.value_function
 
     regularization = if type == :min
-        min_regularization
+        min_regularization!
     elseif type == :flip
-        flip_regularization
+        flip_regularization!
     elseif type == :holy
-        holy_regularization
+        holy_regularization!
     end
 
     @threads for k in 1:N
@@ -93,7 +95,7 @@ function cost_regularization(workset, type, δ)
     return nothing
 end
 
-function backward_pass!(workset, δ)
+function backward_pass!(workset)
     @unpack N, ndx, nu = workset
     @unpack Δv, vx, vxx = workset.value_function
     @unpack d, K = workset.policy_update
@@ -220,13 +222,13 @@ function iLQR!(
             NaN
         else
             @elapsed begin
-                cost_regularization(workset, regularization, δ)
+                cost_regularization!(workset, regularization, δ)
             end
         end
             
         # backward pass
         bwd = @elapsed begin
-            backward_pass!(workset, δ)
+            backward_pass!(workset)
         end
 
         # forward pass
