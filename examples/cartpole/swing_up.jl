@@ -96,6 +96,13 @@ end
 
 # terminal constraint indicator function
 terminal_constraint(_) = [0, pi, 0, 0]
+# function terminal_constraint(x)
+#     if x[2] <= pi
+#         [0, pi, 0, 0]
+#     else
+#         [0, x[2], 0, 0]
+#     end
+# end
 
 # Trajectory optimization
 workset = IterativeLQR.Workset{Float64}(4, 1, N)
