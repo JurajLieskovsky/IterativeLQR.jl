@@ -1,14 +1,20 @@
 struct Trajectory{T}
-    x::Vector{Vector{T}}
-    u::Vector{Vector{T}}
-    l::Vector{T}
+    x::Vector{Vector{T}} # states
+    u::Vector{Vector{T}} # inputs
+    l::Vector{T}         # running costs
+
+    rN::Vector{T}
+    λN::Vector{T}        # terminal state constraint - Lagrange multiplier
 
     function Trajectory{T}(nx, nu, N) where {T}
         x = [zeros(T, nx) for _ in 1:N+1]
         u = [zeros(T, nu) for _ in 1:N]
         l = zeros(T, N + 1)
 
-        return new(x, u, l)
+        rN = zeros(nx)
+        λN = zeros(nx)
+
+        return new(x, u, l, rN, λN)
     end
 end
 

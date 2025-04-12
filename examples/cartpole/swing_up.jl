@@ -66,8 +66,8 @@ function running_cost_diff!(grad, hess, x, u, k)
 end
 
 # Final cost
-final_cost(x, _) = 1e3 * (x[1]^2 + (x[2] - pi)^2) + 1e0 * (x[3]^2 + x[4]^2)
-# final_cost(_, _) = 0
+# final_cost(x, _) = 1e3 * (x[1]^2 + (x[2] - pi)^2) + 1e0 * (x[3]^2 + x[4]^2)
+final_cost(_, _) = 0
 
 function final_cost_diff!(Φx, Φxx, x, k)
     H = DiffResults.DiffResult(0.0, (Φx, Φxx))
@@ -98,25 +98,29 @@ end
 workset = IterativeLQR.Workset{Float64}(4, 1, N)
 IterativeLQR.set_initial_state!(workset, x₀)
 
+xN = [0, pi, 0, 0]
+
 IterativeLQR.set_initial_inputs!(workset, us₀)
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
     stacked_derivatives=true, regularization=:min,
-    verbose=true, logging=true, plotting_callback=plotting_callback
+    verbose=true, logging=true, plotting_callback=plotting_callback, xN=xN
 )
 
-# Benchmark
-opt = filter(row -> row.accepted, df).J[end]
-iter = df.i[findfirst(J -> (J - opt) < 1e-3 * opt, df.J)]
+display(nominal_trajectory(workset).x[end] - xN)
 
-display(@benchmark begin
-    IterativeLQR.set_initial_inputs!(workset, us₀)
-    IterativeLQR.iLQR!(
-        workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-        stacked_derivatives=true, regularization=:min,
-        verbose=false, maxiter=iter
-    )
-end)
+# Benchmark
+# opt = filter(row -> row.accepted, df).J[end]
+# iter = df.i[findfirst(J -> (J - opt) < 1e-3 * opt, df.J)]
+
+# display(@benchmark begin
+#     IterativeLQR.set_initial_inputs!(workset, us₀)
+#     IterativeLQR.iLQR!(
+#         workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
+#         stacked_derivatives=true, regularization=:min,
+#         verbose=false, maxiter=iter
+#     )
+# end)
 
 # Visualization
 (@isdefined vis) || (vis = Visualizer())

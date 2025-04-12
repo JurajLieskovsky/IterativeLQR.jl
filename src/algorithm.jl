@@ -65,6 +65,29 @@ function regularization!(workset, regularization_function!)
     return nothing
 end
 
+# augmented lagrangian penalty function and its derivatives
+
+penalty(ρ, r, u) = ρ / 2 * (r + u)' * (r + u)
+
+function add_penalty_derivatives!(dr, ddr, ρ, r, u)
+    dr .+= ρ * (r + u)
+    ddr[diagind(ddr)] .+= ρ
+    return nothing
+end
+
+
+## terminal constraint
+
+function evaluate_terminal_constraint(trajectory, ρ, xN)
+    @unpack x, l = trajectory
+    @unpack rN, λN = trajectory
+    
+    rN .= x[end] - xN
+
+    return penalty(ρ, rN, λN)
+end
+
+
 # backward and forward pass of the algorithm
 
 function backward_pass!(workset)
@@ -160,7 +183,7 @@ function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
     maxiter=100, σ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16),
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
-    stacked_derivatives=false, state_difference=-, regularization=:min
+    stacked_derivatives=false, state_difference=-, regularization=:min, ρ=1e0, xN=nothing
 )
     # line count for printing
     line_count = Ref(0)
@@ -182,6 +205,10 @@ function iLQR!(
     if rollout
         rlt = @elapsed begin
             successful, J = trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
+        end
+
+        if xN !== nothing
+            J += evaluate_terminal_constraint(nominal_trajectory(workset), ρ, xN)
         end
 
         verbose && print_iteration!(line_count, 0, NaN, J, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
@@ -206,6 +233,14 @@ function iLQR!(
         # regularization
         reg = (regularization == :none) ? NaN : @elapsed regularization!(workset, regularization_function!)
 
+        # add terminal constaint penalty's derivatives
+        if xN !== nothing
+            add_penalty_derivatives!(
+                workset.value_function.vx[end], workset.value_function.vxx[end],
+                ρ, nominal_trajectory(workset).rN, nominal_trajectory(workset).λN
+            )
+        end
+
         # backward pass
         bwd = @elapsed backward_pass!(workset)
 
@@ -218,6 +253,17 @@ function iLQR!(
                 successful, J, ΔJ = forward_pass!(workset, dynamics!, state_difference, running_cost, final_cost, α)
             end
 
+            # add terminal constraint penalty
+            if xN !== nothing
+                active_trajectory(workset).λN .= nominal_trajectory(workset).λN
+
+                pen_old = evaluate_terminal_constraint(nominal_trajectory(workset), ρ, xN)
+                pen_new = evaluate_terminal_constraint(active_trajectory(workset), ρ, xN)
+
+                J += pen_new
+                ΔJ += pen_new - pen_old
+            end
+
             # expected improvement
             Δv = mapreduce(Δ -> α * Δ[1] + α^2 * Δ[2], +, workset.value_function.Δv)
 
@@ -226,6 +272,11 @@ function iLQR!(
                 verbose && print_iteration!(line_count, i, α, J, ΔJ, Δv, false, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
                 logging && log_iteration!(dataframe, i, α, J, ΔJ, Δv, false)
                 continue
+            end
+
+            # update dual variable
+            if (xN !== nothing)
+                active_trajectory(workset).λN .= nominal_trajectory(workset).λN + active_trajectory(workset).rN 
             end
 
             # iteration's evaluation
