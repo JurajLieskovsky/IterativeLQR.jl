@@ -86,7 +86,10 @@ function evaluate_penalties(workset, trajectory)
     penalty = (z_projection !== nothing) ? evaluate_penalty(ρ, trajectory.x[N+1] - z + α) : 0
 
     if (w_projection !== nothing)
-        penalty += ThreadsX.mapreduce(k -> evaluate_penalty(ρ, trajectory.u[k] - w[k] + β[k]), +, 1:N)
+        penalty += ThreadsX.mapreduce(
+            (u_k, w_k, β_k) -> evaluate_penalty(ρ, u_k - w_k + β_k), +,
+            trajectory.u, w, β
+        )
     end
 
     return penalty
