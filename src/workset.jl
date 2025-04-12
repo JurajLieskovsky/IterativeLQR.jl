@@ -3,18 +3,12 @@ struct Trajectory{T}
     u::Vector{Vector{T}} # inputs
     l::Vector{T}         # running costs
 
-    rN::Vector{T}
-    λN::Vector{T}        # terminal state constraint - Lagrange multiplier
-
     function Trajectory{T}(nx, nu, N) where {T}
         x = [zeros(T, nx) for _ in 1:N+1]
         u = [zeros(T, nu) for _ in 1:N]
         l = zeros(T, N + 1)
 
-        rN = zeros(nx)
-        λN = zeros(nx)
-
-        return new(x, u, l, rN, λN)
+        return new(x, u, l)
     end
 end
 
@@ -123,6 +117,7 @@ struct Workset{T}
     dynamics_derivatives::DynamicsDerivatives{T}
     cost_derivatives::CostDerivatives{T}
     subproblem_objective_derivatives::SubproblemObjectiveDerivatives{T}
+    terminal_state_constraint::TerminalStateConstraint{T}
 
     function Workset{T}(nx, nu, N, ndx=nothing) where {T}
         ndx = ndx !== nothing ? ndx : nx
@@ -135,7 +130,9 @@ struct Workset{T}
 
         subproblem_objective_derivatives = SubproblemObjectiveDerivatives{T}(ndx, nu)
 
-        return new(N, nx, ndx, nu, 1, 2, trajectory, value_function, policy_update, dynamics_derivatives, cost_derivatives, subproblem_objective_derivatives)
+        terminal_state_constraint = TerminalStateConstraint{T}(nx)
+
+        return new(N, nx, ndx, nu, 1, 2, trajectory, value_function, policy_update, dynamics_derivatives, cost_derivatives, subproblem_objective_derivatives, terminal_state_constraint)
     end
 end
 

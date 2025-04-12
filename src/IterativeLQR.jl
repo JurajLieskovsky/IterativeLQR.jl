@@ -8,6 +8,7 @@ using Infiltrator
 using PositiveFactorizations
 using Base.Threads
 
+include("constraints.jl")
 include("workset.jl")
 include("trajectory_utils.jl")
 include("regularization_functions.jl")

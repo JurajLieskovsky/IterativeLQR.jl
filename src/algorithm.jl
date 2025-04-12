@@ -65,29 +65,6 @@ function regularization!(workset, regularization_function!)
     return nothing
 end
 
-# augmented lagrangian penalty function and its derivatives
-
-penalty(ρ, r, u) = ρ / 2 * (r + u)' * (r + u)
-
-function add_penalty_derivatives!(dr, ddr, ρ, r, u)
-    dr .+= ρ * (r + u)
-    ddr[diagind(ddr)] .+= ρ
-    return nothing
-end
-
-
-## terminal constraint
-
-function evaluate_terminal_constraint(trajectory, ρ, xN)
-    @unpack x, l = trajectory
-    @unpack rN, λN = trajectory
-    
-    rN .= x[end] - xN
-
-    return penalty(ρ, rN, λN)
-end
-
-
 # backward and forward pass of the algorithm
 
 function backward_pass!(workset)
@@ -183,13 +160,17 @@ function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
     maxiter=100, σ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16),
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
-    stacked_derivatives=false, state_difference=-, regularization=:min, ρ=1e0, xN=nothing
+    stacked_derivatives=false, state_difference=-, regularization=:min, ρ_init=1e0, xN=nothing
 )
     # line count for printing
     line_count = Ref(0)
 
     # dataframe for logging
     dataframe = logging ? iteration_dataframe() : nothing
+
+    # set parameter
+    set_parameter!(workset.terminal_state_constraint, ρ_init)
+    set_terminal_state!(workset.terminal_state_constraint, xN)
 
     # regularization function
     regularization_function! =
@@ -208,7 +189,8 @@ function iLQR!(
         end
 
         if xN !== nothing
-            J += evaluate_terminal_constraint(nominal_trajectory(workset), ρ, xN)
+            J += evaluate(workset.terminal_state_constraint, nominal_trajectory(workset).x[end])
+            update_dual!(workset.terminal_state_constraint, nominal_trajectory(workset).x[end])
         end
 
         verbose && print_iteration!(line_count, 0, NaN, J, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
@@ -235,9 +217,11 @@ function iLQR!(
 
         # add terminal constaint penalty's derivatives
         if xN !== nothing
-            add_penalty_derivatives!(
-                workset.value_function.vx[end], workset.value_function.vxx[end],
-                ρ, nominal_trajectory(workset).rN, nominal_trajectory(workset).λN
+            add_derivatives!(
+                workset.value_function.vx[end],
+                workset.value_function.vxx[end],
+                workset.terminal_state_constraint,
+                nominal_trajectory(workset).x[end]
             )
         end
 
@@ -255,10 +239,8 @@ function iLQR!(
 
             # add terminal constraint penalty
             if xN !== nothing
-                active_trajectory(workset).λN .= nominal_trajectory(workset).λN
-
-                pen_old = evaluate_terminal_constraint(nominal_trajectory(workset), ρ, xN)
-                pen_new = evaluate_terminal_constraint(active_trajectory(workset), ρ, xN)
+                pen_old = evaluate(workset.terminal_state_constraint, nominal_trajectory(workset).x[end])
+                pen_new = evaluate(workset.terminal_state_constraint, active_trajectory(workset).x[end])
 
                 J += pen_new
                 ΔJ += pen_new - pen_old
@@ -274,11 +256,6 @@ function iLQR!(
                 continue
             end
 
-            # update dual variable
-            if (xN !== nothing)
-                active_trajectory(workset).λN .= nominal_trajectory(workset).λN + active_trajectory(workset).rN 
-            end
-
             # iteration's evaluation
             accepted = ΔJ < 0 && ΔJ <= σ * Δv
 
@@ -288,7 +265,15 @@ function iLQR!(
 
             # solution copying and regularization parameter adjustment
             if accepted
+                # update dual variable
+                if (xN !== nothing)
+                    update_dual!(workset.terminal_state_constraint, active_trajectory(workset).x[end])
+                end
+
+                # plot trajectory
                 (plotting_callback === nothing) || plotting_callback(workset)
+
+                # swap active for nominal
                 swap_trajectories!(workset)
                 break
             end
