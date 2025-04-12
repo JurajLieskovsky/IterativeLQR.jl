@@ -69,7 +69,7 @@ function add_penalty_derivatives!(workset)
     end
 
     if w_projection !== nothing
-        for k in 1:N
+        @threads for k in 1:N
             add_penalty_derivative!(lu[k], luu[k], ρ, u[k] - w[k] + β[k])
         end
     end
@@ -86,9 +86,7 @@ function evaluate_penalties(workset, trajectory)
     penalty = (z_projection !== nothing) ? evaluate_penalty(ρ, trajectory.x[N+1] - z + α) : 0
 
     if (w_projection !== nothing)
-        for k in 1:N
-            penalty += evaluate_penalty(ρ, trajectory.u[k] - w[k] + β[k])
-        end
+        penalty += ThreadsX.mapreduce(k -> evaluate_penalty(ρ, trajectory.u[k] - w[k] + β[k]), +, 1:N)
     end
 
     return penalty
@@ -104,7 +102,7 @@ function update_slack_variables!(workset, trajectory)
     end
 
     if w_projection !== nothing
-        for k in 1:N
+        @threads for k in 1:N
             w[k] .= w_projection(trajectory.u[k] + β[k])
         end
     end
@@ -120,7 +118,7 @@ function update_dual_variables!(workset, trajectory)
     end
 
     if w_projection !== nothing
-        for k in 1:N
+        @threads for k in 1:N
             β[k] .= β[k] + trajectory.u[k] - w[k]
         end
     end
