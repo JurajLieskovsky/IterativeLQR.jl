@@ -49,7 +49,9 @@ function add_penalty_derivatives!(workset)
     @unpack N = workset
     @unpack x = nominal_trajectory(workset)
     @unpack vx, vxx = workset.value_function
-    @unpack ρ, zN_indicator, αN, zN = workset.constraints
+
+    @unpack ρ = workset.constraints
+    @unpack zN_indicator, αN, zN = workset.constraints
 
     if zN_indicator !== nothing
         add_penalty_derivative!(vx[N+1], vxx[N+1], ρ, x[N+1] - zN + αN)
@@ -60,7 +62,8 @@ end
 
 function evaluate_penalties(workset, trajectory)
     @unpack N = workset
-    @unpack ρ, zN_indicator, zN, αN = workset.constraints
+    @unpack ρ = workset.constraints
+    @unpack zN_indicator, αN, zN = workset.constraints
 
     return (zN_indicator !== nothing) ? evaluate_penalty(ρ, trajectory.x[N+1] - zN + αN) : 0
 end
