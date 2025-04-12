@@ -26,28 +26,32 @@ function add_penalty_derivative!(grad, hess, ρ, arg)
 end
 
 # workset evaluation functions
-function evaluate_penalties(workset, xN, xT)
-    @unpack ρ, λN = workset.constraints
-    return (xT !== nothing) ? evaluate_penalty(ρ[], xN - xT + λN) : 0
-end
-
-function add_penalty_derivatives!(workset, xN, xT)
+function add_penalty_derivatives!(workset, xT)
     @unpack N = workset
+    @unpack x = nominal_trajectory(workset)
     @unpack vx, vxx = workset.value_function
     @unpack ρ, λN = workset.constraints
 
     if xT !== nothing
-        add_penalty_derivative!(vx[N+1], vxx[N+1], ρ[], xN - xT + λN)
+        add_penalty_derivative!(vx[N+1], vxx[N+1], ρ[], x[N+1] - xT + λN)
     end
 
     return nothing
 end
 
-function update_dual_variables!(workset, xN, xT)
-    @unpack λN = workset.constraints
+function evaluate_penalties(workset, trajectory, xT)
+    @unpack N = workset
+    @unpack ρ, λN = workset.constraints
 
+    return (xT !== nothing) ? evaluate_penalty(ρ[], trajectory.x[N+1] - xT + λN) : 0
+end
+
+function update_dual_variables!(workset, trajectory, xT)
+    @unpack N = workset
+    @unpack λN = workset.constraints
+    
     if xT !== nothing
-        λN .= λN + xN - xT
+        λN .= λN + trajectory.x[N+1] - xT
     end
 
     return nothing
