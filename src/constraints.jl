@@ -21,12 +21,14 @@ end
 ## evaluation functions
 
 function evaluate(constraint::TerminalStateConstraint, xN, xT)
+    xT === nothing && return 0
     @unpack ρ, λN = constraint
     arg = xN - xT + λN
     return ρ[] / 2 * arg' * arg
 end
 
 function add_derivatives!(vxN, vxxN, constraint::TerminalStateConstraint, xN, xT)
+    xT === nothing && return nothing
     @unpack ρ, λN = constraint
     vxN .+= ρ[] * (xN - xT + λN)
     vxxN[diagind(vxxN)] .+= ρ[]
@@ -34,6 +36,7 @@ function add_derivatives!(vxN, vxxN, constraint::TerminalStateConstraint, xN, xT
 end
 
 function update_dual!(constraint::TerminalStateConstraint, xN, xT)
+    xT === nothing && return nothing
     @unpack λN = constraint
     λN .= λN + xN - xT
     return nothing

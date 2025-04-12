@@ -183,15 +183,16 @@ function iLQR!(
 
     # initial trajectory rollout
     if rollout
+        # rollout trajectory
         rlt = @elapsed begin
             successful, J = trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
         end
 
-        if xT !== nothing
-            J += evaluate(workset.terminal_state_constraint, nominal_trajectory(workset).x[end], xT)
-            update_dual!(workset.terminal_state_constraint, nominal_trajectory(workset).x[end], xT)
-        end
+        # add terminal constraint penalty and update dual
+        J += evaluate(workset.terminal_state_constraint, nominal_trajectory(workset).x[end], xT)
+        update_dual!(workset.terminal_state_constraint, nominal_trajectory(workset).x[end], xT)
 
+        # print and log
         verbose && print_iteration!(line_count, 0, NaN, J, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
         logging && log_iteration!(dataframe, 0, NaN, J, NaN, NaN, successful)
 
@@ -215,15 +216,13 @@ function iLQR!(
         reg = (regularization == :none) ? NaN : @elapsed regularization!(workset, regularization_function!)
 
         # add terminal constaint penalty's derivatives
-        if xT !== nothing
-            add_derivatives!(
-                workset.value_function.vx[end],
-                workset.value_function.vxx[end],
-                workset.terminal_state_constraint,
-                nominal_trajectory(workset).x[end],
-                xT
-            )
-        end
+        add_derivatives!(
+            workset.value_function.vx[end],
+            workset.value_function.vxx[end],
+            workset.terminal_state_constraint,
+            nominal_trajectory(workset).x[end],
+            xT
+        )
 
         # backward pass
         bwd = @elapsed backward_pass!(workset)
@@ -238,13 +237,11 @@ function iLQR!(
             end
 
             # add terminal constraint penalty
-            if xT !== nothing
-                pen_old = evaluate(workset.terminal_state_constraint, nominal_trajectory(workset).x[end], xT)
-                pen_new = evaluate(workset.terminal_state_constraint, active_trajectory(workset).x[end], xT)
+            pen_old = evaluate(workset.terminal_state_constraint, nominal_trajectory(workset).x[end], xT)
+            pen_new = evaluate(workset.terminal_state_constraint, active_trajectory(workset).x[end], xT)
 
-                J += pen_new
-                ΔJ += pen_new - pen_old
-            end
+            J += pen_new
+            ΔJ += pen_new - pen_old
 
             # expected improvement
             Δv = mapreduce(Δ -> α * Δ[1] + α^2 * Δ[2], +, workset.value_function.Δv)
@@ -259,21 +256,19 @@ function iLQR!(
             # iteration's evaluation
             accepted = ΔJ < 0 && ΔJ <= σ * Δv
 
-            # printout
+            # print and log
             verbose && print_iteration!(line_count, i, α, J, ΔJ, Δv, accepted, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
             logging && log_iteration!(dataframe, i, α, J, ΔJ, Δv, accepted)
 
             # solution copying and regularization parameter adjustment
             if accepted
                 # update dual variable
-                if (xT !== nothing)
-                    update_dual!(workset.terminal_state_constraint, active_trajectory(workset).x[end], xT)
-                end
+                update_dual!(workset.terminal_state_constraint, active_trajectory(workset).x[end], xT)
 
                 # plot trajectory
                 (plotting_callback === nothing) || plotting_callback(workset)
 
-                # swap active for nominal
+                # swap nominal trajectory for active trajectory
                 swap_trajectories!(workset)
                 break
             end
