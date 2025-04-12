@@ -96,7 +96,7 @@ end
 
 # terminal constraint indicator function
 terminal_constraint(_) = [0, pi, 0, 0]
-input_constraint(u) = map(e -> sign(e) * min(4, abs(e)), u)
+input_constraint(u) = map(u_k -> sign(u_k) * min(4, abs(u_k)), u)
 
 # Trajectory optimization
 workset = IterativeLQR.Workset{Float64}(4, 1, N)
