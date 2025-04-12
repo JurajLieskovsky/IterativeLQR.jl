@@ -21,7 +21,7 @@ end
 
 ## set functions
 
-function set_terminal_constraint_function!(workset, fun)
+function set_terminal_constraint_indicator_function!(workset, fun)
     workset.constraints.zN_indicator = fun
 end
 
@@ -51,7 +51,7 @@ function add_penalty_derivatives!(workset)
     @unpack vx, vxx = workset.value_function
 
     @unpack ρ = workset.constraints
-    @unpack zN_indicator, αN, zN = workset.constraints
+    @unpack zN_indicator, zN, αN = workset.constraints
 
     if zN_indicator !== nothing
         add_penalty_derivative!(vx[N+1], vxx[N+1], ρ, x[N+1] - zN + αN)
@@ -63,17 +63,17 @@ end
 function evaluate_penalties(workset, trajectory)
     @unpack N = workset
     @unpack ρ = workset.constraints
-    @unpack zN_indicator, αN, zN = workset.constraints
+    @unpack zN_indicator, zN, αN = workset.constraints
 
     return (zN_indicator !== nothing) ? evaluate_penalty(ρ, trajectory.x[N+1] - zN + αN) : 0
 end
 
 function update_slack_variables!(workset, trajectory)
     @unpack N = workset
-    @unpack zN_indicator, zN = workset.constraints
+    @unpack zN_indicator, zN, αN = workset.constraints
 
     if zN_indicator !== nothing
-        zN .= zN_indicator(trajectory.x[N+1])
+        zN .= zN_indicator(trajectory.x[N+1] + αN)
     end
 end
 
