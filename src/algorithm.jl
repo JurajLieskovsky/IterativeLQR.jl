@@ -160,7 +160,7 @@ function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
     maxiter=100, σ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16),
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
-    stacked_derivatives=false, state_difference=-, regularization=:min, ρ0=1e0, xT=nothing
+    stacked_derivatives=false, state_difference=-, regularization=:min, ρ0=1e0, terminal_constraint=nothing
 )
     # line count for printing
     line_count = Ref(0)
@@ -189,8 +189,9 @@ function iLQR!(
         end
 
         # add terminal constraint penalty and update dual
-        J += evaluate_penalties(workset, nominal_trajectory(workset), xT)
-        update_dual_variables!(workset, nominal_trajectory(workset), xT)
+        update_slack_variables!(workset, nominal_trajectory(workset), terminal_constraint) 
+        J += evaluate_penalties(workset, nominal_trajectory(workset))
+        update_dual_variables!(workset, nominal_trajectory(workset))
 
         # print and log
         verbose && print_iteration!(line_count, 0, NaN, J, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
@@ -219,7 +220,7 @@ function iLQR!(
         reg = (regularization == :none) ? NaN : @elapsed regularization!(workset, regularization_function!)
 
         # add terminal constaint penalty's derivatives
-        add_penalty_derivatives!(workset, xT)
+        add_penalty_derivatives!(workset)
 
         # backward pass
         bwd = @elapsed backward_pass!(workset)
@@ -234,8 +235,8 @@ function iLQR!(
             end
 
             # add terminal constraint penalty
-            pen_old = evaluate_penalties(workset, nominal_trajectory(workset), xT)
-            pen_new = evaluate_penalties(workset, active_trajectory(workset), xT)
+            pen_old = evaluate_penalties(workset, nominal_trajectory(workset))
+            pen_new = evaluate_penalties(workset, active_trajectory(workset))
 
             J += pen_new
             ΔJ += pen_new - pen_old
@@ -260,7 +261,8 @@ function iLQR!(
             # solution copying and regularization parameter adjustment
             if accepted
                 # update dual variable
-                update_dual_variables!(workset, active_trajectory(workset), xT)
+                update_slack_variables!(workset, active_trajectory(workset), terminal_constraint) 
+                update_dual_variables!(workset, active_trajectory(workset))
 
                 # plot trajectory
                 (plotting_callback === nothing) || plotting_callback(workset)
