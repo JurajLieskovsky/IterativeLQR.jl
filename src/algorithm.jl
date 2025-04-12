@@ -196,6 +196,9 @@ function iLQR!(
         verbose && print_iteration!(line_count, 0, NaN, J, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
         logging && log_iteration!(dataframe, 0, NaN, J, NaN, NaN, successful)
 
+        # plot trajectory
+        (plotting_callback === nothing) || plotting_callback(workset)
+
         if !successful
             return nothing
         end
