@@ -160,7 +160,7 @@ function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
     maxiter=100, σ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16),
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
-    stacked_derivatives=false, state_difference=-, regularization=:min, ρ_init=1e0, xN=nothing
+    stacked_derivatives=false, state_difference=-, regularization=:min, ρ0=1e0, xT=nothing
 )
     # line count for printing
     line_count = Ref(0)
@@ -169,8 +169,7 @@ function iLQR!(
     dataframe = logging ? iteration_dataframe() : nothing
 
     # set parameter
-    set_parameter!(workset.terminal_state_constraint, ρ_init)
-    set_terminal_state!(workset.terminal_state_constraint, xN)
+    set_parameter!(workset.terminal_state_constraint, ρ0)
 
     # regularization function
     regularization_function! =
@@ -188,9 +187,9 @@ function iLQR!(
             successful, J = trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
         end
 
-        if xN !== nothing
-            J += evaluate(workset.terminal_state_constraint, nominal_trajectory(workset).x[end])
-            update_dual!(workset.terminal_state_constraint, nominal_trajectory(workset).x[end])
+        if xT !== nothing
+            J += evaluate(workset.terminal_state_constraint, nominal_trajectory(workset).x[end], xT)
+            update_dual!(workset.terminal_state_constraint, nominal_trajectory(workset).x[end], xT)
         end
 
         verbose && print_iteration!(line_count, 0, NaN, J, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
@@ -216,12 +215,13 @@ function iLQR!(
         reg = (regularization == :none) ? NaN : @elapsed regularization!(workset, regularization_function!)
 
         # add terminal constaint penalty's derivatives
-        if xN !== nothing
+        if xT !== nothing
             add_derivatives!(
                 workset.value_function.vx[end],
                 workset.value_function.vxx[end],
                 workset.terminal_state_constraint,
-                nominal_trajectory(workset).x[end]
+                nominal_trajectory(workset).x[end],
+                xT
             )
         end
 
@@ -238,9 +238,9 @@ function iLQR!(
             end
 
             # add terminal constraint penalty
-            if xN !== nothing
-                pen_old = evaluate(workset.terminal_state_constraint, nominal_trajectory(workset).x[end])
-                pen_new = evaluate(workset.terminal_state_constraint, active_trajectory(workset).x[end])
+            if xT !== nothing
+                pen_old = evaluate(workset.terminal_state_constraint, nominal_trajectory(workset).x[end], xT)
+                pen_new = evaluate(workset.terminal_state_constraint, active_trajectory(workset).x[end], xT)
 
                 J += pen_new
                 ΔJ += pen_new - pen_old
@@ -266,8 +266,8 @@ function iLQR!(
             # solution copying and regularization parameter adjustment
             if accepted
                 # update dual variable
-                if (xN !== nothing)
-                    update_dual!(workset.terminal_state_constraint, active_trajectory(workset).x[end])
+                if (xT !== nothing)
+                    update_dual!(workset.terminal_state_constraint, active_trajectory(workset).x[end], xT)
                 end
 
                 # plot trajectory

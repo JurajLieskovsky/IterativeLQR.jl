@@ -98,16 +98,16 @@ end
 workset = IterativeLQR.Workset{Float64}(4, 1, N)
 IterativeLQR.set_initial_state!(workset, x₀)
 
-xN = [0, pi, 0, 0]
+xT = [0, pi, 0, 0]
 
 IterativeLQR.set_initial_inputs!(workset, us₀)
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
     stacked_derivatives=true, regularization=:min,
-    verbose=true, logging=true, plotting_callback=plotting_callback, xN=xN
+    verbose=true, logging=true, plotting_callback=plotting_callback, xT=xT
 )
 
-display(nominal_trajectory(workset).x[end] - xN)
+display(nominal_trajectory(workset).x[end] - xT)
 
 # Benchmark
 # opt = filter(row -> row.accepted, df).J[end]
