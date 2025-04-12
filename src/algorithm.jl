@@ -169,7 +169,7 @@ function iLQR!(
     dataframe = logging ? iteration_dataframe() : nothing
 
     # set parameter
-    set_penalty_parameter!(workset.constraints, ρ0)
+    set_penalty_parameter!(workset, ρ0)
 
     # regularization function
     regularization_function! =
@@ -189,8 +189,8 @@ function iLQR!(
         end
 
         # add terminal constraint penalty and update dual
-        J += evaluate_penalties(workset.constraints, nominal_trajectory(workset).x[end], xT)
-        update_dual_variables!(workset.constraints, nominal_trajectory(workset).x[end], xT)
+        J += evaluate_penalties(workset, nominal_trajectory(workset).x[end], xT)
+        update_dual_variables!(workset, nominal_trajectory(workset).x[end], xT)
 
         # print and log
         verbose && print_iteration!(line_count, 0, NaN, J, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
@@ -216,13 +216,7 @@ function iLQR!(
         reg = (regularization == :none) ? NaN : @elapsed regularization!(workset, regularization_function!)
 
         # add terminal constaint penalty's derivatives
-        add_penalty_derivatives!(
-            workset.value_function.vx[end],
-            workset.value_function.vxx[end],
-            workset.constraints,
-            nominal_trajectory(workset).x[end],
-            xT
-        )
+        add_penalty_derivatives!(workset, nominal_trajectory(workset).x[end], xT)
 
         # backward pass
         bwd = @elapsed backward_pass!(workset)
@@ -237,8 +231,8 @@ function iLQR!(
             end
 
             # add terminal constraint penalty
-            pen_old = evaluate_penalties(workset.constraints, nominal_trajectory(workset).x[end], xT)
-            pen_new = evaluate_penalties(workset.constraints, active_trajectory(workset).x[end], xT)
+            pen_old = evaluate_penalties(workset, nominal_trajectory(workset).x[end], xT)
+            pen_new = evaluate_penalties(workset, active_trajectory(workset).x[end], xT)
 
             J += pen_new
             ΔJ += pen_new - pen_old
@@ -263,7 +257,7 @@ function iLQR!(
             # solution copying and regularization parameter adjustment
             if accepted
                 # update dual variable
-                update_dual_variables!(workset.constraints, active_trajectory(workset).x[end], xT)
+                update_dual_variables!(workset, active_trajectory(workset).x[end], xT)
 
                 # plot trajectory
                 (plotting_callback === nothing) || plotting_callback(workset)

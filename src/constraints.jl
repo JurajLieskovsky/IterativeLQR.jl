@@ -10,33 +10,45 @@ end
 
 ## set functions
 
-function set_penalty_parameter!(constraint::Constraints, ρ_new)
-    @unpack ρ, λN = constraint
+function set_penalty_parameter!(workset, ρ_new)
+    @unpack ρ, λN = workset.constraints
     λN .*= ρ[] / ρ_new
     ρ[] = ρ_new
     return nothing
 end
 
-## evaluation functions
+## general evaluation functions
+evaluate_penalty(ρ, arg) = ρ / 2 * mapreduce(a -> a^2, +, arg)
 
-function evaluate_penalties(constraint::Constraints, xN, xT)
-    xT === nothing && return 0
-    @unpack ρ, λN = constraint
-    arg = xN - xT + λN
-    return ρ[] / 2 * arg' * arg
+function add_penalty_derivative!(grad, hess, ρ, arg)
+    grad .+= ρ * arg
+    hess[diagind(hess)] .+= ρ
 end
 
-function add_penalty_derivatives!(vxN, vxxN, constraint::Constraints, xN, xT)
-    xT === nothing && return nothing
-    @unpack ρ, λN = constraint
-    vxN .+= ρ[] * (xN - xT + λN)
-    vxxN[diagind(vxxN)] .+= ρ[]
+# workset evaluation functions
+function evaluate_penalties(workset, xN, xT)
+    @unpack ρ, λN = workset.constraints
+    return (xT !== nothing) ? evaluate_penalty(ρ[], xN - xT + λN) : 0
+end
+
+function add_penalty_derivatives!(workset, xN, xT)
+    @unpack N = workset
+    @unpack vx, vxx = workset.value_function
+    @unpack ρ, λN = workset.constraints
+
+    if xT !== nothing
+        add_penalty_derivative!(vx[N+1], vxx[N+1], ρ[], xN - xT + λN)
+    end
+
     return nothing
 end
 
-function update_dual_variables!(constraint::Constraints, xN, xT)
-    xT === nothing && return nothing
-    @unpack λN = constraint
-    λN .= λN + xN - xT
+function update_dual_variables!(workset, xN, xT)
+    @unpack λN = workset.constraints
+
+    if xT !== nothing
+        λN .= λN + xN - xT
+    end
+
     return nothing
 end
