@@ -130,7 +130,7 @@ struct Workset{T}
 
         subproblem_objective_derivatives = SubproblemObjectiveDerivatives{T}(ndx, nu)
 
-        constraints = Constraints{T}(nx)
+        constraints = Constraints{T}(nx, nu, N)
 
         return new(N, nx, ndx, nu, 1, 2, trajectory, value_function, policy_update, dynamics_derivatives, cost_derivatives, subproblem_objective_derivatives, constraints)
     end
