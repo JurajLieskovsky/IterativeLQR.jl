@@ -37,9 +37,22 @@ function set_penalty_parameter!(workset, ρ_new)
     workset.constraints.ρ = ρ_new
 
     α .*= ratio
+    @threads for β_k in β
+        β_k .*= ratio
+    end
 
-    for λ in β
-        λ .*= ratio
+    return nothing
+end
+
+## penalty parameter modification
+function scale_penalty_parameter!(workset, k)
+    @unpack α, β = workset.constraints
+
+    workset.constraints.ρ *= k
+
+    α ./= k
+    @threads for β_k in β
+        β_k ./= k
     end
 
     return nothing
