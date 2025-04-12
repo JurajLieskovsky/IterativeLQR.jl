@@ -2,30 +2,34 @@
 mutable struct Constraints{T}
     ρ::T
 
-    _xN::Bool
-    αN::Vector{T}
+    zN_indicator::Union{Function,Nothing}
     zN::Vector{T}
+    αN::Vector{T}
 
     # w::Vector{Vector{T}}
     # β::Vector{Vector{T}}
 
     function Constraints{T}(nx) where {T} # , nu, N) where {T}
-        αN = zeros(T, nx)
         zN = zeros(T, nx)
+        αN = zeros(T, nx)
         # β = [zeros(T, nu) for _ in 1:N]
         # w = [zeros(T, nu) for _ in 1:N]
 
-        new(zero(T), true, αN, zN)#, β, w)
+        new(zero(T), nothing, αN, zN)#, β, w)
     end
 end
 
 ## set functions
 
-function set_penalty_parameter!(workset, ρ_new)
-    @unpack ρ, αN = workset.constraints
+function set_terminal_constraint_function!(workset, fun)
+    workset.constraints.zN_indicator = fun
+end
 
-    ratio = ρ / ρ_new
-    ρ = ρ_new
+function set_penalty_parameter!(workset, ρ_new)
+    @unpack αN = workset.constraints
+
+    ratio = workset.constraints.ρ / ρ_new
+    workset.constraints.ρ = ρ_new
 
     αN .*= ratio
 
@@ -45,9 +49,9 @@ function add_penalty_derivatives!(workset)
     @unpack N = workset
     @unpack x = nominal_trajectory(workset)
     @unpack vx, vxx = workset.value_function
-    @unpack ρ, _xN, αN, zN = workset.constraints
+    @unpack ρ, zN_indicator, αN, zN = workset.constraints
 
-    if _xN
+    if zN_indicator !== nothing
         add_penalty_derivative!(vx[N+1], vxx[N+1], ρ, x[N+1] - zN + αN)
     end
 
@@ -56,28 +60,25 @@ end
 
 function evaluate_penalties(workset, trajectory)
     @unpack N = workset
-    @unpack ρ, _xN, zN, αN = workset.constraints
+    @unpack ρ, zN_indicator, zN, αN = workset.constraints
 
-    return _xN ? evaluate_penalty(ρ, trajectory.x[N+1] - zN + αN) : 0
+    return (zN_indicator !== nothing) ? evaluate_penalty(ρ, trajectory.x[N+1] - zN + αN) : 0
 end
 
-function update_slack_variables!(workset, trajectory, terminal_constraint)
+function update_slack_variables!(workset, trajectory)
     @unpack N = workset
-    @unpack _xN, zN = workset.constraints
+    @unpack zN_indicator, zN = workset.constraints
 
-    if terminal_constraint !== nothing
-        _xN = true
-        zN .= terminal_constraint(trajectory.x[N+1])
-    else
-        _xN = false
+    if zN_indicator !== nothing
+        zN .= zN_indicator(trajectory.x[N+1])
     end
 end
 
 function update_dual_variables!(workset, trajectory)
     @unpack N = workset
-    @unpack _xN, zN, αN = workset.constraints
+    @unpack zN_indicator, zN, αN = workset.constraints
 
-    if _xN
+    if zN_indicator !== nothing
         αN .= αN + trajectory.x[N+1] - zN
     end
 

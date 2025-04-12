@@ -169,6 +169,7 @@ function iLQR!(
     dataframe = logging ? iteration_dataframe() : nothing
 
     # set parameter
+    set_terminal_constraint_function!(workset, terminal_constraint)
     set_penalty_parameter!(workset, ρ0)
 
     # regularization function
@@ -189,8 +190,10 @@ function iLQR!(
         end
 
         # add terminal constraint penalty and update dual
-        update_slack_variables!(workset, nominal_trajectory(workset), terminal_constraint) 
+        update_slack_variables!(workset, nominal_trajectory(workset)) # to minimize initial penalty
         J += evaluate_penalties(workset, nominal_trajectory(workset))
+
+        update_slack_variables!(workset, nominal_trajectory(workset))
         update_dual_variables!(workset, nominal_trajectory(workset))
 
         # print and log
@@ -261,7 +264,7 @@ function iLQR!(
             # solution copying and regularization parameter adjustment
             if accepted
                 # update dual variable
-                update_slack_variables!(workset, active_trajectory(workset), terminal_constraint) 
+                update_slack_variables!(workset, active_trajectory(workset))
                 update_dual_variables!(workset, active_trajectory(workset))
 
                 # plot trajectory
