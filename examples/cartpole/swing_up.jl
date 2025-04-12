@@ -94,17 +94,20 @@ function plotting_callback(workset)
     return plt
 end
 
+# terminal constraint indicator function
+terminal_constraint(_) = [0, pi, 0, 0]
+
 # Trajectory optimization
 workset = IterativeLQR.Workset{Float64}(4, 1, N)
 IterativeLQR.set_initial_state!(workset, x₀)
-
-terminal_constraint(_) = [0, pi, 0, 0]
+IterativeLQR.set_penalty_parameter!(workset, 1e0)
+IterativeLQR.set_terminal_constraint_indicator_function!(workset, terminal_constraint)
 
 IterativeLQR.set_initial_inputs!(workset, us₀)
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
     stacked_derivatives=true, regularization=:min,
-    verbose=true, logging=true, plotting_callback=plotting_callback, terminal_constraint=terminal_constraint
+    verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
 xN = nominal_trajectory(workset).x[end]

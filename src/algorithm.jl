@@ -132,26 +132,26 @@ end
 
 # printing and saving utilities
 
-function print_iteration!(line_count, i, α, J, ΔJ, Δv, accepted, diff, reg, bwd, fwd)
+function print_iteration!(line_count, i, α, J, P, ΔJ, ΔP, Δv, accepted, diff, reg, bwd, fwd)
     line_count[] % 10 == 0 && @printf(
-        "%-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s\n",
-        "iter", "α", "J", "ΔJ", "ΔV", "accepted", "diff", "reg", "bwd", "fwd"
+        "%-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s\n",
+        "iter", "α", "J", "P", "ΔJ", "ΔP", "ΔV", "accepted", "diff", "reg", "bwd", "fwd"
     )
     @printf(
-        "%-9i %-9.3g %-9.3g %-9.3g %-9.3g %-9s %-9.3g %-9.3g %-9.3g %-9.3g\n",
-        i, α, J, ΔJ, Δv, accepted, diff, reg, bwd, fwd
+        "%-9i %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9s %-9.3g %-9.3g %-9.3g %-9.3g\n",
+        i, α, J, P, ΔJ, ΔP, Δv, accepted, diff, reg, bwd, fwd
     )
     line_count[] += 1
 end
 
 iteration_dataframe() = DataFrame(
     i=Int[], α=Float64[],
-    J=Float64[], ΔJ=Float64[], ΔV=Float64[],
+    J=Float64[], P=Float64[], ΔJ=Float64[], ΔP=Float64[], ΔV=Float64[],
     accepted=Bool[]
 )
 
-function log_iteration!(dataframe, i, α, J, ΔJ, Δv, accepted)
-    push!(dataframe, (i, α, J, ΔJ, Δv, accepted))
+function log_iteration!(dataframe, i, α, J, P, ΔJ, ΔP, Δv, accepted)
+    push!(dataframe, (i, α, J, P, ΔJ, ΔP, Δv, accepted))
 end
 
 # algorithm
@@ -160,17 +160,13 @@ function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
     maxiter=100, σ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16),
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
-    stacked_derivatives=false, state_difference=-, regularization=:min, ρ0=1e0, terminal_constraint=nothing
+    stacked_derivatives=false, state_difference=-, regularization=:min
 )
     # line count for printing
     line_count = Ref(0)
 
     # dataframe for logging
     dataframe = logging ? iteration_dataframe() : nothing
-
-    # set parameter
-    set_terminal_constraint_function!(workset, terminal_constraint)
-    set_penalty_parameter!(workset, ρ0)
 
     # regularization function
     regularization_function! =
@@ -189,16 +185,13 @@ function iLQR!(
             successful, J = trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
         end
 
-        # add terminal constraint penalty and update dual
-        update_slack_variables!(workset, nominal_trajectory(workset)) # to minimize initial penalty
-        J += evaluate_penalties(workset, nominal_trajectory(workset))
-
+        # update slack and dual variables
         update_slack_variables!(workset, nominal_trajectory(workset))
         update_dual_variables!(workset, nominal_trajectory(workset))
 
         # print and log
-        verbose && print_iteration!(line_count, 0, NaN, J, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
-        logging && log_iteration!(dataframe, 0, NaN, J, NaN, NaN, successful)
+        verbose && print_iteration!(line_count, 0, NaN, J, NaN, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
+        logging && log_iteration!(dataframe, 0, NaN, J, NaN, NaN, NaN, NaN, successful)
 
         # plot trajectory
         (plotting_callback === nothing) || plotting_callback(workset)
@@ -238,32 +231,29 @@ function iLQR!(
             end
 
             # add terminal constraint penalty
-            pen_old = evaluate_penalties(workset, nominal_trajectory(workset))
-            pen_new = evaluate_penalties(workset, active_trajectory(workset))
-
-            J += pen_new
-            ΔJ += pen_new - pen_old
+            P = evaluate_penalties(workset, active_trajectory(workset))
+            ΔP = P - evaluate_penalties(workset, nominal_trajectory(workset))
 
             # expected improvement
             Δv = mapreduce(Δ -> α * Δ[1] + α^2 * Δ[2], +, workset.value_function.Δv)
 
             # error handling
             if !successful
-                verbose && print_iteration!(line_count, i, α, J, ΔJ, Δv, false, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
-                logging && log_iteration!(dataframe, i, α, J, ΔJ, Δv, false)
+                verbose && print_iteration!(line_count, i, α, J, P, ΔJ, ΔP, Δv, false, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
+                logging && log_iteration!(dataframe, i, α, J, P, ΔJ, ΔP, Δv, false)
                 continue
             end
 
             # iteration's evaluation
-            accepted = ΔJ < 0 && ΔJ <= σ * Δv
+            accepted = (ΔJ + ΔP) < 0 && (ΔJ + ΔP) <= σ * Δv
 
             # print and log
-            verbose && print_iteration!(line_count, i, α, J, ΔJ, Δv, accepted, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
-            logging && log_iteration!(dataframe, i, α, J, ΔJ, Δv, accepted)
+            verbose && print_iteration!(line_count, i, α, J, P, ΔJ, ΔP, Δv, accepted, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
+            logging && log_iteration!(dataframe, i, α, J, P, ΔJ, ΔP, Δv, accepted)
 
             # solution copying and regularization parameter adjustment
             if accepted
-                # update dual variable
+                # update slack and dual variable
                 update_slack_variables!(workset, active_trajectory(workset))
                 update_dual_variables!(workset, active_trajectory(workset))
 
