@@ -51,7 +51,7 @@ function stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, f
     return nothing
 end
 
-function cost_regularization!(workset, regularization_function!)
+function regularization!(workset, regularization_function!)
     @unpack N = workset
     @unpack hess = workset.cost_derivatives
     @unpack vxx = workset.value_function
@@ -64,6 +64,8 @@ function cost_regularization!(workset, regularization_function!)
 
     return nothing
 end
+
+# backward and forward pass of the algorithm
 
 function backward_pass!(workset)
     @unpack N, ndx, nu = workset
@@ -128,6 +130,8 @@ function forward_pass!(workset, dynamics!, difference, running_cost, final_cost,
     return true, sum(l), sum(l) - sum(l_ref)
 end
 
+# printing and saving utilities
+
 function print_iteration!(line_count, i, α, J, ΔJ, Δv, accepted, diff, reg, bwd, fwd)
     line_count[] % 10 == 0 && @printf(
         "%-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s\n",
@@ -150,9 +154,11 @@ function log_iteration!(dataframe, i, α, J, ΔJ, Δv, accepted)
     push!(dataframe, (i, α, J, ΔJ, Δv, accepted))
 end
 
+# algorithm
+
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
-    maxiter=200, ρ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16),
+    maxiter=100, σ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16),
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
     stacked_derivatives=false, state_difference=-, regularization=:min
 )
@@ -198,7 +204,7 @@ function iLQR!(
         end
 
         # regularization
-        reg = (regularization == :none) ? NaN : @elapsed cost_regularization!(workset, regularization_function!)
+        reg = (regularization == :none) ? NaN : @elapsed regularization!(workset, regularization_function!)
 
         # backward pass
         bwd = @elapsed backward_pass!(workset)
@@ -223,7 +229,7 @@ function iLQR!(
             end
 
             # iteration's evaluation
-            accepted = ΔJ < 0 && ΔJ <= ρ * Δv
+            accepted = ΔJ < 0 && ΔJ <= σ * Δv
 
             # printout
             verbose && print_iteration!(line_count, i, α, J, ΔJ, Δv, accepted, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
