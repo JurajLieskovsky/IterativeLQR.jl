@@ -1,7 +1,7 @@
 # Terminal state constraint
 struct Constraints{T}
     ρ::Ref{T}
-    λN::Vector{T}
+    αN::Vector{T}
 
     function Constraints{T}(nx) where {T}
         new(zero(T), zeros(T, nx))
@@ -11,8 +11,8 @@ end
 ## set functions
 
 function set_penalty_parameter!(workset, ρ_new)
-    @unpack ρ, λN = workset.constraints
-    λN .*= ρ[] / ρ_new
+    @unpack ρ, αN = workset.constraints
+    αN .*= ρ[] / ρ_new
     ρ[] = ρ_new
     return nothing
 end
@@ -30,10 +30,10 @@ function add_penalty_derivatives!(workset, xT)
     @unpack N = workset
     @unpack x = nominal_trajectory(workset)
     @unpack vx, vxx = workset.value_function
-    @unpack ρ, λN = workset.constraints
+    @unpack ρ, αN = workset.constraints
 
     if xT !== nothing
-        add_penalty_derivative!(vx[N+1], vxx[N+1], ρ[], x[N+1] - xT + λN)
+        add_penalty_derivative!(vx[N+1], vxx[N+1], ρ[], x[N+1] - xT + αN)
     end
 
     return nothing
@@ -41,17 +41,17 @@ end
 
 function evaluate_penalties(workset, trajectory, xT)
     @unpack N = workset
-    @unpack ρ, λN = workset.constraints
+    @unpack ρ, αN = workset.constraints
 
-    return (xT !== nothing) ? evaluate_penalty(ρ[], trajectory.x[N+1] - xT + λN) : 0
+    return (xT !== nothing) ? evaluate_penalty(ρ[], trajectory.x[N+1] - xT + αN) : 0
 end
 
 function update_dual_variables!(workset, trajectory, xT)
     @unpack N = workset
-    @unpack λN = workset.constraints
+    @unpack αN = workset.constraints
     
     if xT !== nothing
-        λN .= λN + trajectory.x[N+1] - xT
+        αN .= αN + trajectory.x[N+1] - xT
     end
 
     return nothing
