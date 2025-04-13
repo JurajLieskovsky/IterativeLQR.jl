@@ -105,8 +105,8 @@ IterativeLQR.set_initial_state!(workset, x₀)
 IterativeLQR.set_initial_inputs!(workset, us₀)
 
 IterativeLQR.set_projection_function!(workset, :terminal_state, terminal_state_projection)
-IterativeLQR.set_terminal_state_constraint_parameter!(workset, 1e1)
 IterativeLQR.set_projection_function!(workset, :input, input_projection)
+IterativeLQR.set_terminal_state_constraint_parameter!(workset, 1e1)
 IterativeLQR.set_input_constraint_parameter!(workset, 1e-1)
 
 df = IterativeLQR.iLQR!(
