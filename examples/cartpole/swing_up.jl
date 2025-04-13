@@ -96,16 +96,16 @@ function plotting_callback(workset)
 end
 
 # terminal constraint indicator function
-terminal_state_constraint(_) = [0, pi, 0, 0]
-input_constraint(u) = map(u_k -> sign(u_k) * min(4.0, abs(u_k)), u)
+terminal_state_projection(_) = [0, pi, 0, 0]
+input_projection(u) = map(u_k -> sign(u_k) * min(4.0, abs(u_k)), u)
 
 # Trajectory optimization
 workset = IterativeLQR.Workset{Float64}(4, 1, N)
 IterativeLQR.set_initial_state!(workset, x₀)
 
-IterativeLQR.set_projection_function!(workset, :terminal_state_constraint, terminal_state_constraint)
+IterativeLQR.set_projection_function!(workset, :terminal_state_constraint, terminal_state_projection)
 IterativeLQR.set_penalty_parameter!(workset, :terminal_state_constraint, 1e1)
-IterativeLQR.set_projection_function!(workset, :input_constraint, input_constraint)
+IterativeLQR.set_projection_function!(workset, :input_constraint, input_projection)
 IterativeLQR.set_penalty_parameter!(workset, :input_constraint, 1e-1)
 
 IterativeLQR.set_initial_inputs!(workset, us₀)
@@ -116,7 +116,7 @@ df = IterativeLQR.iLQR!(
 )
 
 xN = nominal_trajectory(workset).x[end]
-display(xN - terminal_state_constraint(xN))
+display(xN - terminal_state_projection(xN))
 
 # Benchmark
 # opt_J = filter(row -> row.accepted, df).J[end]
