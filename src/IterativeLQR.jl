@@ -9,7 +9,6 @@ using PositiveFactorizations
 using Base.Threads
 using ThreadsX
 
-# include("constraints.jl")
 include("abstract_constraints.jl")
 include("workset.jl")
 include("trajectory_utils.jl")

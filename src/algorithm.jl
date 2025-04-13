@@ -157,7 +157,7 @@ end
 
 function evaluate_penalties!(workset)
     @unpack N = workset
-    @unpack terminal_state_constraint = workset
+    @unpack terminal_state_constraint, input_constraint = workset
 
     for trajectory in workset.trajectory
         # continue if slack and dual variables are unchanged
@@ -170,6 +170,11 @@ function evaluate_penalties!(workset)
         if terminal_state_constraint.projection !== nothing
             trajectory.p[N+1] = evaluate_penalty!(terminal_state_constraint, trajectory.x[N+1])
         end
+
+        # input constraint
+        if input_constraint.projection !== nothing
+            @views evaluate_penalty!(trajectory.p[1:N], input_constraint, trajectory.u)
+        end
     end
 
     return nothing
@@ -177,12 +182,17 @@ end
 
 function add_penalty_derivatives!(workset)
     @unpack N = workset
-    @unpack x = nominal_trajectory(workset)
+    @unpack x,u = nominal_trajectory(workset)
     @unpack vx, vxx = workset.value_function
-    @unpack terminal_state_constraint = workset
+    @unpack lu, luu = workset.cost_derivatives
+    @unpack terminal_state_constraint, input_constraint = workset
 
     if terminal_state_constraint.projection !== nothing
         add_penalty_derivative!(vx[N+1], vxx[N+1], terminal_state_constraint, x[N+1])
+    end
+
+    if input_constraint.projection !== nothing
+        add_penalty_derivative!(lu, luu, input_constraint, u)
     end
 
     return nothing
@@ -190,11 +200,15 @@ end
 
 function update_slack_and_dual_variables!(workset)
     @unpack N = workset
-    @unpack x = nominal_trajectory(workset)
-    @unpack terminal_state_constraint = workset
+    @unpack x,u = nominal_trajectory(workset)
+    @unpack terminal_state_constraint, input_constraint = workset
 
     if terminal_state_constraint.projection !== nothing
         update_slack_and_dual_variable!(terminal_state_constraint, x[N+1])
+    end
+
+    if input_constraint.projection !== nothing
+        update_slack_and_dual_variable!(input_constraint, u)
     end
 
     for trajectory in workset.trajectory

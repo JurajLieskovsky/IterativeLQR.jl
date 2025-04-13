@@ -122,6 +122,7 @@ struct Workset{T}
     cost_derivatives::CostDerivatives{T}
     subproblem_objective_derivatives::SubproblemObjectiveDerivatives{T}
     terminal_state_constraint::SingleConstraint{T}
+    input_constraint::MultipleConstraint{T}
 
     function Workset{T}(nx, nu, N, ndx=nothing) where {T}
         ndx = ndx !== nothing ? ndx : nx
@@ -135,8 +136,9 @@ struct Workset{T}
         subproblem_objective_derivatives = SubproblemObjectiveDerivatives{T}(ndx, nu)
 
         terminal_state_constraint = SingleConstraint{T}(nx)
+        input_constraint = MultipleConstraint{T}(nu, N)
 
-        return new(N, nx, ndx, nu, 1, 2, trajectory, value_function, policy_update, dynamics_derivatives, cost_derivatives, subproblem_objective_derivatives, terminal_state_constraint)
+        return new(N, nx, ndx, nu, 1, 2, trajectory, value_function, policy_update, dynamics_derivatives, cost_derivatives, subproblem_objective_derivatives, terminal_state_constraint, input_constraint)
     end
 end
 

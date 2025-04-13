@@ -14,16 +14,14 @@ mutable struct SingleConstraint{T}
 end
 
 function set_penalty_parameter!(constraint::SingleConstraint, ρ_new)
-    @unpack param, dual = constraint
-    dual .*= param / ρ_new
-    param = ρ_new
+    constraint.dual .*= constraint.param / ρ_new
+    constraint.param = ρ_new
     return nothing
 end
 
 function scale_penalty_parameter!(constraint::SingleConstraint, k)
-    @unpack param, dual = constraint
-    dual ./= k
-    param *= k
+    constraint.dual ./= k
+    constraint.param *= k
     return nothing
 end
 
@@ -63,21 +61,19 @@ mutable struct MultipleConstraint{T}
 end
 
 function set_penalty_parameter!(constraint::MultipleConstraint, ρ_new)
-    @unpack num, param, dual = constraint
-    ratio = param / ρ_new
-    @threads for k in 1:num
-        dual[k] .*= ratio
+    ratio = constraint.param / ρ_new
+    @threads for k in 1:constraint.num
+        constraint.dual[k] .*= ratio
     end
-    param = ρ_new
+    constraint.param = ρ_new
     return nothing
 end
 
 function scale_penalty_parameter!(constraint::MultipleConstraint, factor)
-    @unpack num, param, dual = constraint
-    @threads for k in 1:num
-        dual[k] ./= factor
+    @threads for k in 1:constraint.num
+        constraint.dual[k] ./= factor
     end
-    param *= factor
+    constraint.param *= factor
     return nothing
 end
 
@@ -85,7 +81,7 @@ function add_penalty_derivative!(gradient, hessian, constraint::MultipleConstrai
     @unpack num, param, slack, dual = constraint
     @threads for k in 1:num
         gradient[k] .+= param * (primal[k] - slack[k] + dual[k])
-        hessian[diagind(hessian[k])] .+= param
+        hessian[k][diagind(hessian[k])] .+= param
     end
     return nothing
 end

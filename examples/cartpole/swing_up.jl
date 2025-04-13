@@ -47,7 +47,7 @@ function dynamics_diff!(jac, x, u, k)
 end
 
 # Running cost
-running_cost(_, u, _) = 1e-2 * h * u[1]^2
+running_cost(_, u, _) = 1e0 * h * u[1]^2
 # running_cost(x, u, _) = 1 + cos(x[2]) + 1e1 * x[1]^2 + 3e-2 * u[1]^2
 
 function running_cost_diff!(grad, hess, x, u, k)
@@ -96,16 +96,16 @@ function plotting_callback(workset)
 end
 
 # terminal constraint indicator function
-terminal_constraint(_) = [0, pi, 0, 0]
-# input_constraint(u) = map(u_k -> sign(u_k) * min(4, abs(u_k)), u)
+terminal_state_constraint(_) = [0, pi, 0, 0]
+input_constraint(u) = map(u_k -> sign(u_k) * min(4, abs(u_k)), u)
 
 # Trajectory optimization
 workset = IterativeLQR.Workset{Float64}(4, 1, N)
 IterativeLQR.set_initial_state!(workset, x₀)
-
-IterativeLQR.set_penalty_parameter!(workset.terminal_state_constraint, 1e-1)
-workset.terminal_state_constraint.projection = terminal_constraint
-# IterativeLQR.set_input_constraint_projection_function!(workset, input_constraint)
+IterativeLQR.set_penalty_parameter!(workset.terminal_state_constraint, 1e1)
+workset.terminal_state_constraint.projection = terminal_state_constraint
+IterativeLQR.set_penalty_parameter!(workset.input_constraint, 1e-1)
+workset.input_constraint.projection = input_constraint
 
 IterativeLQR.set_initial_inputs!(workset, us₀)
 df = IterativeLQR.iLQR!(
@@ -115,7 +115,7 @@ df = IterativeLQR.iLQR!(
 )
 
 xN = nominal_trajectory(workset).x[end]
-display(xN - terminal_constraint(xN))
+display(xN - terminal_state_constraint(xN))
 
 # Benchmark
 # opt = filter(row -> row.accepted, df).J[end]
