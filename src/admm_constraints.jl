@@ -1,7 +1,7 @@
 # ADMM constraints
 mutable struct Constraint{T}
-    ρ::T                        # penalty parameter   
-    Π::Union{Function,Nothing}  # projection function
+    parameter::T                         # penalty parameter   
+    projection::Union{Function,Nothing}  # projection function
 
     function Constraint{T}() where {T}
         return new{T}(one(T), nothing)
@@ -30,40 +30,44 @@ struct Constraints{T}
     end
 end
 
-isactive(constraint::Constraint) = constraint.Π !== nothing
+isactive(constraint::Constraint) = constraint.projection !== nothing
 
 ## workset functions
-function set_projection_function!(workset, constraint::Symbol, projection::Function)
-    setproperty!(getproperty(workset.constraints, constraint), :Π, projection)
+function set_projection_function!(workset, constraint::Symbol, Π::Function)
+    setproperty!(getproperty(workset.constraints, constraint), :projection, Π)
 end
 
-function set_terminal_state_constraint_parameter!(workset, ρ_new)
-    workset.constraints.α .*= workset.constraints.terminal_state.ρ / ρ_new
-    workset.constraints.terminal_state.ρ = ρ_new
+function set_terminal_state_constraint_parameter!(workset, ρ)
+    @unpack α = workset.constraints
+    @unpack parameter = workset.constraints.terminal_state
+    α .*= parameter / ρ
+    setproperty!(workset.constraints.terminal_state, :parameter,  ρ)
     return nothing
 end
 
-function set_input_constraint_parameter!(workset, ρ_new)
-    ThreadsX.map(u -> u ./= workset.constraints.input.ρ / ρ_new, workset.constraints.β)
-    workset.constraints.input.ρ = ρ_new
+function set_input_constraint_parameter!(workset, ρ)
+    @unpack β = workset.constraints
+    @unpack parameter = workset.constraints.input
+    ThreadsX.map(u -> u ./= parameter / ρ, β)
+    setproperty!(workset.constraints.input, :parameter,  ρ)
     return nothing
 end
 
 ## evaluation functions
 function add_penalty_derivative!(gradient, hessian, constraint, primal, slack, dual)
     isactive(constraint) || return nothing
-    gradient .+= constraint.ρ * (primal - slack + dual)
-    hessian[diagind(hessian)] .+= constraint.ρ
+    gradient .+= constraint.parameter * (primal - slack + dual)
+    hessian[diagind(hessian)] .+= constraint.parameter
     return nothing
 end
 
 function evaluate_penalty(constraint, residual, dual)
     isactive(constraint) || return nothing
-    constraint.ρ / 2 * mapreduce(a -> a^2, +, residual + dual)
+    constraint.parameter / 2 * mapreduce(a -> a^2, +, residual + dual)
 end
 
 function update_slack_and_dual_variable!(constraint, primal, slack, dual)
     isactive(constraint) || return nothing
-    slack .= constraint.Π(primal + dual)
+    slack .= constraint.projection(primal + dual)
     dual .+= primal - slack
 end
