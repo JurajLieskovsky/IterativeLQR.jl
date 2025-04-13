@@ -1,3 +1,12 @@
+# Shared
+function set_projection_function!(workset::Workset, constraint::Symbol, projection::Function)
+    setproperty!(getproperty(workset, constraint), :projection, projection)
+end
+
+function set_penalty_parameter!(workset::Workset{T}, constraint::Symbol, ρ::T) where {T}
+    set_penalty_parameter!(getproperty(workset, constraint), ρ)
+end
+
 # Single step constraint
 
 mutable struct SingleConstraint{T}
@@ -13,9 +22,9 @@ mutable struct SingleConstraint{T}
     end
 end
 
-function set_penalty_parameter!(constraint::SingleConstraint, ρ_new)
-    constraint.dual .*= constraint.param / ρ_new
-    constraint.param = ρ_new
+function set_penalty_parameter!(constraint::SingleConstraint, ρ)
+    constraint.dual .*= constraint.param / ρ
+    constraint.param = ρ
     return nothing
 end
 
@@ -60,12 +69,12 @@ mutable struct MultipleConstraint{T}
     end
 end
 
-function set_penalty_parameter!(constraint::MultipleConstraint, ρ_new)
-    ratio = constraint.param / ρ_new
+function set_penalty_parameter!(constraint::MultipleConstraint, ρ)
+    ratio = constraint.param / ρ
     @threads for k in 1:constraint.num
         constraint.dual[k] .*= ratio
     end
-    constraint.param = ρ_new
+    constraint.param = ρ
     return nothing
 end
 
