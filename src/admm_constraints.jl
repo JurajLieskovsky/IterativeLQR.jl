@@ -1,21 +1,9 @@
 # ADMM constraints
-
-abstract type Constraint end
-
-mutable struct SingleConstraint{T} <: Constraint
+mutable struct Constraint{T}
     param::T                             # penalty parameter   
     projection::Union{Function,Nothing}  # projection function
 
-    function SingleConstraint{T}(n) where {T}
-        return new{T}(one(T), nothing)
-    end
-end
-
-mutable struct MultipleConstraint{T} <: Constraint
-    param::T                             # penalty parameter   
-    projection::Union{Function,Nothing}  # projection function
-
-    function MultipleConstraint{T}(n, m) where {T}
+    function Constraint{T}() where {T}
         return new{T}(one(T), nothing)
     end
 end

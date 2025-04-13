@@ -122,8 +122,8 @@ struct Workset{T}
     cost_derivatives::CostDerivatives{T}
     subproblem_objective_derivatives::SubproblemObjectiveDerivatives{T}
 
-    terminal_state_constraint::SingleConstraint{T}
-    input_constraint::MultipleConstraint{T}
+    terminal_state_constraint::Constraint{T}
+    input_constraint::Constraint{T}
     z::Vector{T}
     α::Vector{T}
     w::Vector{Vector{T}}
@@ -140,8 +140,8 @@ struct Workset{T}
 
         subproblem_objective_derivatives = SubproblemObjectiveDerivatives{T}(ndx, nu)
 
-        terminal_state_constraint = SingleConstraint{T}(nx)
-        input_constraint = MultipleConstraint{T}(nu, N)
+        terminal_state_constraint = Constraint{T}()
+        input_constraint = Constraint{T}()
         z = zeros(T, nx)
         α = zeros(T, nx)
         w = [zeros(T, nu) for _ in 1:N]
