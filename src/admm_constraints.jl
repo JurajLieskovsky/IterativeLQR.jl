@@ -49,7 +49,7 @@ end
 function update_slack_and_dual_variable!(constraint::SingleConstraint, primal)
     @unpack slack, dual, projection = constraint
     slack .= projection(primal + dual)
-    dual .+= primal - slack 
+    dual .+= primal - slack
     return nothing
 end
 
@@ -70,19 +70,14 @@ mutable struct MultipleConstraint{T}
 end
 
 function set_penalty_parameter!(constraint::MultipleConstraint, ρ)
-    ratio = constraint.param / ρ
-    @threads for k in 1:constraint.num
-        constraint.dual[k] .*= ratio
-    end
+    ThreadsX.map(u -> u ./= constraint.param / ρ, constraint.dual)
     constraint.param = ρ
     return nothing
 end
 
-function scale_penalty_parameter!(constraint::MultipleConstraint, factor)
-    @threads for k in 1:constraint.num
-        constraint.dual[k] ./= factor
-    end
-    constraint.param *= factor
+function scale_penalty_parameter!(constraint::MultipleConstraint, k)
+    ThreadsX.map(u -> u ./= k, constraint.dual)
+    constraint.param *= k
     return nothing
 end
 
@@ -96,18 +91,15 @@ function add_penalty_derivative!(gradient, hessian, constraint::MultipleConstrai
 end
 
 function evaluate_penalty!(penalty, constraint::MultipleConstraint, primal)
-    @unpack num, param, slack, dual = constraint
-    @threads for k in 1:num
-        penalty[k] = param / 2 * mapreduce(a -> a^2, +, primal[k] - slack[k] + dual[k])
-    end
+    ThreadsX.map(
+        (p, x, z, u) -> p = constraint.param / 2 * mapreduce(arg -> arg^2, +, x - z + u),
+        penalty, primal, constraint.slack, constraint.dual
+    )
     return nothing
 end
 
 function update_slack_and_dual_variable!(constraint::MultipleConstraint, primal)
-    @unpack num, slack, dual, projection = constraint
-    @threads for k in 1:num
-        slack[k] .= projection(primal[k] + dual[k])
-        dual[k] .+= primal[k] - slack[k] 
-    end
+    ThreadsX.map((x, z, u) -> z .= constraint.projection(x + u), primal, constraint.slack, constraint.dual)
+    ThreadsX.map((x, z, u) -> u .+= x - z, primal, constraint.slack, constraint.dual)
     return nothing
 end
