@@ -28,18 +28,12 @@ function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cos
     @threads for k in 1:N
         dynamics_diff!(fx[k], fu[k], x[k], u[k], k)
         running_cost_diff!(lx[k], lu[k], lxx[k], lxu[k], luu[k], x[k], u[k], k)
+        add_penalty_derivative!(lu[k], luu[k], input_constraint, u[k], w[k], β[k])
         lux[k] .= lxu[k]'
-
-        if isactive(input_constraint)
-            add_penalty_derivative!(lu[k], luu[k], input_constraint.param, u[k], w[k], β[k])
-        end
     end
 
     final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
-
-    if isactive(terminal_state_constraint)
-        add_penalty_derivative!(vx[N+1], vxx[N+1], terminal_state_constraint.param, x[N+1], z, α)
-    end
+    add_penalty_derivative!(vx[N+1], vxx[N+1], terminal_state_constraint, x[N+1], z, α)
 
     return nothing
 end
@@ -57,17 +51,11 @@ function stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, f
     @threads for k in 1:N
         dynamics_diff!(jac[k], x[k], u[k], k)
         running_cost_diff!(grad[k], hess[k], x[k], u[k], k)
-
-        if isactive(input_constraint)
-            add_penalty_derivative!(lu[k], luu[k], input_constraint.param, u[k], w[k], β[k])
-        end
+        add_penalty_derivative!(lu[k], luu[k], input_constraint, u[k], w[k], β[k])
     end
 
     final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
-
-    if isactive(terminal_state_constraint)
-        add_penalty_derivative!(vx[N+1], vxx[N+1], terminal_state_constraint.param, x[N+1], z, α)
-    end
+    add_penalty_derivative!(vx[N+1], vxx[N+1], terminal_state_constraint, x[N+1], z, α)
 
     return nothing
 end

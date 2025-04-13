@@ -28,9 +28,11 @@ function set_input_constraint_parameter!(workset, ρ)
 end
 
 ## evaluation functions
-function add_penalty_derivative!(gradient, hessian, param, primal, slack, dual)
-    gradient .+= param * (primal - slack + dual)
-    hessian[diagind(hessian)] .+= param
+function add_penalty_derivative!(gradient, hessian, constraint, primal, slack, dual)
+    isactive(constraint) || return nothing
+    gradient .+= constraint.param * (primal - slack + dual)
+    hessian[diagind(hessian)] .+= constraint.param
+    return nothing
 end
 
 evaluate_penalty(parameter, residual, dual) = parameter / 2 * mapreduce(a -> a^2, +, residual + dual)
