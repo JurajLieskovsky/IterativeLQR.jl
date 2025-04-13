@@ -112,56 +112,42 @@ function backward_pass!(workset)
     return nothing
 end
 
-function forward_pass!(workset, dynamics!, difference, running_cost, final_cost, α)
+function forward_pass!(workset, dynamics!, difference, running_cost, final_cost, search)
     @unpack N = workset
-    @unpack x, u, l = active_trajectory(workset)
+    @unpack x, u, l, p = active_trajectory(workset)
     @unpack d, K = workset.policy_update
+    @unpack terminal_state_constraint, input_constraint, z, α, w, β = workset
 
     x_ref = nominal_trajectory(workset).x
     u_ref = nominal_trajectory(workset).u
+    p_ref = nominal_trajectory(workset).p
 
+    # active trajectory rollout including penalty evaluation
     x[1] = x_ref[1]
 
     @inbounds for k in 1:N
-        u[k] .= u_ref[k] + α * d[k] + K[k] * difference(x[k], x_ref[k])
-
+        u[k] .= u_ref[k] + search * d[k] + K[k] * difference(x[k], x_ref[k])
         try
             dynamics!(x[k+1], x[k], u[k], k)
             l[k] = running_cost(x[k], u[k], k)
+            p[k] = evaluate_penalty(input_constraint, u[k] - w[k], β[k])
         catch
             return false
         end
     end
 
     l[N+1] = final_cost(x[N+1], N + 1)
+    p[N+1] = evaluate_penalty(terminal_state_constraint, x[N+1] - z, α)
 
-    return true
-end
-
-# constraint related functions
-
-function evaluate_penalties!(workset)
-    # separate function because it currently runs on both trajectories
-
-    @unpack N = workset
-    @unpack terminal_state_constraint, input_constraint, z, α, w, β = workset
-
-    for trajectory in workset.trajectory
-        # continue if slack and dual variables are unchanged
-        trajectory.dirty[] || continue
-
-        fill!(trajectory.p, 0)
-
-        if isactive(terminal_state_constraint)
-            trajectory.p[N+1] += evaluate_penalty(terminal_state_constraint.param, trajectory.x[N+1] - z, α)
+    # penalty re-evaluation for nominal trajectory after a slack and dual variable update
+    if nominal_trajectory(workset).dirty[]
+        @inbounds for k in 1:N
+            p_ref[k] = evaluate_penalty(input_constraint, u_ref[k] - w[k], β[k])
         end
-
-        isactive(input_constraint) && @threads for k in 1:N
-            trajectory.p[k] += evaluate_penalty(input_constraint.param, trajectory.u[k] - w[k], β[k])
-        end
+        p_ref[N+1] = evaluate_penalty(terminal_state_constraint, x_ref[N+1] - z, α)
     end
 
-    return nothing
+    return true
 end
 
 function update_slack_and_dual_variables!(workset)
@@ -281,9 +267,6 @@ function iLQR!(
             fwd = @elapsed begin
                 successful = forward_pass!(workset, dynamics!, state_difference, running_cost, final_cost, α)
             end
-
-            # add terminal constraint penalty
-            evaluate_penalties!(workset)
 
             # total cost and penalty sum
             J = sum(active_trajectory(workset).l)

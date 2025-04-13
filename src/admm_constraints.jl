@@ -35,7 +35,10 @@ function add_penalty_derivative!(gradient, hessian, constraint, primal, slack, d
     return nothing
 end
 
-evaluate_penalty(parameter, residual, dual) = parameter / 2 * mapreduce(a -> a^2, +, residual + dual)
+function evaluate_penalty(constraint, residual, dual)
+    isactive(constraint) || return nothing
+    constraint.param / 2 * mapreduce(a -> a^2, +, residual + dual)
+end
 
 function update_slack_and_dual_variable!(projection, primal, slack, dual)
     slack .= projection(primal + dual)
