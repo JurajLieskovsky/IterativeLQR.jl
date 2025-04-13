@@ -192,8 +192,7 @@ function iLQR!(
         J = nominal_trajectory(workset).total_cost
 
         # update slack and dual variables
-        update_slack_variables!(workset)
-        update_dual_variables!(workset)
+        update_slack_and_dual_variables!(workset)
 
         # print and log
         verbose && print_iteration!(line_count, 0, NaN, J, NaN, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
@@ -271,9 +270,8 @@ function iLQR!(
                 # swap nominal trajectory for active trajectory
                 swap_trajectories!(workset)
 
-                # update slack and dual variable
-                update_slack_variables!(workset)
-                update_dual_variables!(workset)
+                # update slack and dual variable (based on nominal trajectory)
+                update_slack_and_dual_variables!(workset)
 
                 break
             end
