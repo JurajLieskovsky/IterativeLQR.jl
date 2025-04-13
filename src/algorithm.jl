@@ -120,7 +120,7 @@ function forward_pass!(workset, dynamics!, difference, running_cost, final_cost,
             dynamics!(x[k+1], x[k], u[k], k)
             l[k] = running_cost(x[k], u[k], k)
         catch
-            return false, NaN, NaN
+            return false
         end
     end
 
@@ -154,6 +154,55 @@ function log_iteration!(dataframe, i, α, J, P, ΔJ, ΔP, Δv, accepted)
 end
 
 # algorithm
+
+function evaluate_penalties!(workset)
+    @unpack N = workset
+    @unpack terminal_state_constraint = workset
+
+    for trajectory in workset.trajectory
+        # continue if slack and dual variables are unchanged
+        trajectory.dirty[] || continue
+
+        # fill per-step penalties with zeros
+        fill!(trajectory.p, 0)
+
+        # terminal state constraint
+        if terminal_state_constraint.projection !== nothing
+            trajectory.p[N+1] = evaluate_penalty!(terminal_state_constraint, trajectory.x[N+1])
+        end
+    end
+
+    return nothing
+end
+
+function add_penalty_derivatives!(workset)
+    @unpack N = workset
+    @unpack x = nominal_trajectory(workset)
+    @unpack vx, vxx = workset.value_function
+    @unpack terminal_state_constraint = workset
+
+    if terminal_state_constraint.projection !== nothing
+        add_penalty_derivative!(vx[N+1], vxx[N+1], terminal_state_constraint, x[N+1])
+    end
+
+    return nothing
+end
+
+function update_slack_and_dual_variables!(workset)
+    @unpack N = workset
+    @unpack x = nominal_trajectory(workset)
+    @unpack terminal_state_constraint = workset
+
+    if terminal_state_constraint.projection !== nothing
+        update_slack_and_dual_variable!(terminal_state_constraint, x[N+1])
+    end
+
+    for trajectory in workset.trajectory
+        trajectory.dirty[] = true
+    end
+
+    return nothing
+end
 
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;

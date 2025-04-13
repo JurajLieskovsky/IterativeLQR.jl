@@ -87,6 +87,7 @@ function plotting_callback(workset)
     input_plot = plot(range, vcat(inputs, inputs[end, :]'), label="u", seriestype=:steppost)
 
     cost_plot = plot(range, cumsum(nominal_trajectory(workset).l), label="c", seriestype=:steppost)
+    # cost_plot = plot(range, hcat(cumsum(nominal_trajectory(workset).l), nominal_trajectory(workset).p), label=["c" "p"], seriestype=:steppost)
 
     plt = plot(position_plot, input_plot, cost_plot, layout=(3, 1))
     display(plt)
@@ -96,14 +97,15 @@ end
 
 # terminal constraint indicator function
 terminal_constraint(_) = [0, pi, 0, 0]
-input_constraint(u) = map(u_k -> sign(u_k) * min(4, abs(u_k)), u)
+# input_constraint(u) = map(u_k -> sign(u_k) * min(4, abs(u_k)), u)
 
 # Trajectory optimization
 workset = IterativeLQR.Workset{Float64}(4, 1, N)
 IterativeLQR.set_initial_state!(workset, x₀)
-IterativeLQR.set_penalty_parameter!(workset, 1e-3)
-IterativeLQR.set_terminal_constraint_projection_function!(workset, terminal_constraint)
-IterativeLQR.set_input_constraint_projection_function!(workset, input_constraint)
+
+IterativeLQR.set_penalty_parameter!(workset.terminal_state_constraint, 1e-1)
+workset.terminal_state_constraint.projection = terminal_constraint
+# IterativeLQR.set_input_constraint_projection_function!(workset, input_constraint)
 
 IterativeLQR.set_initial_inputs!(workset, us₀)
 df = IterativeLQR.iLQR!(
