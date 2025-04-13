@@ -28,11 +28,11 @@ mutable struct MultipleConstraint{T}
 end
 
 ## workset functions
-function set_projection_function!(workset::Workset, constraint::Symbol, projection::Function)
+function set_projection_function!(workset, constraint::Symbol, projection::Function)
     setproperty!(getproperty(workset, constraint), :projection, projection)
 end
 
-function set_penalty_parameter!(workset::Workset, constraint::Symbol, ρ::Number)
+function set_penalty_parameter!(workset, constraint::Symbol, ρ::Number)
     set_penalty_parameter!(getproperty(workset, constraint), ρ)
 end
 
@@ -44,8 +44,7 @@ function set_penalty_parameter!(constraint::SingleConstraint, ρ)
 end
 
 function set_penalty_parameter!(constraint::MultipleConstraint, ρ)
-    factor = constraint.param / ρ
-    ThreadsX.map(u -> u ./= factor, constraint.dual)
+    ThreadsX.map(u -> u ./= constraint.param / ρ, constraint.dual)
     constraint.param = ρ
     return nothing
 end
@@ -57,22 +56,23 @@ function add_penalty_derivative!(gradient, hessian, param, primal, slack, dual)
 end
 
 function add_penalty_derivative!(gradient, hessian, constraint::SingleConstraint, primal)
-    add_penalty_derivative!(gradient, hessian, constraint.param, primal, constraint.slack, constraint.dual) 
+    add_penalty_derivative!(gradient, hessian, constraint.param, primal, constraint.slack, constraint.dual)
     return nothing
 end
 
 function add_penalty_derivative!(gradient, hessian, constraint::MultipleConstraint, primal)
     ThreadsX.map(
-        (g,H,x,z,u)->add_penalty_derivative!(g,H,constraint.param,x-z+u),
-        gradient, hessian, primal, constraint.slack, constrain.dual
+        (g, H, x, z, u) -> add_penalty_derivative!(g, H, constraint.param, x, z, u),
+        gradient, hessian, primal, constraint.slack, constraint.dual
     )
     return nothing
 end
 
 ## evaluate penalty
-function evaluate_penalty!(constraint::SingleConstraint, primal)
-    @unpack param, slack, dual = constraint
-    return param / 2 * mapreduce(a -> a^2, +, primal - slack + dual)
+evaluate_penalty(parameter, primal, slack, dual) = parameter / 2 * mapreduce(a -> a^2, +, primal - slack + dual)
+
+function evaluate_penalty(constraint::SingleConstraint, primal)
+    return evaluate_penalty(constraint.param, primal, constraint.slack, constraint.dual)
 end
 
 function evaluate_penalty!(penalty, constraint::MultipleConstraint, primal)
@@ -88,7 +88,7 @@ function update_slack_and_dual_variable!(projection, primal, slack, dual)
     slack .= projection(primal + dual)
     dual .+= primal - slack
 end
-    
+
 function update_slack_and_dual_variable!(constraint::SingleConstraint, primal)
     update_slack_and_dual_variable!(constraint.projection, primal, constraint.slack, constraint.dual)
     return nothing
@@ -96,7 +96,7 @@ end
 
 function update_slack_and_dual_variable!(constraint::MultipleConstraint, primal)
     ThreadsX.map(
-        (x, z, u) -> update_slack_and_dual_variable!(constraint.projection, x,z,u),
+        (x, z, u) -> update_slack_and_dual_variable!(constraint.projection, x, z, u),
         primal, constraint.slack, constraint.dual
     )
     return nothing

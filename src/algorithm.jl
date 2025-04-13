@@ -144,7 +144,7 @@ function evaluate_penalties!(workset)
 
         # terminal state constraint
         if terminal_state_constraint.projection !== nothing
-            trajectory.p[N+1] = evaluate_penalty!(terminal_state_constraint, trajectory.x[N+1])
+            trajectory.p[N+1] = evaluate_penalty(terminal_state_constraint, trajectory.x[N+1])
         end
 
         # input constraint
