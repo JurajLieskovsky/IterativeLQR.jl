@@ -122,18 +122,22 @@ function forward_pass!(workset, dynamics!, difference, running_cost, final_cost,
     u_ref = nominal_trajectory(workset).u
     p_ref = nominal_trajectory(workset).p
 
-    # active trajectory rollout including penalty evaluation
+    # active trajectory rollout
     x[1] = x_ref[1]
 
     @inbounds for k in 1:N
         u[k] .= u_ref[k] + search * d[k] + K[k] * difference(x[k], x_ref[k])
         try
             dynamics!(x[k+1], x[k], u[k], k)
-            l[k] = running_cost(x[k], u[k], k)
-            p[k] = evaluate_penalty(input, u[k] - w[k], β[k])
         catch
             return false
         end
+    end
+
+    # penalty and cost function evaluation
+    @inbounds @threads for k in 1:N
+        l[k] = running_cost(x[k], u[k], k)
+        p[k] = evaluate_penalty(input, u[k] - w[k], β[k])
     end
 
     l[N+1] = final_cost(x[N+1], N + 1)
@@ -141,7 +145,7 @@ function forward_pass!(workset, dynamics!, difference, running_cost, final_cost,
 
     # penalty re-evaluation for nominal trajectory after a slack and dual variable update
     if nominal_trajectory(workset).dirty[]
-        @inbounds for k in 1:N
+        @inbounds @threads for k in 1:N
             p_ref[k] = evaluate_penalty(input, u_ref[k] - w[k], β[k])
         end
 
@@ -158,7 +162,7 @@ function update_slack_and_dual_variables!(workset)
 
     update_slack_and_dual_variable!(terminal_state, x[N+1], zT, αT)
 
-    @threads for k in 1:N
+    @inbounds @threads for k in 1:N
         update_slack_and_dual_variable!(input, u[k], w[k], β[k])
     end
 
