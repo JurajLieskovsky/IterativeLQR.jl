@@ -13,8 +13,6 @@ function trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
 
     l[N+1] = final_cost(x[N+1], N + 1)
 
-    nominal_trajectory(workset).total_cost = sum(l)
-
     return true
 end
 
@@ -128,8 +126,6 @@ function forward_pass!(workset, dynamics!, difference, running_cost, final_cost,
 
     l[N+1] = final_cost(x[N+1], N + 1)
 
-    active_trajectory(workset).total_cost = sum(l)
-
     return true
 end
 
@@ -189,7 +185,7 @@ function iLQR!(
         end
 
         # calculate preliminary total cost
-        J = nominal_trajectory(workset).total_cost
+        J = sum(nominal_trajectory(workset).l)
 
         # update slack and dual variables
         update_slack_and_dual_variables!(workset)
@@ -239,11 +235,11 @@ function iLQR!(
             evaluate_penalties!(workset)
 
             # total cost and penalty sum
-            J = active_trajectory(workset).total_cost
-            P = active_trajectory(workset).penalty_sum
+            J = sum(active_trajectory(workset).l)
+            P = sum(active_trajectory(workset).p)
 
-            ΔJ = J - nominal_trajectory(workset).total_cost
-            ΔP = P - nominal_trajectory(workset).penalty_sum
+            ΔJ = J - sum(nominal_trajectory(workset).l)
+            ΔP = P - sum(nominal_trajectory(workset).p)
 
             # expected improvement
             Δv = mapreduce(Δ -> α * Δ[1] + α^2 * Δ[2], +, workset.value_function.Δv)

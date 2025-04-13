@@ -98,7 +98,7 @@ function evaluate_penalties!(workset)
 
     for trajectory in workset.trajectory
         # continue if slack and dual variables are unchanged
-        isnan(trajectory.penalty_sum) || continue
+        trajectory.dirty[] || continue
 
         # fill per-step penalties with zeros
         fill!(trajectory.p, 0)
@@ -115,8 +115,8 @@ function evaluate_penalties!(workset)
             end
         end
 
-        # sum per-step penalties
-        trajectory.penalty_sum = sum(trajectory.p)
+        # declare trajectory clean
+        trajectory.dirty[] = false
     end
 
     return nothing
@@ -140,5 +140,7 @@ function update_slack_and_dual_variables!(workset)
         end
     end
 
-    nominal_trajectory(workset).penalty_sum = NaN
+    for trajectory in workset.trajectory
+        trajectory.dirty[] = true
+    end
 end
