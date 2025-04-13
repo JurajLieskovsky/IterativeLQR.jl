@@ -217,11 +217,11 @@ function iLQR!(
             end
         end
 
-        # regularization
-        reg = (regularization == :none) ? NaN : @elapsed regularization!(workset, regularization_function!)
-
         # add terminal constaint penalty's derivatives
         add_penalty_derivatives!(workset)
+
+        # regularization
+        reg = (regularization == :none) ? NaN : @elapsed regularization!(workset, regularization_function!)
 
         # backward pass
         bwd = @elapsed backward_pass!(workset)
