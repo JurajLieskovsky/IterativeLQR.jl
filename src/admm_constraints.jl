@@ -8,22 +8,42 @@ mutable struct Constraint{T}
     end
 end
 
+struct Constraints{T}
+    terminal_state_constraint::Constraint{T}
+    input_constraint::Constraint{T}
+    z::Vector{T}
+    α::Vector{T}
+    w::Vector{Vector{T}}
+    β::Vector{Vector{T}}
+
+    function Constraints{T}(nx, nu, N) where {T}
+        terminal_state_constraint = Constraint{T}()
+        input_constraint = Constraint{T}()
+        z = zeros(T, nx)
+        α = zeros(T, nx)
+        w = [zeros(T, nu) for _ in 1:N]
+        β = [zeros(T, nu) for _ in 1:N]
+
+        return new(terminal_state_constraint, input_constraint, z, α, w, β)
+    end
+end
+
 isactive(constraint::Constraint) = constraint.Π !== nothing
 
 ## workset functions
 function set_projection_function!(workset, constraint::Symbol, projection::Function)
-    setproperty!(getproperty(workset, constraint), :Π, projection)
+    setproperty!(getproperty(workset.constraints, constraint), :Π, projection)
 end
 
 function set_terminal_state_constraint_parameter!(workset, ρ_new)
-    workset.α .*= workset.terminal_state_constraint.ρ / ρ_new
-    workset.terminal_state_constraint.ρ = ρ_new
+    workset.constraints.α .*= workset.constraints.terminal_state_constraint.ρ / ρ_new
+    workset.constraints.terminal_state_constraint.ρ = ρ_new
     return nothing
 end
 
 function set_input_constraint_parameter!(workset, ρ_new)
-    ThreadsX.map(u -> u ./= workset.input_constraint.ρ / ρ_new, workset.β)
-    workset.input_constraint.ρ = ρ_new
+    ThreadsX.map(u -> u ./= workset.constraints.input_constraint.ρ / ρ_new, workset.constraints.β)
+    workset.constraints.input_constraint.ρ = ρ_new
     return nothing
 end
 
@@ -40,7 +60,8 @@ function evaluate_penalty(constraint, residual, dual)
     constraint.ρ / 2 * mapreduce(a -> a^2, +, residual + dual)
 end
 
-function update_slack_and_dual_variable!(Π, primal, slack, dual)
-    slack .= Π(primal + dual)
+function update_slack_and_dual_variable!(constraint, primal, slack, dual)
+    isactive(constraint) || return nothing
+    slack .= constraint.Π(primal + dual)
     dual .+= primal - slack
 end

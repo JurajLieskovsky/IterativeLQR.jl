@@ -23,7 +23,7 @@ function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cos
     @unpack lx, lu, lxx, lux, lxu, luu = workset.cost_derivatives
     @unpack vx, vxx = workset.value_function
 
-    @unpack terminal_state_constraint, input_constraint, z, α, w, β = workset
+    @unpack terminal_state_constraint, input_constraint, z, α, w, β = workset.constraints
 
     @threads for k in 1:N
         dynamics_diff!(fx[k], fu[k], x[k], u[k], k)
@@ -45,7 +45,7 @@ function stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, f
     @unpack grad, hess = workset.cost_derivatives
     @unpack vx, vxx = workset.value_function
 
-    @unpack terminal_state_constraint, input_constraint, z, α, w, β = workset
+    @unpack terminal_state_constraint, input_constraint, z, α, w, β = workset.constraints
     @unpack lu, luu = workset.cost_derivatives
 
     @threads for k in 1:N
@@ -116,7 +116,7 @@ function forward_pass!(workset, dynamics!, difference, running_cost, final_cost,
     @unpack N = workset
     @unpack x, u, l, p = active_trajectory(workset)
     @unpack d, K = workset.policy_update
-    @unpack terminal_state_constraint, input_constraint, z, α, w, β = workset
+    @unpack terminal_state_constraint, input_constraint, z, α, w, β = workset.constraints
 
     x_ref = nominal_trajectory(workset).x
     u_ref = nominal_trajectory(workset).u
@@ -152,15 +152,13 @@ end
 
 function update_slack_and_dual_variables!(workset)
     @unpack N = workset
-    @unpack terminal_state_constraint, input_constraint, z, α, w, β = workset
+    @unpack terminal_state_constraint, input_constraint, z, α, w, β = workset.constraints
     @unpack x, u = nominal_trajectory(workset)
 
-    if isactive(terminal_state_constraint)
-        update_slack_and_dual_variable!(terminal_state_constraint.projection, x[N+1], z, α)
-    end
+    update_slack_and_dual_variable!(terminal_state_constraint, x[N+1], z, α)
 
-    isactive(input_constraint) && @threads for k in 1:N
-        update_slack_and_dual_variable!(input_constraint.projection, u[k], w[k], β[k])
+    @threads for k in 1:N
+        update_slack_and_dual_variable!(input_constraint, u[k], w[k], β[k])
     end
 
     for trajectory in workset.trajectory
