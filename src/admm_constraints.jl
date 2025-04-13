@@ -1,19 +1,17 @@
 # ADMM constraints
 
-mutable struct SingleConstraint{T}
+abstract type Constraint end
+
+mutable struct SingleConstraint{T} <: Constraint
     param::T                             # penalty parameter   
-    slack::Vector{T}                     # slack variables
-    dual::Vector{T}                      # dual variables
     projection::Union{Function,Nothing}  # projection function
 
     function SingleConstraint{T}(n) where {T}
-        slack = zeros(T, n)
-        dual = zeros(T, n)
-        return new{T}(one(T), slack, dual, nothing)
+        return new{T}(one(T), nothing)
     end
 end
 
-mutable struct MultipleConstraint{T}
+mutable struct MultipleConstraint{T} <: Constraint
     num::Int64                           # number of constraints
     param::T                             # penalty parameter   
     slack::Vector{Vector{T}}             # slack variables
@@ -27,6 +25,8 @@ mutable struct MultipleConstraint{T}
     end
 end
 
+isactive(constraint::Constraint) = constraint.projection !== nothing
+
 ## workset functions
 function set_projection_function!(workset, constraint::Symbol, projection::Function)
     setproperty!(getproperty(workset, constraint), :projection, projection)
@@ -37,9 +37,9 @@ function set_penalty_parameter!(workset, constraint::Symbol, ρ::Number)
 end
 
 ## set penalty parameter
-function set_penalty_parameter!(constraint::SingleConstraint, ρ)
-    constraint.dual .*= constraint.param / ρ
-    constraint.param = ρ
+function set_terminal_state_constraint_parameter!(workset, ρ)
+    workset.α .*= workset.terminal_state_constraint.param / ρ
+    workset.terminal_state_constraint.param = ρ
     return nothing
 end
 

@@ -136,6 +136,7 @@ function evaluate_penalties!(workset)
 
     @unpack N = workset
     @unpack terminal_state_constraint, input_constraint = workset
+    @unpack z, α = workset
 
     for trajectory in workset.trajectory
         # continue if slack and dual variables are unchanged
@@ -145,19 +146,15 @@ function evaluate_penalties!(workset)
         fill!(trajectory.p, 0)
 
         # terminal state constraint
-        if terminal_state_constraint.projection !== nothing
-            trajectory.p[N+1] += evaluate_penalty(
-                terminal_state_constraint.param, trajectory.x[N+1] - terminal_state_constraint.slack, terminal_state_constraint.dual
-            )
-        end
+        isactive(terminal_state_constraint) && (trajectory.p[N+1] += evaluate_penalty(
+            terminal_state_constraint.param, trajectory.x[N+1] - z, α
+        ))
 
         # input constraint
-        if input_constraint.projection !== nothing
-            @threads for k in 1:N
-                trajectory.p[k] += evaluate_penalty(
-                    input_constraint.param, trajectory.u[k] - input_constraint.slack[k], input_constraint.dual[k]
-                )
-            end
+        isactive(input_constraint) && @threads for k in 1:N
+            trajectory.p[k] += evaluate_penalty(
+                input_constraint.param, trajectory.u[k] - input_constraint.slack[k], input_constraint.dual[k]
+            )
         end
     end
 
@@ -169,24 +166,20 @@ function add_penalty_derivatives!(workset)
 
     @unpack N = workset
     @unpack x, u = nominal_trajectory(workset)
+    @unpack z, α = workset
     @unpack vx, vxx = workset.value_function
     @unpack lu, luu = workset.cost_derivatives
     @unpack terminal_state_constraint, input_constraint = workset
 
-    if terminal_state_constraint.projection !== nothing
-        add_penalty_derivative!(
-            vx[N+1], vxx[N+1], terminal_state_constraint.param,
-            x[N+1], terminal_state_constraint.slack, terminal_state_constraint.dual
-        )
-    end
+    isactive(terminal_state_constraint) && add_penalty_derivative!(
+        vx[N+1], vxx[N+1], terminal_state_constraint.param, x[N+1], z, α
+    )
 
-    if input_constraint.projection !== nothing
-        @threads for k in 1:N
-            add_penalty_derivative!(
-                lu[k], luu[k], input_constraint.param,
-                u[k], input_constraint.slack[k], input_constraint.dual[k]
-            )
-        end
+    isactive(input_constraint) && @threads for k in 1:N
+        add_penalty_derivative!(
+            lu[k], luu[k], input_constraint.param,
+            u[k], input_constraint.slack[k], input_constraint.dual[k]
+        )
     end
 
     return nothing
@@ -194,21 +187,18 @@ end
 
 function update_slack_and_dual_variables!(workset)
     @unpack N = workset
+    @unpack z, α = workset
     @unpack x, u = nominal_trajectory(workset)
     @unpack terminal_state_constraint, input_constraint = workset
 
-    if terminal_state_constraint.projection !== nothing
-        update_slack_and_dual_variable!(
-            terminal_state_constraint.projection, x[N+1], terminal_state_constraint.slack, terminal_state_constraint.dual
-        )
-    end
+    isactive(terminal_state_constraint) && update_slack_and_dual_variable!(
+        terminal_state_constraint.projection, x[N+1], z, α
+    )
 
-    if input_constraint.projection !== nothing
-        @threads for k in 1:N
-            update_slack_and_dual_variable!(
-                input_constraint.projection, u[k], input_constraint.slack[k], input_constraint.dual[k]
-            )
-        end
+    isactive(input_constraint) && @threads for k in 1:N
+        update_slack_and_dual_variable!(
+            input_constraint.projection, u[k], input_constraint.slack[k], input_constraint.dual[k]
+        )
     end
 
     for trajectory in workset.trajectory

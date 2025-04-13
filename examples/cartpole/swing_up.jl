@@ -105,7 +105,7 @@ IterativeLQR.set_initial_state!(workset, x₀)
 IterativeLQR.set_initial_inputs!(workset, us₀)
 
 IterativeLQR.set_projection_function!(workset, :terminal_state_constraint, terminal_state_projection)
-IterativeLQR.set_penalty_parameter!(workset, :terminal_state_constraint, 1e1)
+IterativeLQR.set_terminal_state_constraint_parameter!(workset, 1e1)
 IterativeLQR.set_projection_function!(workset, :input_constraint, input_projection)
 IterativeLQR.set_penalty_parameter!(workset, :input_constraint, 1e-1)
 
