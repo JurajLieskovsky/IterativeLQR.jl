@@ -118,8 +118,9 @@ xN = nominal_trajectory(workset).x[end]
 display(xN - terminal_state_constraint(xN))
 
 # Benchmark
-# opt = filter(row -> row.accepted, df).J[end]
-# iter = df.i[findfirst(J -> (J - opt) < 1e-3 * opt, df.J)]
+# opt_J = filter(row -> row.accepted, df).J[end]
+# opt_P = filter(row -> row.accepted, df).P[end]
+# iter = df.i[findfirst(JP -> (JP - opt_J - opt_P) < 1e-3 * (opt_J + opt_P), df.J .+ df.P)]
 
 # display(@benchmark begin
 #     IterativeLQR.set_initial_inputs!(workset, us₀)
