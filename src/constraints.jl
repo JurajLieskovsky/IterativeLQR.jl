@@ -122,40 +122,42 @@ function evaluate_penalties!(workset)
     return nothing
 end
 
-function update_slack_variables!(workset, trajectory)
+function update_slack_variables!(workset)
     @unpack N = workset
+    @unpack x, u = nominal_trajectory(workset)
     @unpack z_projection, z, α = workset.constraints
     @unpack w_projection, w, β = workset.constraints
 
     if z_projection !== nothing
-        z .= z_projection(trajectory.x[N+1] + α)
+        z .= z_projection(x[N+1] + α)
     end
 
     if w_projection !== nothing
         @threads for k in 1:N
-            w[k] .= w_projection(trajectory.u[k] + β[k])
+            w[k] .= w_projection(u[k] + β[k])
         end
     end
 
-    trajectory.penalty_sum = NaN
+    nominal_trajectory(workset).penalty_sum = NaN
 end
 
-function update_dual_variables!(workset, trajectory)
+function update_dual_variables!(workset)
     @unpack N = workset
+    @unpack x, u = nominal_trajectory(workset)
     @unpack z_projection, z, α = workset.constraints
     @unpack w_projection, w, β = workset.constraints
 
     if z_projection !== nothing
-        α .= α + trajectory.x[N+1] - z
+        α .= α + x[N+1] - z
     end
 
     if w_projection !== nothing
         @threads for k in 1:N
-            β[k] .= β[k] + trajectory.u[k] - w[k]
+            β[k] .= β[k] + u[k] - w[k]
         end
     end
 
-    trajectory.penalty_sum = NaN
+    nominal_trajectory(workset).penalty_sum = NaN
 
     return nothing
 end

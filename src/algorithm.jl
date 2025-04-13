@@ -188,13 +188,14 @@ function iLQR!(
             successful = trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
         end
 
-        # update slack and dual variables
-        update_slack_variables!(workset, nominal_trajectory(workset))
-        update_dual_variables!(workset, nominal_trajectory(workset))
-
-        # print and log
+        # calculate preliminary total cost
         J = nominal_trajectory(workset).total_cost
 
+        # update slack and dual variables
+        update_slack_variables!(workset)
+        update_dual_variables!(workset)
+
+        # print and log
         verbose && print_iteration!(line_count, 0, NaN, J, NaN, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
         logging && log_iteration!(dataframe, 0, NaN, J, NaN, NaN, NaN, NaN, successful)
 
@@ -264,15 +265,16 @@ function iLQR!(
 
             # solution copying and regularization parameter adjustment
             if accepted
-                # update slack and dual variable
-                update_slack_variables!(workset, active_trajectory(workset))
-                update_dual_variables!(workset, active_trajectory(workset))
-
                 # plot trajectory
                 (plotting_callback === nothing) || plotting_callback(workset)
 
                 # swap nominal trajectory for active trajectory
                 swap_trajectories!(workset)
+
+                # update slack and dual variable
+                update_slack_variables!(workset)
+                update_dual_variables!(workset)
+
                 break
             end
         end
