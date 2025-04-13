@@ -144,6 +144,7 @@ function forward_pass!(workset, dynamics!, difference, running_cost, final_cost,
         @inbounds for k in 1:N
             p_ref[k] = evaluate_penalty(input, u_ref[k] - w[k], β[k])
         end
+
         p_ref[N+1] = evaluate_penalty(terminal_state, x_ref[N+1] - z, α)
     end
 
