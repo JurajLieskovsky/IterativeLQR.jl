@@ -10,21 +10,23 @@ end
 
 struct Constraints{T}
     terminal_state::Constraint{T}
-    input::Constraint{T}
     z::Vector{T}
     α::Vector{T}
+
+    input::Constraint{T}
     w::Vector{Vector{T}}
     β::Vector{Vector{T}}
 
     function Constraints{T}(nx, nu, N) where {T}
         terminal_state = Constraint{T}()
-        input = Constraint{T}()
         z = zeros(T, nx)
         α = zeros(T, nx)
+
+        input = Constraint{T}()
         w = [zeros(T, nu) for _ in 1:N]
         β = [zeros(T, nu) for _ in 1:N]
 
-        return new(terminal_state, input, z, α, w, β)
+        return new(terminal_state, z, α, input, w, β)
     end
 end
 
