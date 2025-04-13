@@ -9,7 +9,7 @@ using PositiveFactorizations
 using Base.Threads
 using ThreadsX
 
-include("abstract_constraints.jl")
+include("admm_constraints.jl")
 include("workset.jl")
 include("trajectory_utils.jl")
 include("regularization_functions.jl")
