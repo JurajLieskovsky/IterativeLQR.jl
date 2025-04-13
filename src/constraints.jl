@@ -90,22 +90,36 @@ function add_penalty_derivatives!(workset)
     return nothing
 end
 
-function evaluate_penalties(workset, trajectory)
+function evaluate_penalties!(workset)
     @unpack N = workset
     @unpack ρ = workset.constraints
     @unpack z_projection, z, α = workset.constraints
     @unpack w_projection, w, β = workset.constraints
 
-    penalty = (z_projection !== nothing) ? evaluate_penalty(ρ, trajectory.x[N+1] - z + α) : 0
+    for trajectory in workset.trajectory
+        # continue if slack and dual variables are unchanged
+        isnan(trajectory.penalty_sum) || continue
 
-    if (w_projection !== nothing)
-        penalty += ThreadsX.mapreduce(
-            (u_k, w_k, β_k) -> evaluate_penalty(ρ, u_k - w_k + β_k), +,
-            trajectory.u, w, β
-        )
+        # fill per-step penalties with zeros
+        fill!(trajectory.p, 0)
+        
+        # add penalties per constraint
+
+        if (z_projection !== nothing)  
+            trajectory.p[N+1] += evaluate_penalty(ρ, trajectory.x[N+1] - z + α)
+        end
+
+        if (w_projection !== nothing)
+            @threads for k in 1:N
+                trajectory.p[k] += evaluate_penalty(ρ, trajectory.u[k] - w[k] + β[k])
+            end
+        end
+
+        # sum per-step penalties
+        trajectory.penalty_sum = sum(trajectory.p)
     end
 
-    return penalty
+    return nothing
 end
 
 function update_slack_variables!(workset, trajectory)
@@ -122,6 +136,8 @@ function update_slack_variables!(workset, trajectory)
             w[k] .= w_projection(trajectory.u[k] + β[k])
         end
     end
+
+    trajectory.penalty_sum = NaN
 end
 
 function update_dual_variables!(workset, trajectory)
@@ -138,6 +154,8 @@ function update_dual_variables!(workset, trajectory)
             β[k] .= β[k] + trajectory.u[k] - w[k]
         end
     end
+
+    trajectory.penalty_sum = NaN
 
     return nothing
 end

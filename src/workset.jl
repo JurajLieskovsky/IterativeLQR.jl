@@ -1,14 +1,19 @@
-struct Trajectory{T}
+mutable struct Trajectory{T}
     x::Vector{Vector{T}} # states
     u::Vector{Vector{T}} # inputs
     l::Vector{T}         # running costs
+    p::Vector{T}         # penalties
+
+    total_cost::T                 
+    penalty_sum::T
 
     function Trajectory{T}(nx, nu, N) where {T}
         x = [zeros(T, nx) for _ in 1:N+1]
         u = [zeros(T, nu) for _ in 1:N]
         l = zeros(T, N + 1)
+        p = zeros(T, N + 1)
 
-        return new(x, u, l)
+        return new(x, u, l, p, zero(T), zero(T))
     end
 end
 

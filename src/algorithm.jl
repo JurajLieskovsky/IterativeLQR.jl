@@ -13,7 +13,9 @@ function trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
 
     l[N+1] = final_cost(x[N+1], N + 1)
 
-    return true, sum(l)
+    nominal_trajectory(workset).total_cost = sum(l)
+
+    return true
 end
 
 function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
@@ -110,7 +112,6 @@ function forward_pass!(workset, dynamics!, difference, running_cost, final_cost,
 
     x_ref = nominal_trajectory(workset).x
     u_ref = nominal_trajectory(workset).u
-    l_ref = nominal_trajectory(workset).l
 
     x[1] = x_ref[1]
 
@@ -127,7 +128,9 @@ function forward_pass!(workset, dynamics!, difference, running_cost, final_cost,
 
     l[N+1] = final_cost(x[N+1], N + 1)
 
-    return true, sum(l), sum(l) - sum(l_ref)
+    active_trajectory(workset).total_cost = sum(l)
+
+    return true
 end
 
 # printing and saving utilities
@@ -182,7 +185,7 @@ function iLQR!(
     if rollout
         # rollout trajectory
         rlt = @elapsed begin
-            successful, J = trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
+            successful = trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
         end
 
         # update slack and dual variables
@@ -190,6 +193,8 @@ function iLQR!(
         update_dual_variables!(workset, nominal_trajectory(workset))
 
         # print and log
+        J = nominal_trajectory(workset).total_cost
+
         verbose && print_iteration!(line_count, 0, NaN, J, NaN, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
         logging && log_iteration!(dataframe, 0, NaN, J, NaN, NaN, NaN, NaN, successful)
 
@@ -227,12 +232,18 @@ function iLQR!(
         for α in α_values
 
             fwd = @elapsed begin
-                successful, J, ΔJ = forward_pass!(workset, dynamics!, state_difference, running_cost, final_cost, α)
+                successful = forward_pass!(workset, dynamics!, state_difference, running_cost, final_cost, α)
             end
 
             # add terminal constraint penalty
-            P = evaluate_penalties(workset, active_trajectory(workset))
-            ΔP = P - evaluate_penalties(workset, nominal_trajectory(workset))
+            evaluate_penalties!(workset)
+
+            # total cost and penalty sum
+            J = active_trajectory(workset).total_cost
+            P = active_trajectory(workset).penalty_sum
+
+            ΔJ = J - nominal_trajectory(workset).total_cost
+            ΔP = P - nominal_trajectory(workset).penalty_sum
 
             # expected improvement
             Δv = mapreduce(Δ -> α * Δ[1] + α^2 * Δ[2], +, workset.value_function.Δv)
