@@ -136,7 +136,7 @@ function evaluate_penalties!(workset)
 
     @unpack N = workset
     @unpack terminal_state_constraint, input_constraint = workset
-    @unpack z, α = workset
+    @unpack z, α, w, β = workset
 
     for trajectory in workset.trajectory
         # continue if slack and dual variables are unchanged
@@ -152,9 +152,7 @@ function evaluate_penalties!(workset)
 
         # input constraint
         isactive(input_constraint) && @threads for k in 1:N
-            trajectory.p[k] += evaluate_penalty(
-                input_constraint.param, trajectory.u[k] - input_constraint.slack[k], input_constraint.dual[k]
-            )
+            trajectory.p[k] += evaluate_penalty(input_constraint.param, trajectory.u[k] - w[k], β[k])
         end
     end
 
@@ -166,7 +164,7 @@ function add_penalty_derivatives!(workset)
 
     @unpack N = workset
     @unpack x, u = nominal_trajectory(workset)
-    @unpack z, α = workset
+    @unpack z, α, w, β = workset
     @unpack vx, vxx = workset.value_function
     @unpack lu, luu = workset.cost_derivatives
     @unpack terminal_state_constraint, input_constraint = workset
@@ -176,10 +174,7 @@ function add_penalty_derivatives!(workset)
     )
 
     isactive(input_constraint) && @threads for k in 1:N
-        add_penalty_derivative!(
-            lu[k], luu[k], input_constraint.param,
-            u[k], input_constraint.slack[k], input_constraint.dual[k]
-        )
+        add_penalty_derivative!(lu[k], luu[k], input_constraint.param, u[k], w[k], β[k])
     end
 
     return nothing
@@ -187,7 +182,7 @@ end
 
 function update_slack_and_dual_variables!(workset)
     @unpack N = workset
-    @unpack z, α = workset
+    @unpack z, α, w, β = workset
     @unpack x, u = nominal_trajectory(workset)
     @unpack terminal_state_constraint, input_constraint = workset
 
@@ -196,9 +191,7 @@ function update_slack_and_dual_variables!(workset)
     )
 
     isactive(input_constraint) && @threads for k in 1:N
-        update_slack_and_dual_variable!(
-            input_constraint.projection, u[k], input_constraint.slack[k], input_constraint.dual[k]
-        )
+        update_slack_and_dual_variable!(input_constraint.projection, u[k], w[k], β[k])
     end
 
     for trajectory in workset.trajectory

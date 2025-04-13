@@ -126,6 +126,8 @@ struct Workset{T}
     input_constraint::MultipleConstraint{T}
     z::Vector{T}
     α::Vector{T}
+    w::Vector{Vector{T}}
+    β::Vector{Vector{T}}
 
     function Workset{T}(nx, nu, N, ndx=nothing) where {T}
         ndx = ndx !== nothing ? ndx : nx
@@ -142,8 +144,10 @@ struct Workset{T}
         input_constraint = MultipleConstraint{T}(nu, N)
         z = zeros(T, nx)
         α = zeros(T, nx)
+        w = [zeros(T, nu) for _ in 1:N]
+        β = [zeros(T, nu) for _ in 1:N]
 
-        return new(N, nx, ndx, nu, 1, 2, trajectory, value_function, policy_update, dynamics_derivatives, cost_derivatives, subproblem_objective_derivatives, terminal_state_constraint, input_constraint, z, α)
+        return new(N, nx, ndx, nu, 1, 2, trajectory, value_function, policy_update, dynamics_derivatives, cost_derivatives, subproblem_objective_derivatives, terminal_state_constraint, input_constraint, z, α, w, β)
     end
 end
 

@@ -12,16 +12,11 @@ mutable struct SingleConstraint{T} <: Constraint
 end
 
 mutable struct MultipleConstraint{T} <: Constraint
-    num::Int64                           # number of constraints
     param::T                             # penalty parameter   
-    slack::Vector{Vector{T}}             # slack variables
-    dual::Vector{Vector{T}}              # dual variables
     projection::Union{Function,Nothing}  # projection function
 
     function MultipleConstraint{T}(n, m) where {T}
-        slack = [zeros(T, n) for _ in 1:m]
-        dual = [zeros(T, n) for _ in 1:m]
-        return new{T}(m, one(T), slack, dual, nothing)
+        return new{T}(one(T), nothing)
     end
 end
 
@@ -32,24 +27,19 @@ function set_projection_function!(workset, constraint::Symbol, projection::Funct
     setproperty!(getproperty(workset, constraint), :projection, projection)
 end
 
-function set_penalty_parameter!(workset, constraint::Symbol, ρ::Number)
-    set_penalty_parameter!(getproperty(workset, constraint), ρ)
-end
-
-## set penalty parameter
 function set_terminal_state_constraint_parameter!(workset, ρ)
     workset.α .*= workset.terminal_state_constraint.param / ρ
     workset.terminal_state_constraint.param = ρ
     return nothing
 end
 
-function set_penalty_parameter!(constraint::MultipleConstraint, ρ)
-    ThreadsX.map(u -> u ./= constraint.param / ρ, constraint.dual)
-    constraint.param = ρ
+function set_input_constraint_parameter!(workset, ρ)
+    ThreadsX.map(u -> u ./= workset.input_constraint.param / ρ, workset.β)
+    workset.input_constraint.param = ρ
     return nothing
 end
 
-## add penalty derivatives
+## evaluation functions
 function add_penalty_derivative!(gradient, hessian, param, primal, slack, dual)
     gradient .+= param * (primal - slack + dual)
     hessian[diagind(hessian)] .+= param
