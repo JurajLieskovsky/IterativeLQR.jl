@@ -44,38 +44,28 @@ function set_penalty_parameter!(constraint::SingleConstraint, ρ)
 end
 
 function set_penalty_parameter!(constraint::MultipleConstraint, ρ)
-    ThreadsX.map(u -> u ./= constraint.param / ρ, constraint.dual)
+    factor = constraint.param / ρ
+    ThreadsX.map(u -> u ./= factor, constraint.dual)
     constraint.param = ρ
     return nothing
 end
 
-## scale penalty parameter
-function scale_penalty_parameter!(constraint::SingleConstraint, k)
-    constraint.dual ./= k
-    constraint.param *= k
-    return nothing
-end
-
-function scale_penalty_parameter!(constraint::MultipleConstraint, k)
-    ThreadsX.map(u -> u ./= k, constraint.dual)
-    constraint.param *= k
-    return nothing
-end
-
 ## add penalty derivatives
-function add_penalty_derivative!(gradient, hessian, constraint::SingleConstraint, primal)
-    @unpack param, slack, dual = constraint
+function add_penalty_derivative!(gradient, hessian, param, primal, slack, dual)
     gradient .+= param * (primal - slack + dual)
     hessian[diagind(hessian)] .+= param
+end
+
+function add_penalty_derivative!(gradient, hessian, constraint::SingleConstraint, primal)
+    add_penalty_derivative!(gradient, hessian, constraint.param, primal, constraint.slack, constraint.dual) 
     return nothing
 end
 
 function add_penalty_derivative!(gradient, hessian, constraint::MultipleConstraint, primal)
-    @unpack num, param, slack, dual = constraint
-    @threads for k in 1:num
-        gradient[k] .+= param * (primal[k] - slack[k] + dual[k])
-        hessian[k][diagind(hessian[k])] .+= param
-    end
+    ThreadsX.map(
+        (g,H,x,z,u)->add_penalty_derivative!(g,H,constraint.param,x-z+u),
+        gradient, hessian, primal, constraint.slack, constrain.dual
+    )
     return nothing
 end
 
@@ -94,16 +84,20 @@ function evaluate_penalty!(penalty, constraint::MultipleConstraint, primal)
 end
 
 # update slack and dual variable
-
-function update_slack_and_dual_variable!(constraint::SingleConstraint, primal)
-    @unpack slack, dual, projection = constraint
+function update_slack_and_dual_variable!(projection, primal, slack, dual)
     slack .= projection(primal + dual)
     dual .+= primal - slack
+end
+    
+function update_slack_and_dual_variable!(constraint::SingleConstraint, primal)
+    update_slack_and_dual_variable!(constraint.projection, primal, constraint.slack, constraint.dual)
     return nothing
 end
 
 function update_slack_and_dual_variable!(constraint::MultipleConstraint, primal)
-    ThreadsX.map((x, z, u) -> z .= constraint.projection(x + u), primal, constraint.slack, constraint.dual)
-    ThreadsX.map((x, z, u) -> u .+= x - z, primal, constraint.slack, constraint.dual)
+    ThreadsX.map(
+        (x, z, u) -> update_slack_and_dual_variable!(constraint.projection, x,z,u),
+        primal, constraint.slack, constraint.dual
+    )
     return nothing
 end
