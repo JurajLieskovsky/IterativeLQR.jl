@@ -142,15 +142,12 @@ function evaluate_penalties!(workset)
         # continue if slack and dual variables are unchanged
         trajectory.dirty[] || continue
 
-        # fill per-step penalties with zeros
         fill!(trajectory.p, 0)
 
-        # terminal state constraint
-        isactive(terminal_state_constraint) && (trajectory.p[N+1] += evaluate_penalty(
-            terminal_state_constraint.param, trajectory.x[N+1] - z, α
-        ))
+        if isactive(terminal_state_constraint)
+            trajectory.p[N+1] += evaluate_penalty(terminal_state_constraint.param, trajectory.x[N+1] - z, α)
+        end
 
-        # input constraint
         isactive(input_constraint) && @threads for k in 1:N
             trajectory.p[k] += evaluate_penalty(input_constraint.param, trajectory.u[k] - w[k], β[k])
         end
@@ -169,9 +166,9 @@ function add_penalty_derivatives!(workset)
     @unpack lu, luu = workset.cost_derivatives
     @unpack terminal_state_constraint, input_constraint = workset
 
-    isactive(terminal_state_constraint) && add_penalty_derivative!(
-        vx[N+1], vxx[N+1], terminal_state_constraint.param, x[N+1], z, α
-    )
+    if isactive(terminal_state_constraint)
+        add_penalty_derivative!(vx[N+1], vxx[N+1], terminal_state_constraint.param, x[N+1], z, α)
+    end
 
     isactive(input_constraint) && @threads for k in 1:N
         add_penalty_derivative!(lu[k], luu[k], input_constraint.param, u[k], w[k], β[k])
@@ -186,9 +183,9 @@ function update_slack_and_dual_variables!(workset)
     @unpack x, u = nominal_trajectory(workset)
     @unpack terminal_state_constraint, input_constraint = workset
 
-    isactive(terminal_state_constraint) && update_slack_and_dual_variable!(
-        terminal_state_constraint.projection, x[N+1], z, α
-    )
+    if isactive(terminal_state_constraint)
+        update_slack_and_dual_variable!(terminal_state_constraint.projection, x[N+1], z, α)
+    end
 
     isactive(input_constraint) && @threads for k in 1:N
         update_slack_and_dual_variable!(input_constraint.projection, u[k], w[k], β[k])
