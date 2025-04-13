@@ -38,17 +38,17 @@ function set_projection_function!(workset, constraint::Symbol, Π::Function)
 end
 
 function set_terminal_state_constraint_parameter!(workset, ρ)
-    @unpack α = workset.constraints
     @unpack parameter = workset.constraints.terminal_state
+    @unpack α = workset.constraints
     α .*= parameter / ρ
     setproperty!(workset.constraints.terminal_state, :parameter,  ρ)
     return nothing
 end
 
 function set_input_constraint_parameter!(workset, ρ)
-    @unpack β = workset.constraints
     @unpack parameter = workset.constraints.input
-    ThreadsX.map(u -> u ./= parameter / ρ, β)
+    @unpack β = workset.constraints
+    ThreadsX.map(β_k -> β_k ./= parameter / ρ, β)
     setproperty!(workset.constraints.input, :parameter,  ρ)
     return nothing
 end
