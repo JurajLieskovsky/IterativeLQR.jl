@@ -10,8 +10,8 @@ end
 
 struct Constraints{T}
     terminal_state::Constraint{T}
-    z::Vector{T}
-    α::Vector{T}
+    zT::Vector{T}
+    αT::Vector{T}
 
     input::Constraint{T}
     w::Vector{Vector{T}}
@@ -19,14 +19,14 @@ struct Constraints{T}
 
     function Constraints{T}(nx, nu, N) where {T}
         terminal_state = Constraint{T}()
-        z = zeros(T, nx)
-        α = zeros(T, nx)
+        zT = zeros(T, nx)
+        αT = zeros(T, nx)
 
         input = Constraint{T}()
         w = [zeros(T, nu) for _ in 1:N]
         β = [zeros(T, nu) for _ in 1:N]
 
-        return new(terminal_state, z, α, input, w, β)
+        return new(terminal_state, zT, αT, input, w, β)
     end
 end
 
@@ -39,8 +39,8 @@ end
 
 function set_terminal_state_constraint_parameter!(workset, ρ)
     @unpack parameter = workset.constraints.terminal_state
-    @unpack α = workset.constraints
-    α .*= parameter / ρ
+    @unpack αT = workset.constraints
+    αT .*= parameter / ρ
     setproperty!(workset.constraints.terminal_state, :parameter,  ρ)
     return nothing
 end
