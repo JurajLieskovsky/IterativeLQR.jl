@@ -129,32 +129,8 @@ function forward_pass!(workset, dynamics!, difference, running_cost, final_cost,
     return true
 end
 
-# printing and saving utilities
-
-function print_iteration!(line_count, i, α, J, P, ΔJ, ΔP, Δv, accepted, diff, reg, bwd, fwd)
-    line_count[] % 10 == 0 && @printf(
-        "%-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s\n",
-        "iter", "α", "J", "P", "ΔJ", "ΔP", "ΔV", "accepted", "diff", "reg", "bwd", "fwd"
-    )
-    @printf(
-        "%-9i %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9s %-9.3g %-9.3g %-9.3g %-9.3g\n",
-        i, α, J, P, ΔJ, ΔP, Δv, accepted, diff, reg, bwd, fwd
-    )
-    line_count[] += 1
-end
-
-iteration_dataframe() = DataFrame(
-    i=Int[], α=Float64[],
-    J=Float64[], P=Float64[], ΔJ=Float64[], ΔP=Float64[], ΔV=Float64[],
-    accepted=Bool[]
-)
-
-function log_iteration!(dataframe, i, α, J, P, ΔJ, ΔP, Δv, accepted)
-    push!(dataframe, (i, α, J, P, ΔJ, ΔP, Δv, accepted))
-end
-
-# algorithm
-
+# constraint related functions
+ 
 function evaluate_penalties!(workset)
     @unpack N = workset
     @unpack terminal_state_constraint, input_constraint = workset
@@ -218,6 +194,31 @@ function update_slack_and_dual_variables!(workset)
     return nothing
 end
 
+# printing and saving utilities
+
+function print_iteration!(line_count, i, α, J, P, ΔJ, ΔP, Δv, accepted, diff, reg, bwd, fwd)
+    line_count[] % 10 == 0 && @printf(
+        "%-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s\n",
+        "iter", "α", "J", "P", "ΔJ", "ΔP", "ΔV", "accepted", "diff", "reg", "bwd", "fwd"
+    )
+    @printf(
+        "%-9i %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9s %-9.3g %-9.3g %-9.3g %-9.3g\n",
+        i, α, J, P, ΔJ, ΔP, Δv, accepted, diff, reg, bwd, fwd
+    )
+    line_count[] += 1
+end
+
+iteration_dataframe() = DataFrame(
+    i=Int[], α=Float64[],
+    J=Float64[], P=Float64[], ΔJ=Float64[], ΔP=Float64[], ΔV=Float64[],
+    accepted=Bool[]
+)
+
+function log_iteration!(dataframe, i, α, J, P, ΔJ, ΔP, Δv, accepted)
+    push!(dataframe, (i, α, J, P, ΔJ, ΔP, Δv, accepted))
+end
+
+# algorithm
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
     maxiter=100, σ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16),
