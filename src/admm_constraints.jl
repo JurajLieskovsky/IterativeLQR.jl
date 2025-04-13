@@ -3,7 +3,7 @@ function set_projection_function!(workset::Workset, constraint::Symbol, projecti
     setproperty!(getproperty(workset, constraint), :projection, projection)
 end
 
-function set_penalty_parameter!(workset::Workset{T}, constraint::Symbol, ρ::T) where {T}
+function set_penalty_parameter!(workset::Workset, constraint::Symbol, ρ::Number)
     set_penalty_parameter!(getproperty(workset, constraint), ρ)
 end
 
