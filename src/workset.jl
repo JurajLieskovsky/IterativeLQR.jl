@@ -4,7 +4,7 @@ struct Trajectory{T}
     l::Vector{T}         # running costs (including final)
     p::Vector{T}         # penalties
 
-    dirty::Ref{Bool}     # when not up-to date with slack and dual variables
+    isdirty::Ref{Bool}   # when not up-to date with slack and dual variables
 
     function Trajectory{T}(nx, nu, N) where {T}
         x = [zeros(T, nx) for _ in 1:N+1]
@@ -15,6 +15,8 @@ struct Trajectory{T}
         return new(x, u, l, p, false)
     end
 end
+
+isdirty(trajectory::Trajectory) = trajectory.isdirty[]
 
 struct ValueFunction{T}
     Δv::Vector{Vector{T}}

@@ -47,7 +47,7 @@ function dynamics_diff!(jac, x, u, k)
 end
 
 # Running cost
-running_cost(_, u, _) = 1e0 * h * u[1]^2
+running_cost(_, u, _) = h * u[1]^2
 # running_cost(x, u, _) = 1 + cos(x[2]) + 1e1 * x[1]^2 + 3e-2 * u[1]^2
 
 function running_cost_diff!(grad, hess, x, u, k)
@@ -66,7 +66,7 @@ function running_cost_diff!(grad, hess, x, u, k)
 end
 
 # Final cost
-# final_cost(x, _) = 1e3 * (x[1]^2 + (x[2] - pi)^2) + 1e0 * (x[3]^2 + x[4]^2)
+# final_cost(x, _) = 1e5 * (x[1]^2 + (x[2] - pi)^2) + 1e0 * (x[3]^2 + x[4]^2)
 final_cost(_, _) = 0
 
 function final_cost_diff!(Φx, Φxx, x, k)
@@ -106,7 +106,7 @@ IterativeLQR.set_initial_inputs!(workset, us₀)
 
 IterativeLQR.set_terminal_state_projection_function!(workset, terminal_state_projection)
 IterativeLQR.set_input_projection_function!(workset, input_projection)
-IterativeLQR.set_terminal_state_constraint_parameter!(workset, 1e1)
+IterativeLQR.set_terminal_state_constraint_parameter!(workset, 1e0)
 IterativeLQR.set_input_constraint_parameter!(workset, 1e-1)
 
 df = IterativeLQR.iLQR!(

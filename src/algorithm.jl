@@ -138,17 +138,16 @@ function forward_pass!(workset, dynamics!, difference, running_cost, final_cost,
     @inbounds @threads for k in 1:N
         l[k] = running_cost(x[k], u[k], k)
         p[k] = evaluate_penalty(input, u[k] - w[k], β[k])
+
+        if isdirty(nominal_trajectory(workset))
+            p_ref[k] = evaluate_penalty(input, u_ref[k] - w[k], β[k])
+        end
     end
 
     l[N+1] = final_cost(x[N+1], N + 1)
     p[N+1] = evaluate_penalty(terminal_state, x[N+1] - zT, αT)
 
-    # penalty re-evaluation for nominal trajectory after a slack and dual variable update
-    if nominal_trajectory(workset).dirty[]
-        @inbounds @threads for k in 1:N
-            p_ref[k] = evaluate_penalty(input, u_ref[k] - w[k], β[k])
-        end
-
+    if isdirty(nominal_trajectory(workset))
         p_ref[N+1] = evaluate_penalty(terminal_state, x_ref[N+1] - zT, αT)
     end
 
@@ -167,7 +166,7 @@ function update_slack_and_dual_variables!(workset)
     end
 
     for trajectory in workset.trajectory
-        trajectory.dirty[] = true
+        trajectory.isdirty[] = true
     end
 
     return nothing
