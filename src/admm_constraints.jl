@@ -9,22 +9,22 @@ mutable struct Constraint{T}
 end
 
 struct Constraints{T}
-    terminal_state_constraint::Constraint{T}
-    input_constraint::Constraint{T}
+    terminal_state::Constraint{T}
+    input::Constraint{T}
     z::Vector{T}
     α::Vector{T}
     w::Vector{Vector{T}}
     β::Vector{Vector{T}}
 
     function Constraints{T}(nx, nu, N) where {T}
-        terminal_state_constraint = Constraint{T}()
-        input_constraint = Constraint{T}()
+        terminal_state = Constraint{T}()
+        input = Constraint{T}()
         z = zeros(T, nx)
         α = zeros(T, nx)
         w = [zeros(T, nu) for _ in 1:N]
         β = [zeros(T, nu) for _ in 1:N]
 
-        return new(terminal_state_constraint, input_constraint, z, α, w, β)
+        return new(terminal_state, input, z, α, w, β)
     end
 end
 
@@ -36,14 +36,14 @@ function set_projection_function!(workset, constraint::Symbol, projection::Funct
 end
 
 function set_terminal_state_constraint_parameter!(workset, ρ_new)
-    workset.constraints.α .*= workset.constraints.terminal_state_constraint.ρ / ρ_new
-    workset.constraints.terminal_state_constraint.ρ = ρ_new
+    workset.constraints.α .*= workset.constraints.terminal_state.ρ / ρ_new
+    workset.constraints.terminal_state.ρ = ρ_new
     return nothing
 end
 
 function set_input_constraint_parameter!(workset, ρ_new)
-    ThreadsX.map(u -> u ./= workset.constraints.input_constraint.ρ / ρ_new, workset.constraints.β)
-    workset.constraints.input_constraint.ρ = ρ_new
+    ThreadsX.map(u -> u ./= workset.constraints.input.ρ / ρ_new, workset.constraints.β)
+    workset.constraints.input.ρ = ρ_new
     return nothing
 end
 
