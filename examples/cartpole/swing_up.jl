@@ -95,7 +95,7 @@ function plotting_callback(workset)
     return plt
 end
 
-# terminal constraint indicator function
+# constraint projection functions
 terminal_state_projection(_) = [0, pi, 0, 0]
 input_projection(u) = map(u_k -> sign(u_k) * min(4.0, abs(u_k)), u)
 
@@ -104,8 +104,8 @@ workset = IterativeLQR.Workset{Float64}(4, 1, N)
 IterativeLQR.set_initial_state!(workset, x₀)
 IterativeLQR.set_initial_inputs!(workset, us₀)
 
-IterativeLQR.set_projection_function!(workset, :terminal_state, terminal_state_projection)
-IterativeLQR.set_projection_function!(workset, :input, input_projection)
+IterativeLQR.set_terminal_state_projection_function!(workset, terminal_state_projection)
+IterativeLQR.set_input_projection_function!(workset, input_projection)
 IterativeLQR.set_terminal_state_constraint_parameter!(workset, 1e1)
 IterativeLQR.set_input_constraint_parameter!(workset, 1e-1)
 

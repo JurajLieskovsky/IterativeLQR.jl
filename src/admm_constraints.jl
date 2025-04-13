@@ -32,16 +32,21 @@ end
 
 isactive(constraint::Constraint) = constraint.projection !== nothing
 
-## workset functions
-function set_projection_function!(workset, constraint::Symbol, Π::Function)
-    setproperty!(getproperty(workset.constraints, constraint), :projection, Π)
+## projection setting functions
+function set_terminal_state_projection_function!(workset, Π::Function)
+    setproperty!(workset.constraints.terminal_state, :projection, Π)
 end
 
+function set_input_projection_function!(workset, Π::Function)
+    setproperty!(workset.constraints.input, :projection, Π)
+end
+
+## penalty parameter setting functions
 function set_terminal_state_constraint_parameter!(workset, ρ)
     @unpack parameter = workset.constraints.terminal_state
     @unpack αT = workset.constraints
     αT .*= parameter / ρ
-    setproperty!(workset.constraints.terminal_state, :parameter,  ρ)
+    setproperty!(workset.constraints.terminal_state, :parameter, ρ)
     return nothing
 end
 
@@ -49,7 +54,7 @@ function set_input_constraint_parameter!(workset, ρ)
     @unpack parameter = workset.constraints.input
     @unpack β = workset.constraints
     ThreadsX.map(β_k -> β_k ./= parameter / ρ, β)
-    setproperty!(workset.constraints.input, :parameter,  ρ)
+    setproperty!(workset.constraints.input, :parameter, ρ)
     return nothing
 end
 
