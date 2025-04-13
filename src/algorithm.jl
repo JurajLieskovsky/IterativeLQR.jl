@@ -23,13 +23,23 @@ function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cos
     @unpack lx, lu, lxx, lux, lxu, luu = workset.cost_derivatives
     @unpack vx, vxx = workset.value_function
 
+    @unpack terminal_state_constraint, input_constraint, z, α, w, β = workset
+
     @threads for k in 1:N
         dynamics_diff!(fx[k], fu[k], x[k], u[k], k)
         running_cost_diff!(lx[k], lu[k], lxx[k], lxu[k], luu[k], x[k], u[k], k)
         lux[k] .= lxu[k]'
+
+        if isactive(input_constraint)
+            add_penalty_derivative!(lu[k], luu[k], input_constraint.param, u[k], w[k], β[k])
+        end
     end
 
     final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
+
+    if isactive(terminal_state_constraint)
+        add_penalty_derivative!(vx[N+1], vxx[N+1], terminal_state_constraint.param, x[N+1], z, α)
+    end
 
     return nothing
 end
@@ -41,12 +51,23 @@ function stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, f
     @unpack grad, hess = workset.cost_derivatives
     @unpack vx, vxx = workset.value_function
 
+    @unpack terminal_state_constraint, input_constraint, z, α, w, β = workset
+    @unpack lu, luu = workset.cost_derivatives
+
     @threads for k in 1:N
         dynamics_diff!(jac[k], x[k], u[k], k)
         running_cost_diff!(grad[k], hess[k], x[k], u[k], k)
+
+        if isactive(input_constraint)
+            add_penalty_derivative!(lu[k], luu[k], input_constraint.param, u[k], w[k], β[k])
+        end
     end
 
     final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
+
+    if isactive(terminal_state_constraint)
+        add_penalty_derivative!(vx[N+1], vxx[N+1], terminal_state_constraint.param, x[N+1], z, α)
+    end
 
     return nothing
 end
@@ -135,8 +156,7 @@ function evaluate_penalties!(workset)
     # separate function because it currently runs on both trajectories
 
     @unpack N = workset
-    @unpack terminal_state_constraint, input_constraint = workset
-    @unpack z, α, w, β = workset
+    @unpack terminal_state_constraint, input_constraint, z, α, w, β = workset
 
     for trajectory in workset.trajectory
         # continue if slack and dual variables are unchanged
@@ -156,32 +176,10 @@ function evaluate_penalties!(workset)
     return nothing
 end
 
-function add_penalty_derivatives!(workset)
-    # separate function for now due to the duplicity of differentiation
-
-    @unpack N = workset
-    @unpack x, u = nominal_trajectory(workset)
-    @unpack z, α, w, β = workset
-    @unpack vx, vxx = workset.value_function
-    @unpack lu, luu = workset.cost_derivatives
-    @unpack terminal_state_constraint, input_constraint = workset
-
-    if isactive(terminal_state_constraint)
-        add_penalty_derivative!(vx[N+1], vxx[N+1], terminal_state_constraint.param, x[N+1], z, α)
-    end
-
-    isactive(input_constraint) && @threads for k in 1:N
-        add_penalty_derivative!(lu[k], luu[k], input_constraint.param, u[k], w[k], β[k])
-    end
-
-    return nothing
-end
-
 function update_slack_and_dual_variables!(workset)
     @unpack N = workset
-    @unpack z, α, w, β = workset
+    @unpack terminal_state_constraint, input_constraint, z, α, w, β = workset
     @unpack x, u = nominal_trajectory(workset)
-    @unpack terminal_state_constraint, input_constraint = workset
 
     if isactive(terminal_state_constraint)
         update_slack_and_dual_variable!(terminal_state_constraint.projection, x[N+1], z, α)
@@ -280,9 +278,6 @@ function iLQR!(
                 differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
             end
         end
-
-        # add terminal constaint penalty's derivatives
-        add_penalty_derivatives!(workset)
 
         # regularization
         reg = (regularization == :none) ? NaN : @elapsed regularization!(workset, regularization_function!)
