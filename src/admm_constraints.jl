@@ -1,13 +1,4 @@
-# Shared
-function set_projection_function!(workset::Workset, constraint::Symbol, projection::Function)
-    setproperty!(getproperty(workset, constraint), :projection, projection)
-end
-
-function set_penalty_parameter!(workset::Workset, constraint::Symbol, ρ::Number)
-    set_penalty_parameter!(getproperty(workset, constraint), ρ)
-end
-
-# Single step constraint
+# ADMM constraints
 
 mutable struct SingleConstraint{T}
     param::T                             # penalty parameter   
@@ -21,39 +12,6 @@ mutable struct SingleConstraint{T}
         return new{T}(one(T), slack, dual, nothing)
     end
 end
-
-function set_penalty_parameter!(constraint::SingleConstraint, ρ)
-    constraint.dual .*= constraint.param / ρ
-    constraint.param = ρ
-    return nothing
-end
-
-function scale_penalty_parameter!(constraint::SingleConstraint, k)
-    constraint.dual ./= k
-    constraint.param *= k
-    return nothing
-end
-
-function add_penalty_derivative!(gradient, hessian, constraint::SingleConstraint, primal)
-    @unpack param, slack, dual = constraint
-    gradient .+= param * (primal - slack + dual)
-    hessian[diagind(hessian)] .+= param
-    return nothing
-end
-
-function evaluate_penalty!(constraint::SingleConstraint, primal)
-    @unpack param, slack, dual = constraint
-    return param / 2 * mapreduce(a -> a^2, +, primal - slack + dual)
-end
-
-function update_slack_and_dual_variable!(constraint::SingleConstraint, primal)
-    @unpack slack, dual, projection = constraint
-    slack .= projection(primal + dual)
-    dual .+= primal - slack
-    return nothing
-end
-
-# Multiple step constraint
 
 mutable struct MultipleConstraint{T}
     num::Int64                           # number of constraints
@@ -69,15 +27,46 @@ mutable struct MultipleConstraint{T}
     end
 end
 
+## workset functions
+function set_projection_function!(workset::Workset, constraint::Symbol, projection::Function)
+    setproperty!(getproperty(workset, constraint), :projection, projection)
+end
+
+function set_penalty_parameter!(workset::Workset, constraint::Symbol, ρ::Number)
+    set_penalty_parameter!(getproperty(workset, constraint), ρ)
+end
+
+## set penalty parameter
+function set_penalty_parameter!(constraint::SingleConstraint, ρ)
+    constraint.dual .*= constraint.param / ρ
+    constraint.param = ρ
+    return nothing
+end
+
 function set_penalty_parameter!(constraint::MultipleConstraint, ρ)
     ThreadsX.map(u -> u ./= constraint.param / ρ, constraint.dual)
     constraint.param = ρ
     return nothing
 end
 
+## scale penalty parameter
+function scale_penalty_parameter!(constraint::SingleConstraint, k)
+    constraint.dual ./= k
+    constraint.param *= k
+    return nothing
+end
+
 function scale_penalty_parameter!(constraint::MultipleConstraint, k)
     ThreadsX.map(u -> u ./= k, constraint.dual)
     constraint.param *= k
+    return nothing
+end
+
+## add penalty derivatives
+function add_penalty_derivative!(gradient, hessian, constraint::SingleConstraint, primal)
+    @unpack param, slack, dual = constraint
+    gradient .+= param * (primal - slack + dual)
+    hessian[diagind(hessian)] .+= param
     return nothing
 end
 
@@ -90,11 +79,26 @@ function add_penalty_derivative!(gradient, hessian, constraint::MultipleConstrai
     return nothing
 end
 
+## evaluate penalty
+function evaluate_penalty!(constraint::SingleConstraint, primal)
+    @unpack param, slack, dual = constraint
+    return param / 2 * mapreduce(a -> a^2, +, primal - slack + dual)
+end
+
 function evaluate_penalty!(penalty, constraint::MultipleConstraint, primal)
     ThreadsX.map(
         (p, x, z, u) -> p = constraint.param / 2 * mapreduce(arg -> arg^2, +, x - z + u),
         penalty, primal, constraint.slack, constraint.dual
     )
+    return nothing
+end
+
+# update slack and dual variable
+
+function update_slack_and_dual_variable!(constraint::SingleConstraint, primal)
+    @unpack slack, dual, projection = constraint
+    slack .= projection(primal + dual)
+    dual .+= primal - slack
     return nothing
 end
 
