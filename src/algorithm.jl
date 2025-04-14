@@ -112,21 +112,18 @@ function backward_pass!(workset)
     return nothing
 end
 
-function forward_pass!(workset, dynamics!, difference, running_cost, final_cost, search)
+function trajectory_update!(workset, dynamics!, difference, α)
     @unpack N = workset
-    @unpack x, u, l, p = active_trajectory(workset)
+    @unpack x, u = active_trajectory(workset)
     @unpack d, K = workset.policy_update
-    @unpack terminal_state, input, zT, αT, w, β = workset.constraints
 
     x_ref = nominal_trajectory(workset).x
     u_ref = nominal_trajectory(workset).u
-    p_ref = nominal_trajectory(workset).p
 
-    # active trajectory rollout
     x[1] = x_ref[1]
 
     @inbounds for k in 1:N
-        u[k] .= u_ref[k] + search * d[k] + K[k] * difference(x[k], x_ref[k])
+        u[k] .= u_ref[k] + α * d[k] + K[k] * difference(x[k], x_ref[k])
         try
             dynamics!(x[k+1], x[k], u[k], k)
         catch
@@ -134,7 +131,18 @@ function forward_pass!(workset, dynamics!, difference, running_cost, final_cost,
         end
     end
 
-    # penalty and cost function evaluation
+    return true
+end
+
+function trajectory_evaluation!(workset, running_cost, final_cost)
+    @unpack N = workset
+    @unpack x, u, l, p = active_trajectory(workset)
+    @unpack terminal_state, input, zT, αT, w, β = workset.constraints
+
+    x_ref = nominal_trajectory(workset).x
+    u_ref = nominal_trajectory(workset).u
+    p_ref = nominal_trajectory(workset).p
+
     @inbounds @threads for k in 1:N
         l[k] = running_cost(x[k], u[k], k)
         p[k] = evaluate_penalty(input, u[k] - w[k], β[k])
@@ -151,7 +159,7 @@ function forward_pass!(workset, dynamics!, difference, running_cost, final_cost,
         p_ref[N+1] = evaluate_penalty(terminal_state, x_ref[N+1] - zT, αT)
     end
 
-    return true
+    return nothing
 end
 
 function update_slack_and_dual_variables!(workset)
@@ -267,7 +275,8 @@ function iLQR!(
         for α in α_values
 
             fwd = @elapsed begin
-                successful = forward_pass!(workset, dynamics!, state_difference, running_cost, final_cost, α)
+                successful = trajectory_update!(workset, dynamics!, state_difference, α)
+                trajectory_evaluation!(workset, running_cost, final_cost)
             end
 
             # total cost and penalty sum
