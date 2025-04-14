@@ -162,7 +162,7 @@ function trajectory_evaluation!(workset, running_cost, final_cost)
     return nothing
 end
 
-function update_slack_and_dual_variables!(workset)
+function slack_and_dual_variable_update!(workset)
     @unpack N = workset
     @unpack terminal_state, input, zT, αT, w, β = workset.constraints
     @unpack x, u = nominal_trajectory(workset)
@@ -238,7 +238,7 @@ function iLQR!(
         J = sum(nominal_trajectory(workset).l)
 
         # update slack and dual variables
-        update_slack_and_dual_variables!(workset)
+        slack_and_dual_variable_update!(workset)
 
         # print and log
         verbose && print_iteration!(line_count, 0, NaN, J, NaN, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
@@ -312,7 +312,7 @@ function iLQR!(
                 swap_trajectories!(workset)
 
                 # update slack and dual variable (based on nominal trajectory)
-                update_slack_and_dual_variables!(workset)
+                slack_and_dual_variable_update!(workset)
 
                 break
             end
