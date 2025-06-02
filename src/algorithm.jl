@@ -7,7 +7,7 @@ function trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
             dynamics!(x[k+1], x[k], u[k], k)
             l[k] = running_cost(x[k], u[k], k)
         catch
-            return false, NaN
+            return false
         end
     end
 
