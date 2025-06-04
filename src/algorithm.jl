@@ -23,17 +23,17 @@ function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cos
     @unpack lx, lu, lxx, lux, lxu, luu = workset.cost_derivatives
     @unpack vx, vxx = workset.value_function
 
-    @unpack terminal_state, input, zT, αT, w, β = workset.constraints
+    @unpack terminal_state_projection, input_projection, ρT, zT, αT, σ, w, β = workset.constraints
 
     @threads for k in 1:N
         dynamics_diff!(fx[k], fu[k], x[k], u[k], k)
         running_cost_diff!(lx[k], lu[k], lxx[k], lxu[k], luu[k], x[k], u[k], k)
-        add_penalty_derivative!(lu[k], luu[k], input, u[k], w[k], β[k])
+        isnothing(input_projection) || add_penalty_derivative!(lu[k], luu[k], σ[k], u[k], w[k], β[k])
         lux[k] .= lxu[k]'
     end
 
     final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
-    add_penalty_derivative!(vx[N+1], vxx[N+1], terminal_state, x[N+1], zT, αT)
+    isnothing(terminal_state_projection) || add_penalty_derivative!(vx[N+1], vxx[N+1], ρT, x[N+1], zT, αT)
 
     return nothing
 end
@@ -45,17 +45,17 @@ function stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, f
     @unpack grad, hess = workset.cost_derivatives
     @unpack vx, vxx = workset.value_function
 
-    @unpack terminal_state, input, zT, αT, w, β = workset.constraints
+    @unpack terminal_state_projection, input_projection, ρT, zT, αT, σ, w, β = workset.constraints
     @unpack lu, luu = workset.cost_derivatives
 
     @threads for k in 1:N
         dynamics_diff!(jac[k], x[k], u[k], k)
         running_cost_diff!(grad[k], hess[k], x[k], u[k], k)
-        add_penalty_derivative!(lu[k], luu[k], input, u[k], w[k], β[k])
+        isnothing(input_projection) || add_penalty_derivative!(lu[k], luu[k], σ[k], u[k], w[k], β[k])
     end
 
     final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
-    add_penalty_derivative!(vx[N+1], vxx[N+1], terminal_state, x[N+1], zT, αT)
+    isnothing(terminal_state_projection) || add_penalty_derivative!(vx[N+1], vxx[N+1], ρT, x[N+1], zT, αT)
 
     return nothing
 end
@@ -137,7 +137,7 @@ end
 function trajectory_evaluation!(workset, running_cost, final_cost)
     @unpack N = workset
     @unpack x, u, l, p = active_trajectory(workset)
-    @unpack terminal_state, input, zT, αT, w, β = workset.constraints
+    @unpack terminal_state_projection, input_projection, ρT, zT, αT, σ, w, β = workset.constraints
 
     x_ref = nominal_trajectory(workset).x
     u_ref = nominal_trajectory(workset).u
@@ -145,18 +145,24 @@ function trajectory_evaluation!(workset, running_cost, final_cost)
 
     @inbounds @threads for k in 1:N
         l[k] = running_cost(x[k], u[k], k)
-        p[k] = evaluate_penalty(input, u[k] - w[k], β[k])
 
-        if isdirty(nominal_trajectory(workset))
-            p_ref[k] = evaluate_penalty(input, u_ref[k] - w[k], β[k])
+        if !isnothing(input_projection)
+            p[k] = evaluate_penalty(σ[k], u[k] - w[k], β[k])
+
+            if isdirty(nominal_trajectory(workset))
+                p_ref[k] = evaluate_penalty(σ[k], u_ref[k] - w[k], β[k])
+            end
         end
     end
 
     l[N+1] = final_cost(x[N+1], N + 1)
-    p[N+1] = evaluate_penalty(terminal_state, x[N+1] - zT, αT)
 
-    if isdirty(nominal_trajectory(workset))
-        p_ref[N+1] = evaluate_penalty(terminal_state, x_ref[N+1] - zT, αT)
+    if !isnothing(terminal_state_projection)
+        p[N+1] = evaluate_penalty(ρT, x[N+1] - zT, αT)
+
+        if isdirty(nominal_trajectory(workset))
+            p_ref[N+1] = evaluate_penalty(ρT, x_ref[N+1] - zT, αT)
+        end
     end
 
     return nothing
@@ -164,13 +170,17 @@ end
 
 function slack_and_dual_variable_update!(workset)
     @unpack N = workset
-    @unpack terminal_state, input, zT, αT, w, β = workset.constraints
+    @unpack terminal_state_projection, input_projection, zT, αT, w, β = workset.constraints
     @unpack x, u = nominal_trajectory(workset)
 
-    update_slack_and_dual_variable!(terminal_state, x[N+1], zT, αT)
+    if !isnothing(terminal_state_projection)
+        update_slack_and_dual_variable!(terminal_state_projection, x[N+1], zT, αT)
+    end
 
-    @inbounds @threads for k in 1:N
-        update_slack_and_dual_variable!(input, u[k], w[k], β[k])
+    if !isnothing(input_projection)
+        @inbounds @threads for k in 1:N
+            update_slack_and_dual_variable!(input_projection, u[k], w[k], β[k])
+        end
     end
 
     for trajectory in workset.trajectory

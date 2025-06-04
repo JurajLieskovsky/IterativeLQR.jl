@@ -1,79 +1,71 @@
 # ADMM constraints
-mutable struct Constraint{T}
-    parameter::T                         # penalty parameter   
-    projection::Union{Function,Nothing}  # projection function
-
-    function Constraint{T}() where {T}
-        return new{T}(one(T), nothing)
-    end
-end
-
-struct Constraints{T}
-    terminal_state::Constraint{T}
+mutable struct Constraints{T}
+    terminal_state_projection::Union{Function,Nothing}
+    ρT::Vector{T}
     zT::Vector{T}
     αT::Vector{T}
 
-    input::Constraint{T}
+    input_projection::Union{Function,Nothing}
+    σ::Vector{Vector{T}}
     w::Vector{Vector{T}}
     β::Vector{Vector{T}}
 
     function Constraints{T}(nx, nu, N) where {T}
-        terminal_state = Constraint{T}()
+        terminal_state = nothing
+        ρT = ones(T, nx)
         zT = zeros(T, nx)
         αT = zeros(T, nx)
 
-        input = Constraint{T}()
+        input = nothing
+        σ = [ones(T, nu) for _ in 1:N]
         w = [zeros(T, nu) for _ in 1:N]
         β = [zeros(T, nu) for _ in 1:N]
 
-        return new(terminal_state, zT, αT, input, w, β)
+        return new(terminal_state, ρT, zT, αT, input, σ, w, β)
     end
 end
 
-isactive(constraint::Constraint) = constraint.projection !== nothing
-
 ## projection setting functions
 function set_terminal_state_projection_function!(workset, Π::Function)
-    setproperty!(workset.constraints.terminal_state, :projection, Π)
+    setproperty!(workset.constraints, :terminal_state_projection, Π)
 end
 
 function set_input_projection_function!(workset, Π::Function)
-    setproperty!(workset.constraints.input, :projection, Π)
+    setproperty!(workset.constraints, :input_projection, Π)
 end
 
 ## penalty parameter setting functions
-function set_terminal_state_constraint_parameter!(workset, ρ)
-    @unpack parameter = workset.constraints.terminal_state
-    @unpack αT = workset.constraints
-    αT .*= parameter / ρ
-    setproperty!(workset.constraints.terminal_state, :parameter, ρ)
+function set_constraint_parameter!(parameter, dual, new_parameter)
+    dual .*= parameter ./ new_parameter
+    parameter .= new_parameter
     return nothing
 end
 
-function set_input_constraint_parameter!(workset, ρ)
-    @unpack parameter = workset.constraints.input
-    @unpack β = workset.constraints
-    ThreadsX.map(β_k -> β_k ./= parameter / ρ, β)
-    setproperty!(workset.constraints.input, :parameter, ρ)
+function set_terminal_state_constraint_parameter!(workset, ρ_new)
+    @unpack αT, ρT = workset.constraints
+    set_constraint_parameter!(ρT, αT, ρ_new)
+    return nothing
+end
+
+function set_input_constraint_parameter!(workset, σ_new)
+    @unpack σ, β = workset.constraints
+    ThreadsX.map((σ_k, β_k) -> set_constraint_parameter!(σ_k, β_k, σ_new), σ, β)
     return nothing
 end
 
 ## evaluation functions
-function add_penalty_derivative!(gradient, hessian, constraint, primal, slack, dual)
-    isactive(constraint) || return nothing
-    gradient .+= constraint.parameter * (primal - slack + dual)
-    hessian[diagind(hessian)] .+= constraint.parameter
+function add_penalty_derivative!(gradient, hessian, parameter, primal, slack, dual)
+    gradient .+= (primal - slack + dual) .* parameter
+    hessian[diagind(hessian)] .+= parameter
     return nothing
 end
 
-function evaluate_penalty(constraint, residual, dual)
-    isactive(constraint) || return 0
-    constraint.parameter / 2 * mapreduce(a -> a^2, +, residual + dual)
+function evaluate_penalty(parameter, residual, dual)
+    mapreduce((a, p) -> p / 2 * a^2, +, residual + dual, parameter)
 end
 
-function update_slack_and_dual_variable!(constraint, primal, slack, dual)
-    isactive(constraint) || return nothing
-    slack .= constraint.projection(primal + dual)
+function update_slack_and_dual_variable!(projection, primal, slack, dual)
+    slack .= projection(primal + dual)
     dual .+= primal - slack
     return nothing
 end
