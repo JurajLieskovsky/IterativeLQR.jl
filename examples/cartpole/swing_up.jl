@@ -13,10 +13,10 @@ using BenchmarkTools
 
 # Horizon length, initial state and inputs
 T = 2
-x₀ = [0, pi * 1e-3, 0, 0]
+x₀ = [0.0, 0, 0, 0]
 N = 200
 
-us₀ = [zeros(1) for _ in 1:N]
+us₀ = [i == 1 ? 1e-3 * ones(1) : zeros(1) for i in 1:N]
 
 # Horizon and timestep
 h = T / N
