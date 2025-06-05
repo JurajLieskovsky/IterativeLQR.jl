@@ -58,19 +58,19 @@ function set_input_constraint_parameter!(workset, ρ_new)
 end
 
 ## evaluation functions
-function add_penalty_derivative!(gradient, hessian, primal, constraint)
+function add_penalty_derivative!(gradient, hessian, constraint, primal)
     @unpack ρ, z, α = constraint
     gradient .+= (primal - z + α) .* ρ
     hessian[diagind(hessian)] .+= ρ
     return nothing
 end
 
-function evaluate_penalty(primal, constraint)
+function evaluate_penalty(constraint, primal)
     @unpack ρ, z, α = constraint
     mapreduce((a, p) -> p / 2 * a^2, +, primal - z + α, ρ)
 end
 
-function update_slack_and_dual_variable!(projection, primal, constraint)
+function update_slack_and_dual_variable!(projection, constraint, primal)
     @unpack z, α = constraint
     z .= projection(primal + α)
     α .+= primal - z
