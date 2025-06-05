@@ -1,9 +1,20 @@
 # ADMM constraints
+struct Constraint{T}
+    ρ::Vector{T} # penalty parameter
+    z::Vector{T} # slack variable
+    α::Vector{T} # dual variable
+
+    function Constraint{T}(n) where T
+        ρ = ones(T, n)
+        z = zeros(T, n)
+        α = zeros(T, n)
+        return new(ρ, z, α)
+    end
+end
+
 mutable struct Constraints{T}
     terminal_state_projection::Union{Function,Nothing}
-    ρT::Vector{T}
-    zT::Vector{T}
-    αT::Vector{T}
+    terminal_state_constraint::Constraint{T}
 
     input_projection::Union{Function,Nothing}
     σ::Vector{Vector{T}}
@@ -11,17 +22,15 @@ mutable struct Constraints{T}
     β::Vector{Vector{T}}
 
     function Constraints{T}(nx, nu, N) where {T}
-        terminal_state = nothing
-        ρT = ones(T, nx)
-        zT = zeros(T, nx)
-        αT = zeros(T, nx)
+        terminal_state_projection = nothing
+        terminal_state_constraint = Constraint{T}(nx)
 
         input = nothing
         σ = [ones(T, nu) for _ in 1:N]
         w = [zeros(T, nu) for _ in 1:N]
         β = [zeros(T, nu) for _ in 1:N]
 
-        return new(terminal_state, ρT, zT, αT, input, σ, w, β)
+        return new(terminal_state_projection, terminal_state_constraint, input, σ, w, β)
     end
 end
 
@@ -42,8 +51,8 @@ function set_constraint_parameter!(parameter, dual, new_parameter)
 end
 
 function set_terminal_state_constraint_parameter!(workset, ρ_new)
-    @unpack αT, ρT = workset.constraints
-    set_constraint_parameter!(ρT, αT, ρ_new)
+    @unpack α, ρ = workset.constraints.terminal_state_constraint
+    set_constraint_parameter!(ρ, α, ρ_new)
     return nothing
 end
 
