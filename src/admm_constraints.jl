@@ -17,20 +17,16 @@ mutable struct Constraints{T}
     terminal_state_constraint::Constraint{T}
 
     input_projection::Union{Function,Nothing}
-    σ::Vector{Vector{T}}
-    w::Vector{Vector{T}}
-    β::Vector{Vector{T}}
+    input_constraint::Vector{Constraint{T}}
 
     function Constraints{T}(nx, nu, N) where {T}
         terminal_state_projection = nothing
         terminal_state_constraint = Constraint{T}(nx)
 
-        input = nothing
-        σ = [ones(T, nu) for _ in 1:N]
-        w = [zeros(T, nu) for _ in 1:N]
-        β = [zeros(T, nu) for _ in 1:N]
+        input_projection = nothing
+        input_constraint = [Constraint{T}(nu) for _ in 1:N]
 
-        return new(terminal_state_projection, terminal_state_constraint, input, σ, w, β)
+        return new(terminal_state_projection, terminal_state_constraint, input_projection, input_constraint)
     end
 end
 
@@ -56,9 +52,8 @@ function set_terminal_state_constraint_parameter!(workset, ρ_new)
     return nothing
 end
 
-function set_input_constraint_parameter!(workset, σ_new)
-    @unpack σ, β = workset.constraints
-    ThreadsX.map((σ_k, β_k) -> set_constraint_parameter!(σ_k, β_k, σ_new), σ, β)
+function set_input_constraint_parameter!(workset, ρ_new)
+    ThreadsX.map(c -> set_constraint_parameter!(c.ρ, c.α, ρ_new), workset.constraints.input_constraint)
     return nothing
 end
 
