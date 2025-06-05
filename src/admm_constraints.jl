@@ -40,20 +40,20 @@ function set_input_projection_function!(workset, Π::Function)
 end
 
 ## penalty parameter setting functions
-function set_constraint_parameter!(parameter, dual, new_parameter)
-    dual .*= parameter ./ new_parameter
-    parameter .= new_parameter
+function set_constraint_parameter!(constraint, ρ_new)
+    @unpack α, ρ = constraint
+    α .*= ρ ./ ρ_new
+    ρ .= ρ_new
     return nothing
 end
 
 function set_terminal_state_constraint_parameter!(workset, ρ_new)
-    @unpack α, ρ = workset.constraints.terminal_state_constraint
-    set_constraint_parameter!(ρ, α, ρ_new)
+    set_constraint_parameter!(workset.constraints.terminal_state_constraint, ρ_new)
     return nothing
 end
 
 function set_input_constraint_parameter!(workset, ρ_new)
-    ThreadsX.map(c -> set_constraint_parameter!(c.ρ, c.α, ρ_new), workset.constraints.input_constraint)
+    ThreadsX.map(constraint -> set_constraint_parameter!(constraint, ρ_new), workset.constraints.input_constraint)
     return nothing
 end
 
