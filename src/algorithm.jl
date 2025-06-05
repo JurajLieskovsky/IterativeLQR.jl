@@ -147,10 +147,10 @@ function trajectory_evaluation!(workset, running_cost, final_cost)
         l[k] = running_cost(x[k], u[k], k)
 
         if !isnothing(input_projection)
-            p[k] = evaluate_penalty(σ[k], u[k] - w[k], β[k])
+            p[k] = evaluate_penalty(σ[k], u[k], w[k], β[k])
 
             if isdirty(nominal_trajectory(workset))
-                p_ref[k] = evaluate_penalty(σ[k], u_ref[k] - w[k], β[k])
+                p_ref[k] = evaluate_penalty(σ[k], u_ref[k], w[k], β[k])
             end
         end
     end
@@ -158,10 +158,10 @@ function trajectory_evaluation!(workset, running_cost, final_cost)
     l[N+1] = final_cost(x[N+1], N + 1)
 
     if !isnothing(terminal_state_projection)
-        p[N+1] = evaluate_penalty(ρT, x[N+1] - zT, αT)
+        p[N+1] = evaluate_penalty(ρT, x[N+1], zT, αT)
 
         if isdirty(nominal_trajectory(workset))
-            p_ref[N+1] = evaluate_penalty(ρT, x_ref[N+1] - zT, αT)
+            p_ref[N+1] = evaluate_penalty(ρT, x_ref[N+1], zT, αT)
         end
     end
 

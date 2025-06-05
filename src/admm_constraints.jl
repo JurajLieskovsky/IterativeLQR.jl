@@ -60,8 +60,8 @@ function add_penalty_derivative!(gradient, hessian, parameter, primal, slack, du
     return nothing
 end
 
-function evaluate_penalty(parameter, residual, dual)
-    mapreduce((a, p) -> p / 2 * a^2, +, residual + dual, parameter)
+function evaluate_penalty(parameter, primal, slack, dual)
+    mapreduce((a, p) -> p / 2 * a^2, +, primal - slack + dual, parameter)
 end
 
 function update_slack_and_dual_variable!(projection, primal, slack, dual)
