@@ -4,7 +4,7 @@ struct Constraint{T}
     z::Vector{T} # slack variable
     α::Vector{T} # dual variable
 
-    function Constraint{T}(n) where T
+    function Constraint{T}(n) where {T}
         ρ = ones(T, n)
         z = zeros(T, n)
         α = zeros(T, n)
