@@ -96,8 +96,10 @@ function plotting_callback(workset)
 end
 
 # constraint projection functions
-terminal_state_projection(_) = [0, pi, 0, 0]
-input_projection(u) = map(u_k -> sign(u_k) * min(4.0, abs(u_k)), u)
+box_projection(y, y_max) = sign(y) * min(y_max, abs(y))
+
+terminal_state_projection(x) = [x[1], pi, 0, 0]
+input_projection(u) = map(u_k -> box_projection(u_k, 4.0), u)
 
 # Trajectory optimization
 workset = IterativeLQR.Workset{Float64}(4, 1, N)
