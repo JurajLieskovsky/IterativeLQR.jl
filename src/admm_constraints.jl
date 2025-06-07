@@ -43,6 +43,7 @@ end
 function set_constraint_parameter!(constraint, ρ_new)
     @unpack α, ρ = constraint
     α .*= ρ ./ ρ_new
+    α .= map(α_k -> isnan(α_k) ? 0 : α_k, α)
     ρ .= ρ_new
     return nothing
 end
