@@ -1,10 +1,10 @@
 # ADMM constraints
-struct Constraint{T}
+struct ADMMConstraint{T}
     ρ::Vector{T} # penalty parameter
     z::Vector{T} # slack variable
     α::Vector{T} # dual variable
 
-    function Constraint{T}(n) where {T}
+    function ADMMConstraint{T}(n) where {T}
         ρ = ones(T, n)
         z = zeros(T, n)
         α = zeros(T, n)
@@ -14,17 +14,17 @@ end
 
 mutable struct Constraints{T}
     terminal_state_projection::Union{Function,Nothing}
-    terminal_state_constraint::Constraint{T}
+    terminal_state_constraint::ADMMConstraint{T}
 
     input_projection::Union{Function,Nothing}
-    input_constraint::Vector{Constraint{T}}
+    input_constraint::Vector{ADMMConstraint{T}}
 
     function Constraints{T}(nx, nu, N) where {T}
         terminal_state_projection = nothing
-        terminal_state_constraint = Constraint{T}(nx)
+        terminal_state_constraint = ADMMConstraint{T}(nx)
 
         input_projection = nothing
-        input_constraint = [Constraint{T}(nu) for _ in 1:N]
+        input_constraint = [ADMMConstraint{T}(nu) for _ in 1:N]
 
         return new(terminal_state_projection, terminal_state_constraint, input_projection, input_constraint)
     end
