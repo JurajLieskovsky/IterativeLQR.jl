@@ -25,16 +25,19 @@ function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cos
 
     @unpack terminal_state_projection, terminal_state_constraint = workset.constraints
     @unpack input_projection, input_constraint = workset.constraints
+    @unpack state_projection, state_constraint = workset.constraints
 
     @threads for k in 1:N
         dynamics_diff!(fx[k], fu[k], x[k], u[k], k)
         running_cost_diff!(lx[k], lu[k], lxx[k], lxu[k], luu[k], x[k], u[k], k)
         isnothing(input_projection) || add_penalty_derivative!(lu[k], luu[k], input_constraint[k], u[k])
+        isnothing(state_projection) || add_penalty_derivative!(lx[k], lxx[k], state_constraint[k], x[k])
         lux[k] .= lxu[k]'
     end
 
     final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
     isnothing(terminal_state_projection) || add_penalty_derivative!(vx[N+1], vxx[N+1], terminal_state_constraint, x[N+1])
+    isnothing(state_projection) || add_penalty_derivative!(vx[N+1], vxx[N+1], state_constraint[N+1], x[N+1])
 
     return nothing
 end
@@ -48,16 +51,19 @@ function stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, f
 
     @unpack terminal_state_projection, terminal_state_constraint = workset.constraints
     @unpack input_projection, input_constraint = workset.constraints
-    @unpack lu, luu = workset.cost_derivatives
+    @unpack state_projection, state_constraint = workset.constraints
+    @unpack lx, lxx, lu, luu = workset.cost_derivatives
 
     @threads for k in 1:N
         dynamics_diff!(jac[k], x[k], u[k], k)
         running_cost_diff!(grad[k], hess[k], x[k], u[k], k)
         isnothing(input_projection) || add_penalty_derivative!(lu[k], luu[k], input_constraint[k], u[k])
+        isnothing(state_projection) || add_penalty_derivative!(lx[k], lxx[k], state_constraint[k], x[k])
     end
 
     final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
     isnothing(terminal_state_projection) || add_penalty_derivative!(vx[N+1], vxx[N+1], terminal_state_constraint, x[N+1])
+    isnothing(state_projection) || add_penalty_derivative!(vx[N+1], vxx[N+1], state_constraint[N+1], x[N+1])
 
     return nothing
 end
@@ -141,6 +147,7 @@ function trajectory_evaluation!(workset, running_cost, final_cost)
     @unpack x, u, l, p = active_trajectory(workset)
     @unpack terminal_state_projection, terminal_state_constraint = workset.constraints
     @unpack input_projection, input_constraint = workset.constraints
+    @unpack state_projection, state_constraint = workset.constraints
 
     x_ref = nominal_trajectory(workset).x
     u_ref = nominal_trajectory(workset).u
@@ -156,6 +163,14 @@ function trajectory_evaluation!(workset, running_cost, final_cost)
                 p_ref[k] = evaluate_penalty(input_constraint[k], u_ref[k])
             end
         end
+
+        if !isnothing(state_projection)
+            p[k] += evaluate_penalty(state_constraint[k], x[k])
+
+            if isdirty(nominal_trajectory(workset))
+                p_ref[k] += evaluate_penalty(state_constraint[k], x_ref[k])
+            end
+        end
     end
 
     l[N+1] = final_cost(x[N+1], N + 1)
@@ -168,6 +183,14 @@ function trajectory_evaluation!(workset, running_cost, final_cost)
         end
     end
 
+    if !isnothing(state_projection)
+        p[N+1] += evaluate_penalty(state_constraint[N+1], x[N+1])
+
+        if isdirty(nominal_trajectory(workset))
+            p_ref[N+1] += evaluate_penalty(state_constraint[N+1], x_ref[N+1])
+        end
+    end
+
     return nothing
 end
 
@@ -175,6 +198,7 @@ function slack_and_dual_variable_update!(workset)
     @unpack N = workset
     @unpack terminal_state_projection, terminal_state_constraint = workset.constraints
     @unpack input_projection, input_constraint = workset.constraints
+    @unpack state_projection, state_constraint = workset.constraints
     @unpack x, u = nominal_trajectory(workset)
 
     if !isnothing(terminal_state_projection)
@@ -184,6 +208,12 @@ function slack_and_dual_variable_update!(workset)
     if !isnothing(input_projection)
         @inbounds @threads for k in 1:N
             update_slack_and_dual_variable!(input_projection, input_constraint[k], u[k])
+        end
+    end
+
+    if !isnothing(state_projection)
+        @inbounds @threads for k in 1:N+1
+            update_slack_and_dual_variable!(state_projection, state_constraint[k], x[k])
         end
     end
 
