@@ -232,7 +232,7 @@ function print_iteration!(line_count, j, i, α, J, P, ΔJ, ΔP, Δv, l_inf, l_2,
         "outer", "inner", "α", "J", "P", "ΔJ", "ΔP", "ΔV", "l∞", "l2", "accepted", "diff", "reg", "bwd", "fwd"
     )
     @printf(
-        "%-9i%-9i %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9s %-9.3g %-9.3g %-9.3g %-9.3g\n",
+        "%-9i %-9i %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9s %-9.3g %-9.3g %-9.3g %-9.3g\n",
         j, i, α, J, P, ΔJ, ΔP, Δv, l_inf, l_2, accepted, diff, reg, bwd, fwd
     )
     line_count[] += 1
