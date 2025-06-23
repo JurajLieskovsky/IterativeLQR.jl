@@ -315,7 +315,7 @@ function iLQR!(
             # backward pass
             bwd = @elapsed backward_pass!(workset)
 
-            # maximum l_inf norm of policy update
+            # l_inf and l_2 norms of policy update
             l∞ = maximum(map(d -> maximum(abs.(d)), workset.policy_update.d))
             l2 = sqrt(mapreduce(d -> sum(d.^2), +, workset.policy_update.d))
 
