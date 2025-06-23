@@ -351,14 +351,10 @@ function iLQR!(
                 verbose && print_iteration!(line_count, j, i, α, J, P, ΔJ, ΔP, Δv, max_l_inf, accepted, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
                 logging && log_iteration!(dataframe, j, i, α, J, P, ΔJ, ΔP, Δv, max_l_inf, accepted)
 
-                # solution copying
+                # swap trajectories and plot
                 if accepted
-                    # plot trajectory
-                    (plotting_callback === nothing) || plotting_callback(workset)
-
-                    # swap nominal trajectory for active trajectory
-                    swap_trajectories!(workset)
-
+                    swap_trajectories!(workset) # swap nominal trajectory for active trajectory
+                    (plotting_callback === nothing) || plotting_callback(workset) # plot trajectory
                     break
                 end
             end
