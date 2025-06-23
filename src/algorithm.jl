@@ -325,21 +325,27 @@ function iLQR!(
 
                 fwd = @elapsed begin
                     successful = trajectory_update!(workset, dynamics!, state_difference, α)
-                    trajectory_evaluation!(workset, running_cost, final_cost)
                 end
 
-                # total cost and penalty sum
-                J = sum(active_trajectory(workset).l)
-                P = sum(active_trajectory(workset).p)
+                if !successful
+                    Δv, J, P, ΔJ, ΔP, accepted = NaN, NaN, NaN, NaN, NaN, false
+                else
+                    # expected improvement
+                    Δv = mapreduce(Δ -> α * Δ[1] + α^2 * Δ[2], +, workset.value_function.Δv)
 
-                ΔJ = J - sum(nominal_trajectory(workset).l)
-                ΔP = P - sum(nominal_trajectory(workset).p)
+                    # cost evaluation
+                    fwd += @elapsed trajectory_evaluation!(workset, running_cost, final_cost)
 
-                # expected improvement
-                Δv = mapreduce(Δ -> α * Δ[1] + α^2 * Δ[2], +, workset.value_function.Δv)
+                    # total cost and penalty sum
+                    J = sum(active_trajectory(workset).l)
+                    P = sum(active_trajectory(workset).p)
 
-                # iteration's evaluation
-                accepted = successful ? ((ΔJ + ΔP) < 0 && (ΔJ + ΔP) <= σ * Δv) : false
+                    ΔJ = J - sum(nominal_trajectory(workset).l)
+                    ΔP = P - sum(nominal_trajectory(workset).p)
+
+                    # iteration's evaluation
+                    accepted = (ΔJ + ΔP) < 0 && (ΔJ + ΔP) <= σ * Δv
+                end
 
                 # print and log
                 verbose && print_iteration!(line_count, j, i, α, J, P, ΔJ, ΔP, Δv, max_l_inf, accepted, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
