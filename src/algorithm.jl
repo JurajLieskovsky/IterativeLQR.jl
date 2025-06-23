@@ -226,14 +226,14 @@ end
 
 # printing and saving utilities
 
-function print_iteration!(line_count, j, i, α, J, P, ΔJ, ΔP, Δv, l_inf, accepted, diff, reg, bwd, fwd)
+function print_iteration!(line_count, j, i, α, J, P, ΔJ, ΔP, Δv, l_inf, l_2, accepted, diff, reg, bwd, fwd)
     line_count[] % 10 == 0 && @printf(
-        "%-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s\n",
-        "outer", "inner", "α", "J", "P", "ΔJ", "ΔP", "ΔV", "l∞", "accepted", "diff", "reg", "bwd", "fwd"
+        "%-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s\n",
+        "outer", "inner", "α", "J", "P", "ΔJ", "ΔP", "ΔV", "l∞", "l2", "accepted", "diff", "reg", "bwd", "fwd"
     )
     @printf(
-        "%-9i%-9i %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9s %-9.3g %-9.3g %-9.3g %-9.3g\n",
-        j, i, α, J, P, ΔJ, ΔP, Δv, l_inf, accepted, diff, reg, bwd, fwd
+        "%-9i%-9i %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9s %-9.3g %-9.3g %-9.3g %-9.3g\n",
+        j, i, α, J, P, ΔJ, ΔP, Δv, l_inf, l_2, accepted, diff, reg, bwd, fwd
     )
     line_count[] += 1
 end
@@ -241,12 +241,12 @@ end
 iteration_dataframe() = DataFrame(
     j=Int[], i=Int[], α=Float64[],
     J=Float64[], P=Float64[], ΔJ=Float64[], ΔP=Float64[], ΔV=Float64[],
-    max_l_inf=Float64[],
+    l_inf=Float64[], l_2=Float64[],
     accepted=Bool[]
 )
 
-function log_iteration!(dataframe, j, i, α, J, P, ΔJ, ΔP, Δv, l_inf, accepted)
-    push!(dataframe, (j, i, α, J, P, ΔJ, ΔP, Δv, l_inf, accepted))
+function log_iteration!(dataframe, j, i, α, J, P, ΔJ, ΔP, Δv, l_inf, l_2, accepted)
+    push!(dataframe, (j, i, α, J, P, ΔJ, ΔP, Δv, l_inf, l_2, accepted))
 end
 
 # algorithm
@@ -286,8 +286,8 @@ function iLQR!(
         slack_and_dual_variable_update!(workset)
 
         # print and log
-        verbose && print_iteration!(line_count, 0, 0, NaN, J, NaN, NaN, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
-        logging && log_iteration!(dataframe, 0, 0, NaN, J, NaN, NaN, NaN, NaN, NaN, successful)
+        verbose && print_iteration!(line_count, 0, 0, NaN, J, NaN, NaN, NaN, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
+        logging && log_iteration!(dataframe, 0, 0, NaN, J, NaN, NaN, NaN, NaN, NaN, NaN, successful)
 
         # plot trajectory
         (plotting_callback === nothing) || plotting_callback(workset)
@@ -317,6 +317,7 @@ function iLQR!(
 
             # maximum l_inf norm of policy update
             l∞ = maximum(map(d -> maximum(abs.(d)), workset.policy_update.d))
+            l2 = sqrt(mapreduce(d -> sum(d.^2), +, workset.policy_update.d))
 
             # forward pass
             accepted = false
@@ -348,8 +349,8 @@ function iLQR!(
                 end
 
                 # print and log
-                verbose && print_iteration!(line_count, j, i, α, J, P, ΔJ, ΔP, Δv, l∞, accepted, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
-                logging && log_iteration!(dataframe, j, i, α, J, P, ΔJ, ΔP, Δv, l∞, accepted)
+                verbose && print_iteration!(line_count, j, i, α, J, P, ΔJ, ΔP, Δv, l∞, l2, accepted, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
+                logging && log_iteration!(dataframe, j, i, α, J, P, ΔJ, ΔP, Δv, l∞, l2, accepted)
 
                 # swap trajectories and plot
                 if accepted
