@@ -310,7 +310,7 @@ function iLQR!(
             end
 
             # regularization
-            reg = (regularization == :none) ? NaN : @elapsed regularization!(workset, regularization_function!)
+            reg = regularization == :none ? NaN : @elapsed regularization!(workset, regularization_function!)
 
             # backward pass
             bwd = @elapsed backward_pass!(workset)
