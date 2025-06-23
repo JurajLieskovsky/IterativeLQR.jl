@@ -252,7 +252,7 @@ end
 # algorithm
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
-    maxouter=100, maxinner=20, σ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16), l_inf_threshold=1e-4,
+    maxouter=100, maxinner=20, σ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16), l∞_threshold=1e-4,
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
     stacked_derivatives=false, state_difference=-, regularization=:min
 )
@@ -316,7 +316,7 @@ function iLQR!(
             bwd = @elapsed backward_pass!(workset)
 
             # maximum l_inf norm of policy update
-            max_l_inf = maximum(map(d -> maximum(abs.(d)), workset.policy_update.d))
+            l∞ = maximum(map(d -> maximum(abs.(d)), workset.policy_update.d))
 
             # forward pass
             accepted = false
@@ -348,8 +348,8 @@ function iLQR!(
                 end
 
                 # print and log
-                verbose && print_iteration!(line_count, j, i, α, J, P, ΔJ, ΔP, Δv, max_l_inf, accepted, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
-                logging && log_iteration!(dataframe, j, i, α, J, P, ΔJ, ΔP, Δv, max_l_inf, accepted)
+                verbose && print_iteration!(line_count, j, i, α, J, P, ΔJ, ΔP, Δv, l∞, accepted, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
+                logging && log_iteration!(dataframe, j, i, α, J, P, ΔJ, ΔP, Δv, l∞, accepted)
 
                 # swap trajectories and plot
                 if accepted
@@ -359,7 +359,7 @@ function iLQR!(
                 end
             end
 
-            if (max_l_inf <= l_inf_threshold) || !accepted
+            if (l∞ <= l∞_threshold) || !accepted
                 break
             end
         end
