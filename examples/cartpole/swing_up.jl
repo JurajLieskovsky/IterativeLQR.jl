@@ -108,10 +108,10 @@ IterativeLQR.set_initial_state!(workset, x₀)
 IterativeLQR.set_initial_inputs!(workset, us₀)
 
 IterativeLQR.set_terminal_state_projection_function!(workset, terminal_state_projection)
-IterativeLQR.set_terminal_state_constraint_parameter!(workset, [0, 1e2, 1e2, 1e2])
+IterativeLQR.set_terminal_state_constraint_parameter!(workset, [0, 1e1, 1e1, 1e1])
 
 IterativeLQR.set_input_projection_function!(workset, input_projection)
-IterativeLQR.set_input_constraint_parameter!(workset, 1e-0)
+IterativeLQR.set_input_constraint_parameter!(workset, 1e-1)
 
 IterativeLQR.set_state_projection_function!(workset, state_projection)
 IterativeLQR.set_state_constraint_parameter!(workset, [1e-0, 0, 0, 0])
