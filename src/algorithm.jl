@@ -338,15 +338,8 @@ function iLQR!(
                 # expected improvement
                 Δv = mapreduce(Δ -> α * Δ[1] + α^2 * Δ[2], +, workset.value_function.Δv)
 
-                # error handling
-                if !successful
-                    verbose && print_iteration!(line_count, j, i, α, J, P, ΔJ, ΔP, Δv, max_l_inf, false, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
-                    logging && log_iteration!(dataframe, j, i, α, J, P, ΔJ, ΔP, Δv, max_l_inf, false)
-                    continue
-                end
-
                 # iteration's evaluation
-                accepted = (ΔJ + ΔP) < 0 && (ΔJ + ΔP) <= σ * Δv
+                accepted = successful ? ((ΔJ + ΔP) < 0 && (ΔJ + ΔP) <= σ * Δv) : false
 
                 # print and log
                 verbose && print_iteration!(line_count, j, i, α, J, P, ΔJ, ΔP, Δv, max_l_inf, accepted, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
