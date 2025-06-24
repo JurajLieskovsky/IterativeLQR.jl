@@ -229,6 +229,7 @@ function slack_and_dual_variable_update!(workset)
         s∞_state = mapreduce(c -> norm(c.s, Inf), max, state_constraint)
     end
 
+    # set penalties in trajectory as dirty
     for trajectory in workset.trajectory
         trajectory.isdirty[] = true
     end
