@@ -4,11 +4,16 @@ struct ADMMConstraint{T}
     z::Vector{T} # slack variable
     α::Vector{T} # dual variable
 
+    r::Vector{T} # primal residual
+    s::Vector{T} # dual residual
+
     function ADMMConstraint{T}(n) where {T}
         ρ = ones(T, n)
         z = zeros(T, n)
         α = zeros(T, n)
-        return new(ρ, z, α)
+        r = zeros(T, n)
+        s = zeros(T, n)
+        return new(ρ, z, α, r, s)
     end
 end
 
@@ -87,8 +92,16 @@ function evaluate_penalty(constraint, primal)
 end
 
 function update_slack_and_dual_variable!(projection, constraint, primal)
-    @unpack z, α = constraint
+    @unpack ρ, z, α, r, s = constraint
+
+    s .= -z
+
     z .= projection(primal + α)
-    α .+= primal - z
+    r .= primal - z
+    α .+= r
+
+    s .+= z
+    s .*= -ρ
+
     return nothing
 end
