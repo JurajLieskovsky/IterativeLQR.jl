@@ -91,6 +91,16 @@ function evaluate_penalty(constraint, primal)
     mapreduce((a, p) -> p / 2 * a^2, +, primal - z + α, ρ)
 end
 
+function update_penalty_parameter(ρ, r, s, μ=2, τ=1.1)
+    if abs(r) >= μ * abs(s)
+        ρ * τ
+    elseif abs(s) >= μ * abs(r)
+        ρ / τ
+    else
+        ρ
+    end
+end
+
 function update_slack_and_dual_variable!(projection, constraint, primal)
     @unpack ρ, z, α, r, s = constraint
 
@@ -102,6 +112,8 @@ function update_slack_and_dual_variable!(projection, constraint, primal)
 
     s .+= z
     s .*= -ρ
+
+    ρ .= update_penalty_parameter.(ρ, r, s)
 
     return nothing
 end
