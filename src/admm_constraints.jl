@@ -91,11 +91,11 @@ function evaluate_penalty(constraint, primal)
     mapreduce((a, p) -> p / 2 * a^2, +, primal - z + α, ρ)
 end
 
-function update_penalty_parameter(ρ, r, s, μ=4, τ=1.25)
+function update_penalty_parameter(ρ, r, s, μ=2, τ=1.1, ρ_max = 1e0, ρ_min = 1e-8)
     if abs(r) >= μ * abs(s)
-        ρ * τ
+        min(ρ * τ, ρ_max)
     elseif abs(s) >= μ * abs(r)
-        ρ / τ
+        max(ρ / τ, ρ_min)
     else
         ρ
     end
