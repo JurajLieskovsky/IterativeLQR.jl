@@ -113,7 +113,9 @@ function update_slack_and_dual_variable!(projection, constraint, primal)
     s .+= z
     s .*= -ρ
 
-    ρ .= update_penalty_parameter.(ρ, r, s)
+    ρ_new = update_penalty_parameter.(ρ, r, s)
+    α .*= ρ ./ ρ_new
+    ρ .= ρ_new
 
     return nothing
 end
