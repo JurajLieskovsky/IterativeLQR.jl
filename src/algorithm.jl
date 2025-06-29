@@ -194,7 +194,7 @@ function trajectory_evaluation!(workset, running_cost, final_cost)
     return nothing
 end
 
-function slack_and_dual_variable_update!(workset)
+function slack_and_dual_variable_update!(workset, adaptive)
     @unpack N = workset
     @unpack terminal_state_projection, terminal_state_constraint = workset.constraints
     @unpack input_projection, input_constraint = workset.constraints
@@ -204,7 +204,7 @@ function slack_and_dual_variable_update!(workset)
     r∞_term, s∞_term, r2_term, s2_term = NaN, NaN, NaN, NaN
 
     if !isnothing(terminal_state_projection)
-        update_slack_and_dual_variable!(terminal_state_projection, terminal_state_constraint, x[N+1])
+        update_slack_and_dual_variable!(terminal_state_projection, terminal_state_constraint, x[N+1], adaptive)
         r∞_term = norm(terminal_state_constraint.r, Inf)
         s∞_term = norm(terminal_state_constraint.s, Inf)
         r2_term = norm(terminal_state_constraint.r)
@@ -215,7 +215,7 @@ function slack_and_dual_variable_update!(workset)
 
     if !isnothing(input_projection)
         @inbounds @threads for k in 1:N
-            update_slack_and_dual_variable!(input_projection, input_constraint[k], u[k])
+            update_slack_and_dual_variable!(input_projection, input_constraint[k], u[k], adaptive)
         end
         r∞_input = mapreduce(c -> norm(c.r, Inf), max, input_constraint)
         s∞_input = mapreduce(c -> norm(c.s, Inf), max, input_constraint)
@@ -227,7 +227,7 @@ function slack_and_dual_variable_update!(workset)
 
     if !isnothing(state_projection)
         @inbounds @threads for k in 1:N+1
-            update_slack_and_dual_variable!(state_projection, state_constraint[k], x[k])
+            update_slack_and_dual_variable!(state_projection, state_constraint[k], x[k], adaptive)
         end
         r∞_state = mapreduce(c -> norm(c.r, Inf), max, state_constraint)
         s∞_state = mapreduce(c -> norm(c.s, Inf), max, state_constraint)
@@ -285,6 +285,7 @@ end
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
     maxouter=100, maxinner=20, σ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16), l∞_threshold=1e-4, l2_threshold=0,
+    adaptive = true,
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
     stacked_derivatives=false, state_difference=-, regularization=:min
 )
@@ -315,7 +316,7 @@ function iLQR!(
         J = sum(nominal_trajectory(workset).l)
 
         # update slack and dual variables
-        slack_and_dual_variable_update!(workset)
+        slack_and_dual_variable_update!(workset, adaptive)
 
         # print and log
         verbose && print_iteration!(line_count, 0, 0, NaN, J, NaN, NaN, NaN, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
@@ -398,7 +399,7 @@ function iLQR!(
         end
 
         # update slack and dual variable (based on nominal trajectory)
-        slack_and_dual_variable_update!(workset)
+        slack_and_dual_variable_update!(workset, adaptive)
     end
 
     if logging
