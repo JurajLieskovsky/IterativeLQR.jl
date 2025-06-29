@@ -100,7 +100,6 @@ function backward_pass!(workset)
         g .= grad[k] + jac[k]' * vx[k+1]
         H .= hess[k] + jac[k]' * vxx[k+1] * jac[k]
 
-
         # control update
         F = cholesky(Symmetric(quu))
         d[k] = -(F \ qu)
@@ -256,14 +255,14 @@ end
 
 # printing and saving utilities
 
-function print_iteration!(line_count, j, i, α, J, P, ΔJ, ΔP, Δv, l_inf, l_2, accepted, diff, reg, bwd, fwd)
+function print_iteration!(line_count, j, i, α, J, P, ΔJ, ΔP, Δv, l_inf, l_2, accepted, diff, reg, bwd, fwd, eval)
     line_count[] % 10 == 0 && @printf(
-        "%-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s\n",
-        "outer", "inner", "α", "J", "P", "ΔJ", "ΔP", "ΔV", "l∞", "l2", "accepted", "diff", "reg", "bwd", "fwd"
+        "%-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s\n",
+        "outer", "inner", "α", "J", "P", "ΔJ", "ΔP", "ΔV", "l∞", "l2", "accepted", "diff", "reg", "bwd", "fwd", "eval"
     )
     @printf(
-        "%-9i %-9i %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9s %-9.3g %-9.3g %-9.3g %-9.3g\n",
-        j, i, α, J, P, ΔJ, ΔP, Δv, l_inf, l_2, accepted, diff, reg, bwd, fwd
+        "%-9i %-9i %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9s %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g\n",
+        j, i, α, J, P, ΔJ, ΔP, Δv, l_inf, l_2, accepted, diff, reg, bwd, fwd, eval
     )
     line_count[] += 1
 end
@@ -317,7 +316,7 @@ function iLQR!(
         slack_and_dual_variable_update!(workset, adaptive)
 
         # print and log
-        verbose && print_iteration!(line_count, 0, 0, NaN, J, NaN, NaN, NaN, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
+        verbose && print_iteration!(line_count, 0, 0, NaN, J, NaN, NaN, NaN, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3, NaN)
         logging && log_iteration!(dataframe, 0, 0, NaN, J, NaN, NaN, NaN, NaN, NaN, NaN, successful)
 
         # plot trajectory
@@ -360,13 +359,13 @@ function iLQR!(
                 end
 
                 if !successful
-                    Δv, J, P, ΔJ, ΔP, accepted = NaN, NaN, NaN, NaN, NaN, false
+                    Δv, J, P, ΔJ, ΔP, accepted, eval = NaN, NaN, NaN, NaN, NaN, false, NaN
                 else
                     # expected improvement
                     Δv = mapreduce(Δ -> α * Δ[1] + α^2 * Δ[2], +, workset.value_function.Δv)
 
                     # cost evaluation
-                    fwd += @elapsed trajectory_evaluation!(workset, running_cost, final_cost)
+                    eval = @elapsed trajectory_evaluation!(workset, running_cost, final_cost)
 
                     # total cost and penalty sum
                     J = sum(active_trajectory(workset).l)
@@ -380,7 +379,7 @@ function iLQR!(
                 end
 
                 # print and log
-                verbose && print_iteration!(line_count, j, i, α, J, P, ΔJ, ΔP, Δv, l∞, l2, accepted, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
+                verbose && print_iteration!(line_count, j, i, α, J, P, ΔJ, ΔP, Δv, l∞, l2, accepted, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3, eval * 1e3)
                 logging && log_iteration!(dataframe, j, i, α, J, P, ΔJ, ΔP, Δv, l∞, l2, accepted)
 
                 # swap trajectories and plot
