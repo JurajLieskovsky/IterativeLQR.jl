@@ -91,15 +91,15 @@ function evaluate_penalty(constraint, primal)
     mapreduce((a, p) -> p / 2 * a^2, +, primal - z + α, ρ)
 end
 
-function update_penalty_parameter(ρ, r, s, rt=2, ϵ=1e-8, ρ_max=1e8, ρ_min=1e-8)
-    ρ *= ((r^2 + ϵ) / (s^2 + ϵ))^(1 / rt)
+function mul_update_penalty_parameter(ρ, r, s, ϵ=1e-8, ρ_max=1e8, ρ_min=1e-8)
+    ρ *= sqrt(r^2 + ϵ) / sqrt(s^2 + ϵ)
     return ρ <= ρ_min ? ρ_min : (ρ >= ρ_max ? ρ_max : ρ)
 end
 
-# function update_penalty_parameter(ρ, r, s, α=0.1, ρ_max=1e8, ρ_min=1e-8)
-#     ρ += α * (r^2 - s^2)
-#     return ρ <= ρ_min ? ρ_min : (ρ >= ρ_max ? ρ_max : ρ)
-# end
+function add_update_penalty_parameter(ρ, r, s, α=0.1, ρ_max=1e8, ρ_min=1e-8)
+    ρ += α * (r^2 - s^2)
+    return ρ <= ρ_min ? ρ_min : (ρ >= ρ_max ? ρ_max : ρ)
+end
 
 function update_slack_and_dual_variable!(projection, constraint, primal, adaptive)
     @unpack ρ, z, α, r, s = constraint
@@ -113,11 +113,16 @@ function update_slack_and_dual_variable!(projection, constraint, primal, adaptiv
     s .+= z
     s .*= -ρ
 
-    if adaptive
-        ρ_new = update_penalty_parameter.(ρ, r, s)
-        α .*= ρ ./ ρ_new
-        ρ .= ρ_new
+    if adaptive == :mul
+        ρ_new = mul_update_penalty_parameter.(ρ, r, s)
+    elseif adaptive == :add
+        ρ_new = add_update_penalty_parameter.(ρ, r, s)
+    else
+        return nothing
     end
+
+    α .*= ρ ./ ρ_new
+    ρ .= ρ_new
 
     return nothing
 end
