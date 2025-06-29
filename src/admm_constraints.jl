@@ -1,6 +1,6 @@
 # ADMM constraints
 struct ADMMConstraint{T}
-    ρ::Vector{T} # penalty parameter
+    ρ::Matrix{T} # penalty parameter
     z::Vector{T} # slack variable
     α::Vector{T} # dual variable
 
@@ -8,7 +8,7 @@ struct ADMMConstraint{T}
     s::Vector{T} # dual residual
 
     function ADMMConstraint{T}(n) where {T}
-        ρ = ones(T, n)
+        ρ = Matrix{T}(I, n, n)
         z = zeros(T, n)
         α = zeros(T, n)
         r = zeros(T, n)
@@ -57,7 +57,7 @@ end
 ## penalty parameter setting functions
 function set_constraint_parameter!(constraint, ρ_new)
     @unpack α, ρ = constraint
-    α .*= ρ ./ ρ_new
+    α .= inv(ρ_new) * ρ * α
     α .= map(α_k -> isnan(α_k) ? 0 : α_k, α)
     ρ .= ρ_new
     return nothing
@@ -81,24 +81,39 @@ end
 ## evaluation functions
 function add_penalty_derivative!(gradient, hessian, constraint, primal)
     @unpack ρ, z, α = constraint
-    gradient .+= (primal - z + α) .* ρ
-    hessian[diagind(hessian)] .+= ρ
+    gradient .+= ρ * (primal - z + α)
+    hessian .+= ρ
     return nothing
 end
 
 function evaluate_penalty(constraint, primal)
     @unpack ρ, z, α = constraint
-    mapreduce((a, p) -> p / 2 * a^2, +, primal - z + α, ρ)
+    arg = primal - z + α
+    return 0.5 * arg' * ρ * arg
 end
 
-function mul_update_penalty_parameter(ρ, r, s, ϵ=1e-8, ρ_max=1e8, ρ_min=1e-8)
-    ρ *= sqrt(r^2 + ϵ) / sqrt(s^2 + ϵ)
-    return ρ <= ρ_min ? ρ_min : (ρ >= ρ_max ? ρ_max : ρ)
+function mul_update_penalty_parameter(ρ, r, s, ϵ=1e-4, ρ_max=1e8, ρ_min=1e-8)
+    R = r * r' 
+    R[diagind(R)] .+= ϵ
+
+    S = s * s' 
+    S[diagind(S)] .+= ϵ
+
+    M = R * inv(S)
+
+    ρ_new = ρ * exp(0.01 * log(M))
+
+    λ, V = eigen(Symmetric(ρ_new))
+    λ_reg = map(e -> e < ρ_min ? ρ_min : (e > ρ_max ? ρ_max : e), λ)
+    return V * diagm(λ_reg) * V'
 end
 
 function add_update_penalty_parameter(ρ, r, s, α=0.1, ρ_max=1e8, ρ_min=1e-8)
-    ρ += α * (r^2 - s^2)
-    return ρ <= ρ_min ? ρ_min : (ρ >= ρ_max ? ρ_max : ρ)
+    ρ_new = ρ + α * (r * r' - s * s')
+
+    λ, V = eigen(Symmetric(ρ_new))
+    λ_reg = map(e -> e < ρ_min ? ρ_min : (e > ρ_max ? ρ_max : e), λ)
+    return V * diagm(λ_reg) * V'
 end
 
 function update_slack_and_dual_variable!(projection, constraint, primal, adaptive)
@@ -111,17 +126,17 @@ function update_slack_and_dual_variable!(projection, constraint, primal, adaptiv
     α .+= r
 
     s .+= z
-    s .*= -ρ
+    s .= -ρ * s
 
     if adaptive == :mul
-        ρ_new = mul_update_penalty_parameter.(ρ, r, s)
+        ρ_new = mul_update_penalty_parameter(ρ, r, s)
     elseif adaptive == :add
-        ρ_new = add_update_penalty_parameter.(ρ, r, s)
+        ρ_new = add_update_penalty_parameter(ρ, r, s)
     else
         return nothing
     end
 
-    α .*= ρ ./ ρ_new
+    α .= inv(ρ_new) * ρ * α
     ρ .= ρ_new
 
     return nothing
