@@ -238,14 +238,17 @@ end
 
 # printing and saving utilities
 
-function print_iteration!(line_count, j, i, α, J, P, ΔJ, ΔP, Δv, l_inf, l_2, accepted, diff, reg, bwd, fwd, eval)
+function print_iteration!(line_count, j, i, α, J, P, ΔJ, ΔP, Δv, l_inf, l_2, accepted, timer)
     line_count[] % 10 == 0 && @printf(
         "%-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s\n",
-        "outer", "inner", "α", "J", "P", "ΔJ", "ΔP", "ΔV", "l∞", "l2", "accepted", "diff", "reg", "bwd", "fwd", "eval"
+        "outer", "inner", "α", "J", "P", "ΔJ", "ΔP", "ΔV", "l∞", "l2", "accepted",
+        "diff", "reg", "bwd", "fwd", "eval"
     )
     @printf(
         "%-9i %-9i %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9s %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g\n",
-        j, i, α, J, P, ΔJ, ΔP, Δv, l_inf, l_2, accepted, diff, reg, bwd, fwd, eval
+        j, i, α, J, P, ΔJ, ΔP, Δv, l_inf, l_2, accepted,
+        timer[:diff] * 1e3, timer[:reg] * 1e3, timer[:bwd] * 1e3, timer[:fwd] * 1e3, timer[:eval] * 1e3
+
     )
     line_count[] += 1
 end
@@ -270,6 +273,7 @@ function iLQR!(
 )
     # line count for printing
     line_count = Ref(0)
+    timer = Dict(:diff => NaN, :reg => NaN, :bwd => NaN, :fwd => NaN, :eval => NaN)
 
     # dataframe for logging
     dataframe = logging ? iteration_dataframe() : nothing
@@ -287,7 +291,7 @@ function iLQR!(
     # initial trajectory rollout
     if rollout
         # rollout trajectory
-        rlt = @elapsed begin
+        timer[:fwd] = @elapsed begin
             successful = trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
         end
 
@@ -298,7 +302,7 @@ function iLQR!(
         slack_and_dual_variable_update!(workset, adaptive)
 
         # print and log
-        verbose && print_iteration!(line_count, 0, 0, NaN, J, NaN, NaN, NaN, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3, NaN)
+        verbose && print_iteration!(line_count, 0, 0, NaN, J, NaN, NaN, NaN, NaN, NaN, NaN, successful, timer)
         logging && log_iteration!(dataframe, 0, 0, NaN, J, NaN, NaN, NaN, NaN, NaN, NaN, successful)
 
         # plot trajectory
@@ -313,7 +317,7 @@ function iLQR!(
     for j in 1:maxouter
         for i in 1:maxinner
             # nominal trajectory differentiation
-            diff = @elapsed begin
+            timer[:diff] = @elapsed begin
                 if stacked_derivatives
                     stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
                 else
@@ -322,10 +326,10 @@ function iLQR!(
             end
 
             # regularization
-            reg = regularization == :none ? NaN : @elapsed regularization!(workset, regularization_function!)
+            timer[:reg] = regularization == :none ? NaN : @elapsed regularization!(workset, regularization_function!)
 
             # backward pass
-            bwd = @elapsed backward_pass!(workset)
+            timer[:bwd] = @elapsed backward_pass!(workset)
 
             # l_inf and l_2 norms of policy update
             l∞ = mapreduce(d -> norm(d, Inf), max, workset.policy_update.d)
@@ -336,9 +340,7 @@ function iLQR!(
 
             for α in α_values
 
-                fwd = @elapsed begin
-                    successful = trajectory_update!(workset, dynamics!, state_difference, α)
-                end
+                timer[:fwd] = @elapsed successful = trajectory_update!(workset, dynamics!, state_difference, α)
 
                 if !successful
                     Δv, J, P, ΔJ, ΔP, accepted, eval = NaN, NaN, NaN, NaN, NaN, false, NaN
@@ -347,7 +349,7 @@ function iLQR!(
                     Δv = mapreduce(Δ -> α * Δ[1] + α^2 * Δ[2], +, workset.value_function.Δv)
 
                     # cost evaluation
-                    eval = @elapsed trajectory_evaluation!(workset, running_cost, final_cost)
+                    timer[:eval] = @elapsed trajectory_evaluation!(workset, running_cost, final_cost)
 
                     # total cost and penalty sum
                     J = sum(active_trajectory(workset).l)
@@ -361,7 +363,7 @@ function iLQR!(
                 end
 
                 # print and log
-                verbose && print_iteration!(line_count, j, i, α, J, P, ΔJ, ΔP, Δv, l∞, l2, accepted, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3, eval * 1e3)
+                verbose && print_iteration!(line_count, j, i, α, J, P, ΔJ, ΔP, Δv, l∞, l2, accepted, timer)
                 logging && log_iteration!(dataframe, j, i, α, J, P, ΔJ, ΔP, Δv, l∞, l2, accepted)
 
                 # swap trajectories and plot
