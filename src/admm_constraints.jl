@@ -41,7 +41,9 @@ function set_terminal_state_projection_function!(workset, Π::Function)
 end
 
 function set_step_projection_function!(workset, Π::Function)
-    setproperty!(workset.constraints, :step_projection, Π)
+    @unpack nx, nu = workset
+    stacked_projection(arg) = Π(view(arg, 1:nx), view(arg, nx+1:nx+nu))
+    setproperty!(workset.constraints, :step_projection, stacked_projection)
 end
 
 ## penalty parameter setting functions

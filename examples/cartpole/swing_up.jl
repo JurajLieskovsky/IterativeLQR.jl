@@ -102,7 +102,7 @@ terminal_state_projection(x) = [x[1], pi, 0, 0]
 
 input_projection(u) = map(u_k -> box_projection(u_k, 4.0), u)
 state_projection(x) = [box_projection(x[1], 0.3), x[2], x[3], x[4]]
-step_projection(y) = vcat(state_projection(y[1:4]), input_projection(y[5:5]))
+step_projection(x, u) = vcat(state_projection(x), input_projection(u))
 
 # Trajectory optimization
 workset = IterativeLQR.Workset{Float64}(4, 1, N)
