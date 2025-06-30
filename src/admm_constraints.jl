@@ -21,17 +21,23 @@ mutable struct Constraints{T}
     terminal_state_projection::Union{Function,Nothing}
     terminal_state_constraint::ADMMConstraint{T}
 
-    step_projection::Union{Function,Nothing}
-    step_constraint::Vector{ADMMConstraint{T}}
+    input_projection::Union{Function,Nothing}
+    input_constraint::Vector{ADMMConstraint{T}}
+
+    state_projection::Union{Function,Nothing}
+    state_constraint::Vector{ADMMConstraint{T}}
 
     function Constraints{T}(nx, nu, N) where {T}
         terminal_state_projection = nothing
         terminal_state_constraint = ADMMConstraint{T}(nx)
 
-        step_projection = nothing
-        step_constraint = [ADMMConstraint{T}(nx + nu) for _ in 1:N]
+        input_projection = nothing
+        input_constraint = [ADMMConstraint{T}(nu) for _ in 1:N]
 
-        return new(terminal_state_projection, terminal_state_constraint, step_projection, step_constraint)
+        state_projection = nothing
+        state_constraint = [ADMMConstraint{T}(nx) for _ in 1:N]
+
+        return new(terminal_state_projection, terminal_state_constraint, input_projection, input_constraint, state_projection, state_constraint)
     end
 end
 
@@ -40,8 +46,12 @@ function set_terminal_state_projection_function!(workset, Π::Function)
     setproperty!(workset.constraints, :terminal_state_projection, Π)
 end
 
-function set_step_projection_function!(workset, Π::Function)
-    setproperty!(workset.constraints, :step_projection, Π)
+function set_input_projection_function!(workset, Π::Function)
+    setproperty!(workset.constraints, :input_projection, Π)
+end
+
+function set_state_projection_function!(workset, Π::Function)
+    setproperty!(workset.constraints, :state_projection, Π)
 end
 
 ## penalty parameter setting functions
@@ -58,8 +68,13 @@ function set_terminal_state_constraint_parameter!(workset, ρ_new)
     return nothing
 end
 
-function set_step_constraint_parameter!(workset, ρ_new)
-    ThreadsX.map(constraint -> set_constraint_parameter!(constraint, ρ_new), workset.constraints.step_constraint)
+function set_input_constraint_parameter!(workset, ρ_new)
+    ThreadsX.map(constraint -> set_constraint_parameter!(constraint, ρ_new), workset.constraints.input_constraint)
+    return nothing
+end
+
+function set_state_constraint_parameter!(workset, ρ_new)
+    ThreadsX.map(constraint -> set_constraint_parameter!(constraint, ρ_new), workset.constraints.state_constraint)
     return nothing
 end
 
