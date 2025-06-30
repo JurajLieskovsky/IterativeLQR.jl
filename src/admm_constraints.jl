@@ -2,7 +2,7 @@
 struct ADMMConstraint{T}
     ρ::Vector{T} # penalty parameter
     z::Vector{T} # slack variable
-    α::Vector{T} # dual variable
+    λ::Vector{T} # dual variable
 
     r::Vector{T} # primal residual
     s::Vector{T} # dual residual
@@ -10,10 +10,10 @@ struct ADMMConstraint{T}
     function ADMMConstraint{T}(n) where {T}
         ρ = ones(T, n)
         z = zeros(T, n)
-        α = zeros(T, n)
+        λ = zeros(T, n)
         r = zeros(T, n)
         s = zeros(T, n)
-        return new(ρ, z, α, r, s)
+        return new(ρ, z, λ, r, s)
     end
 end
 
@@ -56,9 +56,9 @@ end
 
 ## penalty parameter setting functions
 function set_constraint_parameter!(constraint, ρ_new)
-    @unpack α, ρ = constraint
-    α .*= ρ ./ ρ_new
-    α .= map(α_k -> isnan(α_k) ? 0 : α_k, α)
+    @unpack λ, ρ = constraint
+    λ .*= ρ ./ ρ_new
+    λ .= map(λ_k -> isnan(λ_k) ? 0 : λ_k, λ)
     ρ .= ρ_new
     return nothing
 end
@@ -80,15 +80,15 @@ end
 
 ## evaluation functions
 function add_penalty_derivative!(gradient, hessian, constraint, primal)
-    @unpack ρ, z, α = constraint
-    gradient .+= (primal - z + α) .* ρ
+    @unpack ρ, z, λ = constraint
+    gradient .+= (primal - z + λ) .* ρ
     hessian[diagind(hessian)] .+= ρ
     return nothing
 end
 
 function evaluate_penalty(constraint, primal)
-    @unpack ρ, z, α = constraint
-    mapreduce((a, p) -> p / 2 * a^2, +, primal - z + α, ρ)
+    @unpack ρ, z, λ = constraint
+    mapreduce((a, p) -> p / 2 * a^2, +, primal - z + λ, ρ)
 end
 
 function mul_update_penalty_parameter(ρ, r, s, η=0.1, ϵ=1e-8, ρ_max=1e8, ρ_min=1e-8)
@@ -96,19 +96,19 @@ function mul_update_penalty_parameter(ρ, r, s, η=0.1, ϵ=1e-8, ρ_max=1e8, ρ_
     return ρ <= ρ_min ? ρ_min : (ρ >= ρ_max ? ρ_max : ρ)
 end
 
-function add_update_penalty_parameter(ρ, r, s, α=0.1, ρ_max=1e8, ρ_min=1e-8)
-    ρ += α * (r^2 - s^2)
+function add_update_penalty_parameter(ρ, r, s, λ=0.1, ρ_max=1e8, ρ_min=1e-8)
+    ρ += λ * (r^2 - s^2)
     return ρ <= ρ_min ? ρ_min : (ρ >= ρ_max ? ρ_max : ρ)
 end
 
 function update_slack_and_dual_variable!(projection, constraint, primal, adaptive)
-    @unpack ρ, z, α, r, s = constraint
+    @unpack ρ, z, λ, r, s = constraint
 
     s .= -z
 
-    z .= projection(primal + α)
+    z .= projection(primal + λ)
     r .= primal - z
-    α .+= r
+    λ .+= r
 
     s .+= z
     s .*= -ρ
@@ -121,7 +121,7 @@ function update_slack_and_dual_variable!(projection, constraint, primal, adaptiv
         return nothing
     end
 
-    α .*= ρ ./ ρ_new
+    λ .*= ρ ./ ρ_new
     ρ .= ρ_new
 
     return nothing
