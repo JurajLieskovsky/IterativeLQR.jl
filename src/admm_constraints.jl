@@ -92,7 +92,7 @@ function evaluate_penalty(constraint, primal)
     return 0.5 * arg' * ρ * arg
 end
 
-function mul_update_penalty_parameter(ρ, r, s, ϵ=1e-4, ρ_max=1e8, ρ_min=1e-8)
+function mul_update_penalty_parameter(ρ, r, s, ϵ=1e-3, ρ_max=1e8, ρ_min=1e-8)
     R = r * r' 
     R[diagind(R)] .+= ϵ
 
@@ -101,7 +101,7 @@ function mul_update_penalty_parameter(ρ, r, s, ϵ=1e-4, ρ_max=1e8, ρ_min=1e-8
 
     M = R * inv(S)
 
-    ρ_new = ρ * exp(0.01 * log(M))
+    ρ_new = ρ * exp(0.02 * log(M))
 
     λ, V = eigen(Symmetric(ρ_new))
     λ_reg = map(e -> e < ρ_min ? ρ_min : (e > ρ_max ? ρ_max : e), λ)
