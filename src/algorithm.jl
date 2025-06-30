@@ -335,8 +335,8 @@ function iLQR!(
                     timer[:eval] = @elapsed J, P = trajectory_evaluation!(workset, running_cost, final_cost)
 
                     # total cost and penalty sum
-                    ΔJ = J - sum(nominal_trajectory(workset).l)
-                    ΔP = P - sum(nominal_trajectory(workset).p)
+                    ΔJ = J - ref_J 
+                    ΔP = P - ref_P
 
                     # iteration's evaluation
                     accepted = (ΔJ + ΔP) < 0 && (ΔJ + ΔP) <= σ * Δv
@@ -348,6 +348,7 @@ function iLQR!(
 
                 # swap trajectories and plot
                 if accepted
+                    ref_J, ref_P = J, P
                     swap_trajectories!(workset) # swap nominal trajectory for active trajectory
                     (plotting_callback === nothing) || plotting_callback(workset) # plot trajectory
                     break
