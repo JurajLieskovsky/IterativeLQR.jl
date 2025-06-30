@@ -209,7 +209,7 @@ end
 function print_iteration!(line_count, j, i, α, J, P, ΔJPΔV, d_inf, accepted, timer)
     line_count[] % 10 == 0 && @printf(
         "%-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-8s %-8s %-8s %-8s\n",
-        "outer", "inner", "α", "J", "P", "ΔJPΔV", "l∞", "accepted",
+        "outer", "inner", "α", "J", "P", "ΔJPΔV", "d_∞", "accepted",
         "diff", "reg", "bwd", "fwd", "eval"
     )
     @printf(
@@ -291,7 +291,7 @@ function iLQR!(
             timer[:reg] = regularization == :none ? NaN : @elapsed regularization!(workset, regularization_function!)
 
             # backward pass
-            timer[:bwd] = @elapsed Δv1, Δv2, d∞ = backward_pass!(workset)
+            timer[:bwd] = @elapsed Δv1, Δv2, d_∞ = backward_pass!(workset)
 
             # forward pass
             accepted = false
@@ -319,8 +319,8 @@ function iLQR!(
                 end
 
                 # print and log
-                verbose && print_iteration!(line_count, j, i, α, J, P, ΔJPΔV, d∞, accepted, timer)
-                logging && log_iteration!(dataframe, j, i, α, J, P, ΔJ, ΔP, ΔV, d∞, accepted)
+                verbose && print_iteration!(line_count, j, i, α, J, P, ΔJPΔV, d_∞, accepted, timer)
+                logging && log_iteration!(dataframe, j, i, α, J, P, ΔJ, ΔP, ΔV, d_∞, accepted)
 
                 # swap trajectories and plot
                 if accepted
@@ -331,7 +331,7 @@ function iLQR!(
                 end
             end
 
-            if (d∞ <= l∞_threshold) || !accepted
+            if (d_∞ <= l∞_threshold) || !accepted
                 break
             end
         end
