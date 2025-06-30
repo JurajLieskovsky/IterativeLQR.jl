@@ -1,6 +1,6 @@
 function trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
     @unpack N = workset
-    @unpack x, u, l, p = active_trajectory(workset)
+    @unpack x, u, l, p = nominal_trajectory(workset)
     @unpack terminal_state_projection, terminal_state_constraint = workset.constraints
     @unpack input_projection, input_constraint = workset.constraints
     @unpack state_projection, state_constraint = workset.constraints
@@ -28,7 +28,7 @@ function trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
         p[N+1] = evaluate_penalty(terminal_state_constraint, x[N+1])
     end
 
-    return true
+    return true, sum(l), sum(p)
 end
 
 function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
@@ -177,7 +177,7 @@ function trajectory_evaluation!(workset, running_cost, final_cost)
         p[N+1] = evaluate_penalty(terminal_state_constraint, x[N+1])
     end
 
-    return nothing
+    return sum(l), sum(p)
 end
 
 function slack_and_dual_variable_update!(workset, adaptive)
@@ -221,7 +221,7 @@ function slack_and_dual_variable_update!(workset, adaptive)
     @printf("%-9s %-9s %-9s %-9s\n", "rk_∞", "sk_∞", "rN_∞", "sN_∞")
     @printf("%-9.3g %-9.3g %-9.3g %-9.3g\n", rk_∞, sk_∞, rN_∞, sN_∞)
 
-    return
+    return sum(p)
 end
 
 # printing and saving utilities
@@ -279,16 +279,18 @@ function iLQR!(
     # initial trajectory rollout
     if rollout
         # rollout trajectory
-        timer[:fwd] = @elapsed begin
-            successful = trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
-        end
+        timer[:fwd] = @elapsed successful, ref_J, ref_P = trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
 
-        # calculate preliminary total cost
-        J = sum(nominal_trajectory(workset).l)
+        ## print and log
+        verbose && print_iteration!(line_count, 0, 0, NaN, ref_J, ref_P, NaN, NaN, NaN, NaN, NaN, successful, timer)
+        logging && log_iteration!(dataframe, 0, 0, NaN, ref_J, ref_P, NaN, NaN, NaN, NaN, NaN, successful)
 
-        # print and log
-        verbose && print_iteration!(line_count, 0, 0, NaN, J, NaN, NaN, NaN, NaN, NaN, NaN, successful, timer)
-        logging && log_iteration!(dataframe, 0, 0, NaN, J, NaN, NaN, NaN, NaN, NaN, NaN, successful)
+        # update constraint
+        ref_P = slack_and_dual_variable_update!(workset, :none)
+
+        ## print and log
+        verbose && print_iteration!(line_count, 0, 0, NaN, ref_J, ref_P, NaN, NaN, NaN, NaN, NaN, successful, timer)
+        logging && log_iteration!(dataframe, 0, 0, NaN, ref_J, ref_P, NaN, NaN, NaN, NaN, NaN, successful)
 
         # plot trajectory
         (plotting_callback === nothing) || plotting_callback(workset)
@@ -334,12 +336,9 @@ function iLQR!(
                     Δv = mapreduce(Δ -> α * Δ[1] + α^2 * Δ[2], +, workset.value_function.Δv)
 
                     # cost evaluation
-                    timer[:eval] = @elapsed trajectory_evaluation!(workset, running_cost, final_cost)
+                    timer[:eval] = @elapsed J, P = trajectory_evaluation!(workset, running_cost, final_cost)
 
                     # total cost and penalty sum
-                    J = sum(active_trajectory(workset).l)
-                    P = sum(active_trajectory(workset).p)
-
                     ΔJ = J - sum(nominal_trajectory(workset).l)
                     ΔP = P - sum(nominal_trajectory(workset).p)
 
@@ -365,7 +364,7 @@ function iLQR!(
         end
 
         # update slack and dual variable (based on nominal trajectory)
-        slack_and_dual_variable_update!(workset, adaptive)
+        ref_P = slack_and_dual_variable_update!(workset, adaptive)
     end
 
     if logging
