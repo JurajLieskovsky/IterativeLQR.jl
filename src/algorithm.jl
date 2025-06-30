@@ -281,14 +281,10 @@ function iLQR!(
         # rollout trajectory
         timer[:fwd] = @elapsed successful, ref_J, ref_P = trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
 
-        ## print and log
-        verbose && print_iteration!(line_count, 0, 0, NaN, ref_J, ref_P, NaN, NaN, NaN, NaN, NaN, successful, timer)
-        logging && log_iteration!(dataframe, 0, 0, NaN, ref_J, ref_P, NaN, NaN, NaN, NaN, NaN, successful)
-
         # update constraint
         ref_P = slack_and_dual_variable_update!(workset, :none)
 
-        ## print and log
+        # print and log
         verbose && print_iteration!(line_count, 0, 0, NaN, ref_J, ref_P, NaN, NaN, NaN, NaN, NaN, successful, timer)
         logging && log_iteration!(dataframe, 0, 0, NaN, ref_J, ref_P, NaN, NaN, NaN, NaN, NaN, successful)
 
