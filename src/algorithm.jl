@@ -1,17 +1,32 @@
 function trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
     @unpack N = workset
-    @unpack x, u, l = nominal_trajectory(workset)
+    @unpack x, u, l, p = active_trajectory(workset)
+    @unpack terminal_state_projection, terminal_state_constraint = workset.constraints
+    @unpack input_projection, input_constraint = workset.constraints
+    @unpack state_projection, state_constraint = workset.constraints
 
     @inbounds for k in 1:N
         try
             dynamics!(x[k+1], x[k], u[k], k)
             l[k] = running_cost(x[k], u[k], k)
+
+            if !isnothing(input_projection)
+                p[k] = evaluate_penalty(input_constraint[k], u[k])
+            end
+
+            if !isnothing(state_projection)
+                p[k] += evaluate_penalty(state_constraint[k], x[k])
+            end
         catch
             return false
         end
     end
 
     l[N+1] = final_cost(x[N+1], N + 1)
+
+    if !isnothing(terminal_state_projection)
+        p[N+1] = evaluate_penalty(terminal_state_constraint, x[N+1])
+    end
 
     return true
 end
@@ -270,9 +285,6 @@ function iLQR!(
 
         # calculate preliminary total cost
         J = sum(nominal_trajectory(workset).l)
-
-        # update slack and dual variables
-        slack_and_dual_variable_update!(workset, adaptive)
 
         # print and log
         verbose && print_iteration!(line_count, 0, 0, NaN, J, NaN, NaN, NaN, NaN, NaN, NaN, successful, timer)
