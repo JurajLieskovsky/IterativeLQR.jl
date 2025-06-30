@@ -111,14 +111,20 @@ IterativeLQR.set_terminal_state_projection_function!(workset, terminal_state_pro
 IterativeLQR.set_terminal_state_constraint_parameter!(workset, [1e1, 1e1, 1e1, 1e1])
 
 IterativeLQR.set_input_projection_function!(workset, input_projection)
-IterativeLQR.set_input_constraint_parameter!(workset, 1e-2)
+IterativeLQR.set_input_constraint_parameter!(workset, 1e-8)
 
 IterativeLQR.set_state_projection_function!(workset, state_projection)
 IterativeLQR.set_state_constraint_parameter!(workset, [1e-4, 1e-4, 1e-4, 1e-4])
 
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    stacked_derivatives=true, regularization=:min, maxouter=200,
+    stacked_derivatives=true, regularization=:min, adaptive=:add, maxouter=10, maxinner=200,
+    verbose=true, logging=true, plotting_callback=plotting_callback
+)
+
+df = IterativeLQR.iLQR!(
+    workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
+    stacked_derivatives=true, regularization=:min, adaptive=:mul, maxouter=20, maxinner=200,
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
