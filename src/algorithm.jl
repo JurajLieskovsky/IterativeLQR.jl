@@ -281,8 +281,7 @@ end
 # algorithm
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
-    maxouter=100, maxinner=20, σ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16), l∞_threshold=1e-6, l2_threshold=0,
-    adaptive = :add,
+    maxouter=100, maxinner=20, σ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16), l∞_threshold=1e-6, adaptive=:mul,
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
     stacked_derivatives=false, state_difference=-, regularization=:min
 )
@@ -390,7 +389,7 @@ function iLQR!(
                 end
             end
 
-            if (l∞ <= l∞_threshold) || (l2 <= l2_threshold) || !accepted
+            if (l∞ <= l∞_threshold) || !accepted
                 break
             end
         end
