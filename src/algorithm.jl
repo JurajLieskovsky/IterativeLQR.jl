@@ -198,32 +198,30 @@ function slack_and_dual_variable_update!(workset, adaptive)
     @unpack state_projection, state_constraint = workset.constraints
     @unpack x, u = nominal_trajectory(workset)
 
-    r∞_term, s∞_term = NaN, NaN
+    rN_∞, sN_∞ = 0, 0
 
     if !isnothing(terminal_state_projection)
         update_slack_and_dual_variable!(terminal_state_projection, terminal_state_constraint, x[N+1], adaptive)
-        r∞_term = norm(terminal_state_constraint.r, Inf)
-        s∞_term = norm(terminal_state_constraint.s, Inf)
+        rN_∞ = max(rN_∞, norm(terminal_state_constraint.r, Inf))
+        sN_∞ = max(sN_∞, norm(terminal_state_constraint.s, Inf))
     end
 
-    r∞_input, s∞_input = NaN, NaN
+    rk_∞, sk_∞ = 0, 0
 
     if !isnothing(input_projection)
         @inbounds @threads for k in 1:N
             update_slack_and_dual_variable!(input_projection, input_constraint[k], u[k], adaptive)
         end
-        r∞_input = mapreduce(c -> norm(c.r, Inf), max, input_constraint)
-        s∞_input = mapreduce(c -> norm(c.s, Inf), max, input_constraint)
+        rk_∞ = max(rk_∞, mapreduce(c -> norm(c.r, Inf), max, input_constraint))
+        sk_∞ = max(sk_∞, mapreduce(c -> norm(c.s, Inf), max, input_constraint))
     end
-
-    r∞_state, s∞_state = NaN, NaN
 
     if !isnothing(state_projection)
         @inbounds @threads for k in 1:N+1
             update_slack_and_dual_variable!(state_projection, state_constraint[k], x[k], adaptive)
         end
-        r∞_state = mapreduce(c -> norm(c.r, Inf), max, state_constraint)
-        s∞_state = mapreduce(c -> norm(c.s, Inf), max, state_constraint)
+        rk_∞ = max(rk_∞, mapreduce(c -> norm(c.r, Inf), max, state_constraint))
+        sk_∞ = max(sk_∞, mapreduce(c -> norm(c.s, Inf), max, state_constraint))
     end
 
     # set penalties in trajectory as dirty
@@ -232,15 +230,8 @@ function slack_and_dual_variable_update!(workset, adaptive)
     end
 
     # print update
-    @printf(
-        "%-9s %-9s %-9s %-9s %-9s %-9s\n",
-        "r∞_term", "s∞_term", "r∞_input", "s∞_input", "r∞_state", "s∞_state",
-    )
-
-    @printf(
-        "%-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g\n",
-        r∞_term, s∞_term, r∞_input, s∞_input, r∞_state, s∞_state,
-    )
+    @printf("%-9s %-9s %-9s %-9s\n", "rk_∞", "sk_∞", "rN_∞", "sN_∞")
+    @printf("%-9.3g %-9.3g %-9.3g %-9.3g\n", rk_∞, sk_∞, rN_∞, sN_∞)
 
     return
 end
