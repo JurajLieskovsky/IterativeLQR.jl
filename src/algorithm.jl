@@ -127,7 +127,10 @@ function backward_pass!(workset)
         Δv[k][2] = 0.5 * d[k]' * quu * d[k]
     end
 
-    return nothing
+    Δ1 = mapreduce(Δ -> Δ[1], +, workset.value_function.Δv)
+    Δ2 = mapreduce(Δ -> Δ[2], +, workset.value_function.Δv)
+
+    return Δ1, Δ2, mapreduce(d_k -> mapreduce(abs, max, d_k), max, d)
 end
 
 function trajectory_update!(workset, dynamics!, difference, α)
@@ -226,17 +229,16 @@ end
 
 # printing and saving utilities
 
-function print_iteration!(line_count, j, i, α, J, P, ΔJ, ΔP, Δv, l_inf, l_2, accepted, timer)
+function print_iteration!(line_count, j, i, α, J, P, ΔJPΔV, d_inf, accepted, timer)
     line_count[] % 10 == 0 && @printf(
-        "%-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s\n",
-        "outer", "inner", "α", "J", "P", "ΔJ", "ΔP", "ΔV", "l∞", "l2", "accepted",
+        "%-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-8s %-8s %-8s %-8s\n",
+        "outer", "inner", "α", "J", "P", "ΔJPΔV", "l∞", "accepted",
         "diff", "reg", "bwd", "fwd", "eval"
     )
     @printf(
-        "%-9i %-9i %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9s %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g\n",
-        j, i, α, J, P, ΔJ, ΔP, Δv, l_inf, l_2, accepted,
+        "%-9i %-9i %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9s %-9.3g %-8.2g %-8.2g %-8.2g %-8.2g\n",
+        j, i, α, J, P, ΔJPΔV, d_inf, accepted,
         timer[:diff] * 1e3, timer[:reg] * 1e3, timer[:bwd] * 1e3, timer[:fwd] * 1e3, timer[:eval] * 1e3
-
     )
     line_count[] += 1
 end
@@ -244,12 +246,12 @@ end
 iteration_dataframe() = DataFrame(
     j=Int[], i=Int[], α=Float64[],
     J=Float64[], P=Float64[], ΔJ=Float64[], ΔP=Float64[], ΔV=Float64[],
-    l_inf=Float64[], l_2=Float64[],
+    l_inf=Float64[],
     accepted=Bool[]
 )
 
-function log_iteration!(dataframe, j, i, α, J, P, ΔJ, ΔP, Δv, l_inf, l_2, accepted)
-    push!(dataframe, (j, i, α, J, P, ΔJ, ΔP, Δv, l_inf, l_2, accepted))
+function log_iteration!(dataframe, j, i, α, J, P, ΔJ, ΔP, Δv, d_inf, accepted)
+    push!(dataframe, (j, i, α, J, P, ΔJ, ΔP, Δv, d_inf, accepted))
 end
 
 # algorithm
@@ -285,8 +287,8 @@ function iLQR!(
         ref_P = slack_and_dual_variable_update!(workset, :none)
 
         # print and log
-        verbose && print_iteration!(line_count, 0, 0, NaN, ref_J, ref_P, NaN, NaN, NaN, NaN, NaN, successful, timer)
-        logging && log_iteration!(dataframe, 0, 0, NaN, ref_J, ref_P, NaN, NaN, NaN, NaN, NaN, successful)
+        verbose && print_iteration!(line_count, 0, 0, NaN, ref_J, ref_P, NaN, NaN, successful, timer)
+        logging && log_iteration!(dataframe, 0, 0, NaN, ref_J, ref_P, NaN, NaN, NaN, NaN, successful)
 
         # plot trajectory
         (plotting_callback === nothing) || plotting_callback(workset)
@@ -312,11 +314,7 @@ function iLQR!(
             timer[:reg] = regularization == :none ? NaN : @elapsed regularization!(workset, regularization_function!)
 
             # backward pass
-            timer[:bwd] = @elapsed backward_pass!(workset)
-
-            # l_inf and l_2 norms of policy update
-            l∞ = mapreduce(d -> norm(d, Inf), max, workset.policy_update.d)
-            l2 = sqrt(mapreduce(d -> sum(d .^ 2), +, workset.policy_update.d))
+            timer[:bwd] = @elapsed Δv1, Δv2, d∞ = backward_pass!(workset)
 
             # forward pass
             accepted = false
@@ -326,25 +324,26 @@ function iLQR!(
                 timer[:fwd] = @elapsed successful = trajectory_update!(workset, dynamics!, state_difference, α)
 
                 if !successful
-                    Δv, J, P, ΔJ, ΔP, accepted, eval = NaN, NaN, NaN, NaN, NaN, false, NaN
+                    ΔV, J, P, ΔJ, ΔP, accepted, eval = NaN, NaN, NaN, NaN, NaN, false, NaN
                 else
                     # expected improvement
-                    Δv = mapreduce(Δ -> α * Δ[1] + α^2 * Δ[2], +, workset.value_function.Δv)
 
                     # cost evaluation
                     timer[:eval] = @elapsed J, P = trajectory_evaluation!(workset, running_cost, final_cost)
 
                     # total cost and penalty sum
-                    ΔJ = J - ref_J 
+                    ΔJ = J - ref_J
                     ΔP = P - ref_P
+                    ΔV = α * Δv1 + α^2 * Δv2
+                    ΔJPΔV = (ΔJ + ΔP) / ΔV
 
                     # iteration's evaluation
-                    accepted = (ΔJ + ΔP) < 0 && (ΔJ + ΔP) <= σ * Δv
+                    accepted = (ΔJ + ΔP) < 0 && ΔJPΔV >= σ
                 end
 
                 # print and log
-                verbose && print_iteration!(line_count, j, i, α, J, P, ΔJ, ΔP, Δv, l∞, l2, accepted, timer)
-                logging && log_iteration!(dataframe, j, i, α, J, P, ΔJ, ΔP, Δv, l∞, l2, accepted)
+                verbose && print_iteration!(line_count, j, i, α, J, P, ΔJPΔV, d∞, accepted, timer)
+                logging && log_iteration!(dataframe, j, i, α, J, P, ΔJ, ΔP, ΔV, d∞, accepted)
 
                 # swap trajectories and plot
                 if accepted
@@ -355,7 +354,7 @@ function iLQR!(
                 end
             end
 
-            if (l∞ <= l∞_threshold) || !accepted
+            if (d∞ <= l∞_threshold) || !accepted
                 break
             end
         end
