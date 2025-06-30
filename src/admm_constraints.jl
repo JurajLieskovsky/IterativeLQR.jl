@@ -82,6 +82,11 @@ function mul_update_penalty_parameter(ρ, r, s, η=0.1, ϵ=1e-12, ρ_max=1e8, ρ
     r = max(abs(r), ϵ)
     s = max(abs(s), ϵ)
     ρ *= exp(η * log(r^2 / s^2))
+
+    # r2 = max(r^2, ϵ)
+    # s2 = max(s^2, ϵ)
+    # ρ *= exp(η * log(r2 / s2))
+
     return ρ <= ρ_min ? ρ_min : (ρ >= ρ_max ? ρ_max : ρ)
 end
 
