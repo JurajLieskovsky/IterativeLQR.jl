@@ -144,27 +144,15 @@ function trajectory_evaluation!(workset, running_cost, final_cost)
     @unpack input_projection, input_constraint = workset.constraints
     @unpack state_projection, state_constraint = workset.constraints
 
-    x_ref = nominal_trajectory(workset).x
-    u_ref = nominal_trajectory(workset).u
-    p_ref = nominal_trajectory(workset).p
-
     @inbounds @threads for k in 1:N
         l[k] = running_cost(x[k], u[k], k)
 
         if !isnothing(input_projection)
             p[k] = evaluate_penalty(input_constraint[k], u[k])
-
-            if isdirty(nominal_trajectory(workset))
-                p_ref[k] = evaluate_penalty(input_constraint[k], u_ref[k])
-            end
         end
 
         if !isnothing(state_projection)
             p[k] += evaluate_penalty(state_constraint[k], x[k])
-
-            if isdirty(nominal_trajectory(workset))
-                p_ref[k] += evaluate_penalty(state_constraint[k], x_ref[k])
-            end
         end
     end
 
@@ -172,10 +160,6 @@ function trajectory_evaluation!(workset, running_cost, final_cost)
 
     if !isnothing(terminal_state_projection)
         p[N+1] = evaluate_penalty(terminal_state_constraint, x[N+1])
-
-        if isdirty(nominal_trajectory(workset))
-            p_ref[N+1] = evaluate_penalty(terminal_state_constraint, x_ref[N+1])
-        end
     end
 
     return nothing
@@ -186,21 +170,14 @@ function slack_and_dual_variable_update!(workset, adaptive)
     @unpack terminal_state_projection, terminal_state_constraint = workset.constraints
     @unpack input_projection, input_constraint = workset.constraints
     @unpack state_projection, state_constraint = workset.constraints
-    @unpack x, u = nominal_trajectory(workset)
-
-    rN_∞, sN_∞ = 0, 0
-
-    if !isnothing(terminal_state_projection)
-        update_slack_and_dual_variable!(terminal_state_projection, terminal_state_constraint, x[N+1], adaptive)
-        rN_∞ = max(rN_∞, norm(terminal_state_constraint.r, Inf))
-        sN_∞ = max(sN_∞, norm(terminal_state_constraint.s, Inf))
-    end
+    @unpack x, u, p = nominal_trajectory(workset)
 
     rk_∞, sk_∞ = 0, 0
 
     if !isnothing(input_projection)
         @inbounds @threads for k in 1:N
             update_slack_and_dual_variable!(input_projection, input_constraint[k], u[k], adaptive)
+            p[k] = evaluate_penalty(input_constraint[k], u[k])
         end
         rk_∞ = max(rk_∞, mapreduce(c -> norm(c.r, Inf), max, input_constraint))
         sk_∞ = max(sk_∞, mapreduce(c -> norm(c.s, Inf), max, input_constraint))
@@ -209,14 +186,20 @@ function slack_and_dual_variable_update!(workset, adaptive)
     if !isnothing(state_projection)
         @inbounds @threads for k in 1:N
             update_slack_and_dual_variable!(state_projection, state_constraint[k], x[k], adaptive)
+            p[k] += evaluate_penalty(state_constraint[k], x[k])
         end
         rk_∞ = max(rk_∞, mapreduce(c -> norm(c.r, Inf), max, state_constraint))
         sk_∞ = max(sk_∞, mapreduce(c -> norm(c.s, Inf), max, state_constraint))
     end
 
-    # set penalties in trajectory as dirty
-    for trajectory in workset.trajectory
-        trajectory.isdirty[] = true
+    rN_∞, sN_∞ = 0, 0
+
+    if !isnothing(terminal_state_projection)
+        update_slack_and_dual_variable!(terminal_state_projection, terminal_state_constraint, x[N+1], adaptive)
+        p[N+1] = evaluate_penalty(terminal_state_constraint, x[N+1])
+
+        rN_∞ = max(rN_∞, norm(terminal_state_constraint.r, Inf))
+        sN_∞ = max(sN_∞, norm(terminal_state_constraint.s, Inf))
     end
 
     # print update
