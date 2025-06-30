@@ -118,7 +118,7 @@ IterativeLQR.set_input_constraint_parameter!(workset, 1e-2)
 
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    stacked_derivatives=true, regularization=:min, adaptive=:mul, maxouter=20, maxinner=200,
+    stacked_derivatives=true, regularization=:none, adaptive=:mul, maxouter=20, maxinner=200, l∞_threshold=1e-3,
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
