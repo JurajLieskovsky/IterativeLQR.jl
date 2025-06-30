@@ -99,8 +99,10 @@ end
 box_projection(y, y_max) = sign(y) * min(y_max, abs(y))
 
 terminal_state_projection(x) = [x[1], pi, 0, 0]
+
 input_projection(u) = map(u_k -> box_projection(u_k, 4.0), u)
 state_projection(x) = [box_projection(x[1], 0.3), x[2], x[3], x[4]]
+step_projection(y) = vcat(state_projection(y[1:4]), input_projection(y[5:5]))
 
 # Trajectory optimization
 workset = IterativeLQR.Workset{Float64}(4, 1, N)
@@ -110,11 +112,8 @@ IterativeLQR.set_initial_inputs!(workset, us₀)
 IterativeLQR.set_terminal_state_projection_function!(workset, terminal_state_projection)
 IterativeLQR.set_terminal_state_constraint_parameter!(workset, 1e-2)
 
-IterativeLQR.set_input_projection_function!(workset, input_projection)
-IterativeLQR.set_input_constraint_parameter!(workset, 1e-2)
-
-IterativeLQR.set_state_projection_function!(workset, state_projection)
-IterativeLQR.set_state_constraint_parameter!(workset, 1e-4)
+IterativeLQR.set_step_projection_function!(workset, step_projection)
+IterativeLQR.set_step_constraint_parameter!(workset, 1e-2)
 
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
