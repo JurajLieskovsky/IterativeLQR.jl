@@ -78,8 +78,10 @@ function evaluate_penalty(constraint, primal)
     mapreduce((a, p) -> p / 2 * a^2, +, primal - z + λ, ρ)
 end
 
-function mul_update_penalty_parameter(ρ, r, s, η=0.1, ϵ=1e-8, ρ_max=1e8, ρ_min=1e-8)
-    ρ *= exp(η * log((r^2 + ϵ) / (s^2 + ϵ)))
+function mul_update_penalty_parameter(ρ, r, s, η=0.1, ϵ=1e-12, ρ_max=1e8, ρ_min=1e-8)
+    r = max(abs(r), ϵ)
+    s = max(abs(s), ϵ)
+    ρ *= exp(η * log(r^2 / s^2))
     return ρ <= ρ_min ? ρ_min : (ρ >= ρ_max ? ρ_max : ρ)
 end
 

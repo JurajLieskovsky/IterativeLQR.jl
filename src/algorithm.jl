@@ -273,10 +273,17 @@ function iLQR!(
         if !successful
             return nothing
         end
+    else
+        swap_trajectories!(workset)
+        ref_J, ref_P = trajectory_evaluation!(workset, running_cost, final_cost)        
+        swap_trajectories!(workset)
     end
 
     # algorithm
     for j in 1:maxouter
+
+        successful = false
+
         for i in 1:maxinner
             # nominal trajectory differentiation
             timer[:diff] = @elapsed begin
@@ -301,7 +308,7 @@ function iLQR!(
                 timer[:fwd] = @elapsed successful = trajectory_update!(workset, dynamics!, state_difference, α)
 
                 if !successful
-                    ΔV, J, P, ΔJ, ΔP, accepted, eval = NaN, NaN, NaN, NaN, NaN, false, NaN
+                    J, P, ΔJPΔV, ΔJ, ΔP, ΔV, accepted, eval = NaN, NaN, NaN, NaN, NaN, NaN, false, NaN
                 else
                     # expected improvement
 
@@ -324,16 +331,23 @@ function iLQR!(
 
                 # swap trajectories and plot
                 if accepted
+                    successful = true
                     ref_J, ref_P = J, P
                     swap_trajectories!(workset) # swap nominal trajectory for active trajectory
                     (plotting_callback === nothing) || plotting_callback(workset) # plot trajectory
                     break
                 end
+
+                successful = false
             end
 
             if (d_∞ <= l∞_threshold) || !accepted
                 break
             end
+        end
+
+        if !successful
+            break
         end
 
         # update slack and dual variable (based on nominal trajectory)
