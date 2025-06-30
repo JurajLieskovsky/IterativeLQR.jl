@@ -22,16 +22,15 @@ function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cos
     @unpack fx, fu = workset.dynamics_derivatives
     @unpack lx, lu, lxx, lux, lxu, luu = workset.cost_derivatives
     @unpack vx, vxx = workset.value_function
+    @unpack grad, hess = workset.cost_derivatives
 
     @unpack terminal_state_projection, terminal_state_constraint = workset.constraints
-    @unpack input_projection, input_constraint = workset.constraints
-    @unpack state_projection, state_constraint = workset.constraints
+    @unpack step_projection, step_constraint = workset.constraints
 
     @threads for k in 1:N
         dynamics_diff!(fx[k], fu[k], x[k], u[k], k)
         running_cost_diff!(lx[k], lu[k], lxx[k], lxu[k], luu[k], x[k], u[k], k)
-        isnothing(input_projection) || add_penalty_derivative!(lu[k], luu[k], input_constraint[k], u[k])
-        isnothing(state_projection) || add_penalty_derivative!(lx[k], lxx[k], state_constraint[k], x[k])
+        isnothing(step_projection) || add_penalty_derivative!(grad[k], hess[k], step_constraint[k], vcat(x[k], u[k]))
         lux[k] .= lxu[k]'
     end
 
@@ -49,15 +48,12 @@ function stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, f
     @unpack vx, vxx = workset.value_function
 
     @unpack terminal_state_projection, terminal_state_constraint = workset.constraints
-    @unpack input_projection, input_constraint = workset.constraints
-    @unpack state_projection, state_constraint = workset.constraints
-    @unpack lx, lxx, lu, luu = workset.cost_derivatives
+    @unpack step_projection, step_constraint = workset.constraints
 
     @threads for k in 1:N
         dynamics_diff!(jac[k], x[k], u[k], k)
         running_cost_diff!(grad[k], hess[k], x[k], u[k], k)
-        isnothing(input_projection) || add_penalty_derivative!(lu[k], luu[k], input_constraint[k], u[k])
-        isnothing(state_projection) || add_penalty_derivative!(lx[k], lxx[k], state_constraint[k], x[k])
+        isnothing(step_projection) || add_penalty_derivative!(grad[k], hess[k], step_constraint[k], vcat(x[k], u[k]))
     end
 
     final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
@@ -141,8 +137,7 @@ function trajectory_evaluation!(workset, running_cost, final_cost)
     @unpack N = workset
     @unpack x, u, l, p = active_trajectory(workset)
     @unpack terminal_state_projection, terminal_state_constraint = workset.constraints
-    @unpack input_projection, input_constraint = workset.constraints
-    @unpack state_projection, state_constraint = workset.constraints
+    @unpack step_projection, step_constraint = workset.constraints
 
     x_ref = nominal_trajectory(workset).x
     u_ref = nominal_trajectory(workset).u
@@ -151,20 +146,12 @@ function trajectory_evaluation!(workset, running_cost, final_cost)
     @inbounds @threads for k in 1:N
         l[k] = running_cost(x[k], u[k], k)
 
-        if !isnothing(input_projection)
-            p[k] = evaluate_penalty(input_constraint[k], u[k])
-
-            if isdirty(nominal_trajectory(workset))
-                p_ref[k] = evaluate_penalty(input_constraint[k], u_ref[k])
-            end
+        if isnothing(step_projection)
+            p[k] = evaluate_penalty(step_constraint[k], vcat(x[k], u[k]))
         end
 
-        if !isnothing(state_projection)
-            p[k] += evaluate_penalty(state_constraint[k], x[k])
-
-            if isdirty(nominal_trajectory(workset))
-                p_ref[k] += evaluate_penalty(state_constraint[k], x_ref[k])
-            end
+        if !isnothing(step_projection) && isdirty(nominal_trajectory(workset))
+            p_ref[k] = evaluate_penalty(step_constraint[k], vcat(x_ref[k], u_ref[k]))
         end
     end
 
@@ -172,10 +159,10 @@ function trajectory_evaluation!(workset, running_cost, final_cost)
 
     if !isnothing(terminal_state_projection)
         p[N+1] = evaluate_penalty(terminal_state_constraint, x[N+1])
+    end
 
-        if isdirty(nominal_trajectory(workset))
-            p_ref[N+1] = evaluate_penalty(terminal_state_constraint, x_ref[N+1])
-        end
+    if !isnothing(terminal_state_projection) && isdirty(nominal_trajectory(workset))
+        p_ref[N+1] = evaluate_penalty(terminal_state_constraint, x_ref[N+1])
     end
 
     return nothing
@@ -184,8 +171,7 @@ end
 function slack_and_dual_variable_update!(workset, adaptive)
     @unpack N = workset
     @unpack terminal_state_projection, terminal_state_constraint = workset.constraints
-    @unpack input_projection, input_constraint = workset.constraints
-    @unpack state_projection, state_constraint = workset.constraints
+    @unpack step_projection, step_constraint = workset.constraints
     @unpack x, u = nominal_trajectory(workset)
 
     rN_∞, sN_∞ = 0, 0
@@ -198,20 +184,12 @@ function slack_and_dual_variable_update!(workset, adaptive)
 
     rk_∞, sk_∞ = 0, 0
 
-    if !isnothing(input_projection)
+    if !isnothing(step_projection)
         @inbounds @threads for k in 1:N
-            update_slack_and_dual_variable!(input_projection, input_constraint[k], u[k], adaptive)
+            update_slack_and_dual_variable!(step_projection, step_constraint[k], vcat(x[k], u[k]), adaptive)
         end
-        rk_∞ = max(rk_∞, mapreduce(c -> norm(c.r, Inf), max, input_constraint))
-        sk_∞ = max(sk_∞, mapreduce(c -> norm(c.s, Inf), max, input_constraint))
-    end
-
-    if !isnothing(state_projection)
-        @inbounds @threads for k in 1:N
-            update_slack_and_dual_variable!(state_projection, state_constraint[k], x[k], adaptive)
-        end
-        rk_∞ = max(rk_∞, mapreduce(c -> norm(c.r, Inf), max, state_constraint))
-        sk_∞ = max(sk_∞, mapreduce(c -> norm(c.s, Inf), max, state_constraint))
+        rk_∞ = max(rk_∞, mapreduce(c -> norm(c.r, Inf), max, step_constraint))
+        sk_∞ = max(sk_∞, mapreduce(c -> norm(c.s, Inf), max, step_constraint))
     end
 
     # set penalties in trajectory as dirty
