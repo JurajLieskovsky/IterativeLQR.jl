@@ -37,7 +37,6 @@ function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cos
 
     final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
     isnothing(terminal_state_projection) || add_penalty_derivative!(vx[N+1], vxx[N+1], terminal_state_constraint, x[N+1])
-    isnothing(state_projection) || add_penalty_derivative!(vx[N+1], vxx[N+1], state_constraint[N+1], x[N+1])
 
     return nothing
 end
@@ -63,7 +62,6 @@ function stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, f
 
     final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
     isnothing(terminal_state_projection) || add_penalty_derivative!(vx[N+1], vxx[N+1], terminal_state_constraint, x[N+1])
-    isnothing(state_projection) || add_penalty_derivative!(vx[N+1], vxx[N+1], state_constraint[N+1], x[N+1])
 
     return nothing
 end
@@ -180,14 +178,6 @@ function trajectory_evaluation!(workset, running_cost, final_cost)
         end
     end
 
-    if !isnothing(state_projection)
-        p[N+1] += evaluate_penalty(state_constraint[N+1], x[N+1])
-
-        if isdirty(nominal_trajectory(workset))
-            p_ref[N+1] += evaluate_penalty(state_constraint[N+1], x_ref[N+1])
-        end
-    end
-
     return nothing
 end
 
@@ -217,7 +207,7 @@ function slack_and_dual_variable_update!(workset, adaptive)
     end
 
     if !isnothing(state_projection)
-        @inbounds @threads for k in 1:N+1
+        @inbounds @threads for k in 1:N
             update_slack_and_dual_variable!(state_projection, state_constraint[k], x[k], adaptive)
         end
         rk_∞ = max(rk_∞, mapreduce(c -> norm(c.r, Inf), max, state_constraint))

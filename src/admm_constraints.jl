@@ -35,7 +35,7 @@ mutable struct Constraints{T}
         input_constraint = [ADMMConstraint{T}(nu) for _ in 1:N]
 
         state_projection = nothing
-        state_constraint = [ADMMConstraint{T}(nx) for _ in 1:N+1]
+        state_constraint = [ADMMConstraint{T}(nx) for _ in 1:N]
 
         return new(terminal_state_projection, terminal_state_constraint, input_projection, input_constraint, state_projection, state_constraint)
     end
