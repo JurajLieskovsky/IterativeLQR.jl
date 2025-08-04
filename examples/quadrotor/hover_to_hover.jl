@@ -20,7 +20,7 @@ h = T / N
 xₜ = vcat([0, 0, 2], [1, 0, 0, 0], zeros(3), zeros(3))
 
 # Initial state and inputs
-x₀ = vcat([6, -6, 1], [1, 0, 0, 0], zeros(3), zeros(3))
+x₀ = vcat([6, -6, 1], [cos(pi/2-1e-3), 0, 0, sin(pi/2-1e-3)], zeros(3), zeros(3))
 u₀ = 9.81 / 4 * ones(4)
 us₀ = [u₀ for _ in 1:N]
 
@@ -62,7 +62,7 @@ function running_cost_diff!(grad, hess, x, u, k)
 
     @views ForwardDiff.hessian!(
         H,
-        arg -> running_cost(QuadrotorODE.incremented_state(x, arg[1:nz]), arg[nz+1:nz+nu], k),
+        arg -> running_cost(QuadrotorODE.δx(x, arg[1:nz]), arg[nz+1:nz+nu], k),
         vcat(zeros(nz), u)
     )
 
@@ -79,7 +79,7 @@ function final_cost_diff!(Φx, Φxx, x, k)
     H = DiffResults.DiffResult(0.0, (Φx, Φxx))
     ForwardDiff.hessian!(
         H,
-        dz -> final_cost(QuadrotorODE.incremented_state(x, dz), k),
+        dz -> final_cost(QuadrotorODE.δx(x, dz), k),
         zeros(QuadrotorODE.nz)
     )
     return nothing
