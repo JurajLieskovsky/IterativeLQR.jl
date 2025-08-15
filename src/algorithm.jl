@@ -51,21 +51,21 @@ function stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, f
     return nothing
 end
 
-function cost_regularization!(workset, regularization_function!)
+function cost_regularization!(workset, δ)
     @unpack N = workset
     @unpack hess = workset.cost_derivatives
     @unpack vxx = workset.value_function
 
     @threads for k in 1:N
-        regularization_function!(hess[k])
+        min_regularization!(hess[k], δ)
     end
 
-    regularization_function!(vxx[N+1])
+    min_regularization!(vxx[N+1], δ)
 
     return nothing
 end
 
-function backward_pass!(workset)
+function backward_pass!(workset, reg, δ)
     @unpack N, ndx, nu = workset
     @unpack Δv, vx, vxx = workset.value_function
     @unpack d, K = workset.policy_update
@@ -80,6 +80,9 @@ function backward_pass!(workset)
         # gradient and hessian of the argument
         g .= grad[k] + jac[k]' * vx[k+1]
         H .= hess[k] + jac[k]' * vxx[k+1] * jac[k]
+
+        # regularization
+        reg && min_regularization!(H, δ)
 
         # control update
         F = cholesky(Symmetric(quu))
@@ -156,23 +159,13 @@ function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
     maxiter=200, ρ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16), termination_threshold=1e-4,
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
-    stacked_derivatives=false, state_difference=-, regularization=:min
+    stacked_derivatives=false, state_difference=-, regularization=:cost
 )
     # line count for printing
     line_count = Ref(0)
 
     # dataframe for logging
     dataframe = logging ? iteration_dataframe() : nothing
-
-    # regularization function
-    regularization_function! =
-        if regularization == :min
-            H -> min_regularization!(H, δ)
-        elseif regularization == :flip
-            H -> flip_regularization!(H, δ)
-        elseif regularization == :holy
-            holy_regularization!
-        end
 
     # initial trajectory rollout
     if rollout
@@ -200,10 +193,10 @@ function iLQR!(
         end
 
         # regularization
-        reg = (regularization == :none) ? NaN : @elapsed cost_regularization!(workset, regularization_function!)
+        reg = (regularization == :cost) ? @elapsed(cost_regularization!(workset, δ)) : NaN
 
         # backward pass
-        bwd = @elapsed Δv1, Δv2, d_∞ = backward_pass!(workset)
+        bwd = @elapsed Δv1, Δv2, d_∞ = backward_pass!(workset, regularization == :arg ? true : false, δ)
 
         # forward pass
         accepted = false
