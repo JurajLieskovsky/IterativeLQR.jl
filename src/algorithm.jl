@@ -96,8 +96,8 @@ function backward_pass!(workset, δ)
         Δv[k][2] = 0.5 * d[k]' * quu * d[k]
     end
 
-    Δ1 = mapreduce(Δ -> Δ[1], +, workset.value_function.Δv)
-    Δ2 = mapreduce(Δ -> Δ[2], +, workset.value_function.Δv)
+    Δ1 = mapreduce(Δ -> Δ[1], +, Δv)
+    Δ2 = mapreduce(Δ -> Δ[2], +, Δv)
 
     d_∞ = mapreduce(d_k -> mapreduce(abs, max, d_k), max, d)
 
