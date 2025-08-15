@@ -65,7 +65,7 @@ function cost_regularization!(workset, δ)
     return nothing
 end
 
-function backward_pass!(workset, reg, δ)
+function backward_pass!(workset, δ)
     @unpack N, ndx, nu = workset
     @unpack Δv, vx, vxx = workset.value_function
     @unpack d, K = workset.policy_update
@@ -82,7 +82,7 @@ function backward_pass!(workset, reg, δ)
         H .= hess[k] + jac[k]' * vxx[k+1] * jac[k]
 
         # regularization
-        reg && min_regularization!(H, δ)
+        isnan(δ) || min_regularization!(H, δ)
 
         # control update
         F = cholesky(Symmetric(quu))
@@ -196,7 +196,9 @@ function iLQR!(
         reg = (regularization == :cost) ? @elapsed(cost_regularization!(workset, δ)) : NaN
 
         # backward pass
-        bwd = @elapsed Δv1, Δv2, d_∞ = backward_pass!(workset, regularization == :arg ? true : false, δ)
+        bwd = @elapsed begin
+            Δv1, Δv2, d_∞ = backward_pass!(workset, regularization == :arg ? δ : NaN)
+        end
 
         # forward pass
         accepted = false
