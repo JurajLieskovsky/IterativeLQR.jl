@@ -98,7 +98,12 @@ function backward_pass!(workset)
         Δv[k][2] = 0.5 * d[k]' * tmp * d[k]
     end
 
-    return nothing
+    Δ1 = mapreduce(Δ -> Δ[1], +, workset.value_function.Δv)
+    Δ2 = mapreduce(Δ -> Δ[2], +, workset.value_function.Δv)
+
+    d_∞ = mapreduce(d_k -> mapreduce(abs, max, d_k), max, d)
+
+    return Δ1, Δ2, d_∞
 end
 
 function forward_pass!(workset, dynamics!, difference, running_cost, final_cost, α)
@@ -128,31 +133,31 @@ function forward_pass!(workset, dynamics!, difference, running_cost, final_cost,
     return true, sum(l), sum(l) - sum(l_ref)
 end
 
-function print_iteration!(line_count, i, α, J, ΔJ, Δv, accepted, diff, reg, bwd, fwd)
+function print_iteration!(line_count, i, α, J, ΔJ, Δv, d_inf, accepted, diff, reg, bwd, fwd)
     line_count[] % 10 == 0 && @printf(
-        "%-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s\n",
-        "iter", "α", "J", "ΔJ", "ΔV", "accepted", "diff", "reg", "bwd", "fwd"
+        "%-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s\n",
+        "iter", "α", "J", "ΔJ", "ΔV", "d∞", "accepted", "diff", "reg", "bwd", "fwd"
     )
     @printf(
-        "%-9i %-9.3g %-9.3g %-9.3g %-9.3g %-9s %-9.3g %-9.3g %-9.3g %-9.3g\n",
-        i, α, J, ΔJ, Δv, accepted, diff, reg, bwd, fwd
+        "%-9i %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9s %-9.3g %-9.3g %-9.3g %-9.3g\n",
+        i, α, J, ΔJ, Δv, d_inf, accepted, diff, reg, bwd, fwd
     )
     line_count[] += 1
 end
 
 iteration_dataframe() = DataFrame(
     i=Int[], α=Float64[],
-    J=Float64[], ΔJ=Float64[], ΔV=Float64[],
+    J=Float64[], ΔJ=Float64[], ΔV=Float64[], d_inf=Float64[],
     accepted=Bool[]
 )
 
-function log_iteration!(dataframe, i, α, J, ΔJ, Δv, accepted)
-    push!(dataframe, (i, α, J, ΔJ, Δv, accepted))
+function log_iteration!(dataframe, i, α, J, ΔJ, Δv, d_inf, accepted)
+    push!(dataframe, (i, α, J, ΔJ, Δv, d_inf, accepted))
 end
 
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
-    maxiter=200, ρ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16),
+    maxiter=200, ρ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16), termination_threshold=1e-4,
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
     stacked_derivatives=false, state_difference=-, regularization=:min
 )
@@ -178,8 +183,8 @@ function iLQR!(
             successful, J = trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
         end
 
-        verbose && print_iteration!(line_count, 0, NaN, J, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
-        logging && log_iteration!(dataframe, 0, NaN, J, NaN, NaN, successful)
+        verbose && print_iteration!(line_count, 0, NaN, J, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
+        logging && log_iteration!(dataframe, 0, NaN, J, NaN, NaN, NaN, successful)
 
         if !successful
             return nothing
@@ -201,7 +206,7 @@ function iLQR!(
         reg = (regularization == :none) ? NaN : @elapsed cost_regularization!(workset, regularization_function!)
 
         # backward pass
-        bwd = @elapsed backward_pass!(workset)
+        bwd = @elapsed Δv1, Δv2, d_∞ = backward_pass!(workset)
 
         # forward pass
         accepted = false
@@ -213,12 +218,12 @@ function iLQR!(
             end
 
             # expected improvement
-            Δv = mapreduce(Δ -> α * Δ[1] + α^2 * Δ[2], +, workset.value_function.Δv)
+            Δv = α * Δv1 + α^2 * Δv2
 
             # error handling
             if !successful
-                verbose && print_iteration!(line_count, i, α, J, ΔJ, Δv, false, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
-                logging && log_iteration!(dataframe, i, α, J, ΔJ, Δv, false)
+                verbose && print_iteration!(line_count, i, α, J, ΔJ, Δv, d_∞, false, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
+                logging && log_iteration!(dataframe, i, α, J, ΔJ, Δv, d_∞, false)
                 continue
             end
 
@@ -226,8 +231,8 @@ function iLQR!(
             accepted = ΔJ < 0 && ΔJ <= ρ * Δv
 
             # printout
-            verbose && print_iteration!(line_count, i, α, J, ΔJ, Δv, accepted, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
-            logging && log_iteration!(dataframe, i, α, J, ΔJ, Δv, accepted)
+            verbose && print_iteration!(line_count, i, α, J, ΔJ, Δv, d_∞, accepted, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
+            logging && log_iteration!(dataframe, i, α, J, ΔJ, Δv, d_∞, accepted)
 
             # solution copying and regularization parameter adjustment
             if accepted
@@ -237,7 +242,7 @@ function iLQR!(
             end
         end
 
-        if !accepted
+        if !accepted || (d_∞ <= termination_threshold)
             break
         end
     end
