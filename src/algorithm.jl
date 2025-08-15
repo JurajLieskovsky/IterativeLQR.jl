@@ -207,18 +207,9 @@ function iLQR!(
                 successful, J, ΔJ = forward_pass!(workset, dynamics!, state_difference, running_cost, final_cost, α)
             end
 
-            # expected improvement
+            # expected improvement and success evaluation
             Δv = α * Δv1 + α^2 * Δv2
-
-            # error handling
-            if !successful
-                verbose && print_iteration!(line_count, i, α, J, ΔJ, Δv, d_∞, false, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
-                logging && log_iteration!(dataframe, i, α, J, ΔJ, Δv, d_∞, false)
-                continue
-            end
-
-            # iteration's evaluation
-            accepted = ΔJ < 0 && ΔJ <= ρ * Δv
+            accepted = successful && ΔJ < 0 && ΔJ <= ρ * Δv
 
             # printout
             verbose && print_iteration!(line_count, i, α, J, ΔJ, Δv, d_∞, accepted, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
