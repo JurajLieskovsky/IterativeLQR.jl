@@ -46,9 +46,24 @@ function dynamics_diff!(jac, x, u, k)
     return nothing
 end
 
+function dynamics_diff!(∇2f, ∇f, x, u, k)
+    nx = CartPoleODE.nx
+    nu = CartPoleODE.nu
+
+    function stacked_dynamics(arg)
+        xnew = zeros(eltype(arg), nx)
+        dynamics!(xnew, view(arg, 1:nx), view(arg, nx+1:nx+nu), k)
+        return xnew
+    end
+
+    ForwardDiff.jacobian!(∇2f, (jac, arg) -> ForwardDiff.jacobian!(jac, stacked_dynamics, arg), ∇f, vcat(x, u))
+
+    return nothing
+end
+
 # Running cost
 # running_cost(_, u, _) = 1e-2 * h * u[1]^2
-running_cost(x, u, _) = 1 + cos(x[2]) + 1e1 * x[1]^2 + 3e-2 * u[1]^2
+running_cost(x, u, _) = 1 + cos(x[2]) + 1e1 * x[1]^2 + 5e-2 * u[1]^2
 
 function running_cost_diff!(grad, hess, x, u, k)
     nx = CartPoleODE.nx
@@ -98,10 +113,13 @@ end
 workset = IterativeLQR.Workset{Float64}(4, 1, N)
 IterativeLQR.set_initial_state!(workset, x₀)
 
+alg = :ilqr
+reg = :cost
+
 IterativeLQR.set_initial_inputs!(workset, us₀)
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    stacked_derivatives=true, regularization=:cost,
+    stacked_derivatives=true, regularization=reg, algorithm=alg,
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
@@ -110,7 +128,7 @@ display(@benchmark begin
     IterativeLQR.set_initial_inputs!(workset, us₀)
     IterativeLQR.iLQR!(
         workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-        stacked_derivatives=true, regularization=:cost,
+        stacked_derivatives=true, regularization=reg, algorithm=alg,
         verbose=false
     )
 end)
