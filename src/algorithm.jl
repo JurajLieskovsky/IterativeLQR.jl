@@ -54,7 +54,7 @@ function stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, f
         if algorithm == :ilqr
             dynamics_diff!(∇f[k], x[k], u[k], k)
         elseif algorithm == :ddp
-            dynamics_diff!(∇2f[k], ∇f[k], x[k], u[k], k)
+            dynamics_diff!(∇f[k], ∇2f[k], x[k], u[k], k)
         end
 
         running_cost_diff!(∇l[k], ∇2l[k], x[k], u[k], k)

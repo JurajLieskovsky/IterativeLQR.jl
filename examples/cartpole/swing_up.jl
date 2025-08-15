@@ -46,7 +46,7 @@ function dynamics_diff!(jac, x, u, k)
     return nothing
 end
 
-function dynamics_diff!(∇2f, ∇f, x, u, k)
+function dynamics_diff!(∇f, ∇2f, x, u, k)
     nx = CartPoleODE.nx
     nu = CartPoleODE.nu
 
