@@ -39,42 +39,42 @@ struct PolicyUpdate{T}
 end
 
 struct DynamicsDerivatives{T}
-    jac::Vector{Matrix{T}}
+    ∇f::Vector{Matrix{T}}
     fx::Vector{SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}}
     fu::Vector{SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}}
 
     function DynamicsDerivatives{T}(ndx, nu, N) where {T}
-        jac = [Matrix{T}(undef, ndx, ndx + nu) for _ in 1:N]
-        fx = [view(jac[k], 1:ndx, 1:ndx) for k in 1:N]
-        fu = [view(jac[k], 1:ndx, ndx+1:ndx+nu) for k in 1:N]
+        ∇f = [Matrix{T}(undef, ndx, ndx + nu) for _ in 1:N]
+        fx = [view(∇f[k], 1:ndx, 1:ndx) for k in 1:N]
+        fu = [view(∇f[k], 1:ndx, ndx+1:ndx+nu) for k in 1:N]
 
-        return new(jac, fx, fu)
+        return new(∇f, fx, fu)
     end
 end
 
 struct CostDerivatives{T}
-    grad::Vector{Vector{T}}
+    ∇l::Vector{Vector{T}}
     lx::Vector{SubArray{T,1,Vector{T},Tuple{UnitRange{Int64}},true}}
     lu::Vector{SubArray{T,1,Vector{T},Tuple{UnitRange{Int64}},true}}
 
-    hess::Vector{Matrix{T}}
+    ∇2l::Vector{Matrix{T}}
     lxx::Vector{SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}}
     luu::Vector{SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}}
     lux::Vector{SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}}
     lxu::Vector{SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}}
 
     function CostDerivatives{T}(ndx, nu, N) where {T}
-        grad = [Vector{T}(undef, ndx + nu) for _ in 1:N]
-        lx = [view(grad[k], 1:ndx) for k in 1:N]
-        lu = [view(grad[k], ndx+1:ndx+nu) for k in 1:N]
+        ∇l = [Vector{T}(undef, ndx + nu) for _ in 1:N]
+        lx = [view(∇l[k], 1:ndx) for k in 1:N]
+        lu = [view(∇l[k], ndx+1:ndx+nu) for k in 1:N]
 
-        hess = [Matrix{T}(undef, ndx + nu, ndx + nu) for _ in 1:N]
-        lxx = [view(hess[k], 1:ndx, 1:ndx) for k in 1:N]
-        luu = [view(hess[k], ndx+1:ndx+nu, ndx+1:ndx+nu) for k in 1:N]
-        lux = [view(hess[k], ndx+1:ndx+nu, 1:ndx) for k in 1:N]
-        lxu = [view(hess[k], 1:ndx, ndx+1:ndx+nu) for k in 1:N]
+        ∇2l = [Matrix{T}(undef, ndx + nu, ndx + nu) for _ in 1:N]
+        lxx = [view(∇2l[k], 1:ndx, 1:ndx) for k in 1:N]
+        luu = [view(∇2l[k], ndx+1:ndx+nu, ndx+1:ndx+nu) for k in 1:N]
+        lux = [view(∇2l[k], ndx+1:ndx+nu, 1:ndx) for k in 1:N]
+        lxu = [view(∇2l[k], 1:ndx, ndx+1:ndx+nu) for k in 1:N]
 
-        return new(grad, lx, lu, hess, lxx, luu, lux, lxu)
+        return new(∇l, lx, lu, ∇2l, lxx, luu, lux, lxu)
     end
 end
 

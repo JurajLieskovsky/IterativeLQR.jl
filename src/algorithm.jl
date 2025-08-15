@@ -37,13 +37,13 @@ end
 function stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
     @unpack N = workset
     @unpack x, u = nominal_trajectory(workset)
-    @unpack jac = workset.dynamics_derivatives
-    @unpack grad, hess = workset.cost_derivatives
+    @unpack ∇f = workset.dynamics_derivatives
+    @unpack ∇l, ∇2l = workset.cost_derivatives
     @unpack vx, vxx = workset.value_function
 
     @threads for k in 1:N
-        dynamics_diff!(jac[k], x[k], u[k], k)
-        running_cost_diff!(grad[k], hess[k], x[k], u[k], k)
+        dynamics_diff!(∇f[k], x[k], u[k], k)
+        running_cost_diff!(∇l[k], ∇2l[k], x[k], u[k], k)
     end
 
     final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
@@ -53,11 +53,11 @@ end
 
 function cost_regularization!(workset, δ)
     @unpack N = workset
-    @unpack hess = workset.cost_derivatives
+    @unpack ∇2l = workset.cost_derivatives
     @unpack vxx = workset.value_function
 
     @threads for k in 1:N
-        min_regularization!(hess[k], δ)
+        min_regularization!(∇2l[k], δ)
     end
 
     min_regularization!(vxx[N+1], δ)
@@ -70,16 +70,14 @@ function backward_pass!(workset, δ)
     @unpack Δv, vx, vxx = workset.value_function
     @unpack d, K = workset.policy_update
     @unpack g, qx, qu, H, qxx, quu, qux = workset.subproblem_objective_derivatives
-
-    jac = workset.dynamics_derivatives.jac
-    grad = workset.cost_derivatives.grad
-    hess = workset.cost_derivatives.hess
+    @unpack ∇f = workset.dynamics_derivatives
+    @unpack ∇l, ∇2l = workset.cost_derivatives
 
     @inbounds for k in N:-1:1
 
         # gradient and hessian of the argument
-        g .= grad[k] + jac[k]' * vx[k+1]
-        H .= hess[k] + jac[k]' * vxx[k+1] * jac[k]
+        g .= ∇l[k] + ∇f[k]' * vx[k+1]
+        H .= ∇2l[k] + ∇f[k]' * vxx[k+1] * ∇f[k]
 
         # regularization
         isnan(δ) || min_regularization!(H, δ)
