@@ -81,9 +81,6 @@ function backward_pass!(workset)
         g .= grad[k] + jac[k]' * vx[k+1]
         H .= hess[k] + jac[k]' * vxx[k+1] * jac[k]
 
-        # hold quu for expected improvement calculation
-        tmp = copy(quu)
-
         # control update
         F = cholesky(Symmetric(quu))
         d[k] = -(F \ qu)
@@ -95,7 +92,7 @@ function backward_pass!(workset)
 
         # expected improvement
         Δv[k][1] = d[k]' * qu
-        Δv[k][2] = 0.5 * d[k]' * tmp * d[k]
+        Δv[k][2] = 0.5 * d[k]' * quu * d[k]
     end
 
     Δ1 = mapreduce(Δ -> Δ[1], +, workset.value_function.Δv)
