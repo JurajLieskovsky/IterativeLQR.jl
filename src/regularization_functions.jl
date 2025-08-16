@@ -5,6 +5,15 @@ function min_regularization!(H, δ)
     return nothing
 end
 
+function bunchkaufman_regularization!(H, δ)
+    S = bunchkaufman(Symmetric(H, :L))
+    λ, V = eigen(S.D)
+    λ_reg = map(e -> e < δ ? δ : e, λ)
+    H .= V * diagm(λ_reg) * V'
+    view(H, S.p, S.p) .= S.L * H * S.L'
+    return nothing
+end
+
 function flip_regularization!(H, δ)
     λ, V = eigen(Symmetric(H))
     λ_reg = map(e -> e < δ ? max(δ, -e) : e, λ)
