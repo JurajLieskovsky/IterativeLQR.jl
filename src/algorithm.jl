@@ -165,13 +165,12 @@ function print_iteration!(line_count, i, α, J, ΔJ, Δv, d_inf, accepted, diff,
 end
 
 iteration_dataframe() = DataFrame(
-    i=Int[], α=Float64[],
-    J=Float64[], ΔJ=Float64[], ΔV=Float64[], d_inf=Float64[],
-    accepted=Bool[]
+    i=Int[], α=Float64[], J=Float64[], ΔJ=Float64[], ΔV=Float64[], d_inf=Float64[], accepted=Bool[],
+    diff=Float64[], reg=Float64[], bwd=Float64[], fwd=Float64[]
 )
 
-function log_iteration!(dataframe, i, α, J, ΔJ, Δv, d_inf, accepted)
-    push!(dataframe, (i, α, J, ΔJ, Δv, d_inf, accepted))
+function log_iteration!(dataframe, i, α, J, ΔJ, Δv, d_inf, accepted, diff, reg, bwd, fwd)
+    push!(dataframe, (i, α, J, ΔJ, Δv, d_inf, accepted, diff, reg, bwd, fwd))
 end
 
 function iLQR!(
@@ -199,7 +198,7 @@ function iLQR!(
         end
 
         verbose && print_iteration!(line_count, 0, NaN, J, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
-        logging && log_iteration!(dataframe, 0, NaN, J, NaN, NaN, NaN, successful)
+        logging && log_iteration!(dataframe, 0, NaN, J, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
 
         if !successful
             return nothing
@@ -240,7 +239,7 @@ function iLQR!(
 
             # printout
             verbose && print_iteration!(line_count, i, α, J, ΔJ, Δv, d_∞, accepted, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
-            logging && log_iteration!(dataframe, i, α, J, ΔJ, Δv, d_∞, accepted)
+            logging && log_iteration!(dataframe, i, α, J, ΔJ, Δv, d_∞, accepted, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
 
             # solution copying and regularization parameter adjustment
             if accepted
