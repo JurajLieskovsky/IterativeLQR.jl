@@ -50,7 +50,7 @@ struct CoordinateJacobians{T}
             aug_E[i][nx+1:nx+nu, ndx+1:ndx+nu] .= Matrix{T}(I, nu, nu)
         end
         
-        return new(aug_E)
+        return new(aug_E, E)
     end
 end
 
