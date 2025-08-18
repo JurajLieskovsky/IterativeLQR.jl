@@ -177,8 +177,10 @@ function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
     maxiter=200, ρ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16), termination_threshold=1e-4,
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
-    stacked_derivatives=false, state_difference=-, regularization=:cost, algorithm=:ilqr
+    stacked_derivatives=false, state_difference=-, coordinate_jacobian=nothing, regularization=:cost, algorithm=:ilqr
 )
+    @assert workset.ndx != workset.nx && coordinate_jacobian !== nothing
+
     # warn if incorrect regularization is chosen
     if algorithm == :ddp && regularization != :arg 
         @warn "`regularization=:cost` does not guarantee a succesful backward pass in the DDP algorithm. " *

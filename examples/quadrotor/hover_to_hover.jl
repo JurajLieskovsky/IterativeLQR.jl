@@ -156,7 +156,8 @@ IterativeLQR.set_initial_inputs!(workset, us₀)
 
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    stacked_derivatives=true, state_difference=QuadrotorODE.state_difference, regularization=:none,
+    stacked_derivatives=true, state_difference=QuadrotorODE.state_difference, coordinate_jacobian=QuadrotorODE.jacobian,
+    regularization=:none,
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
