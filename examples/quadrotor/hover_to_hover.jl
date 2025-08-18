@@ -59,9 +59,7 @@ function dynamics_diff!(∇f, x, u, k)
 
     jac = ForwardDiff.jacobian((xnew_, arg_) -> dynamics!(xnew_, arg_[1:nx], arg_[nx+1:nx+nu], k, false), xnew, vcat(x, u))
 
-    E = QuadrotorODE.jacobian(xnew)
-
-    ∇f .= E' * jac
+    ∇f .= jac
 
     return nothing
 end
@@ -94,7 +92,7 @@ end
 
 # Final cost
 ## Taylor expansions of the system's dynamics and running cost around equilibrium
-∇f, ∇l, ∇2l = zeros(12, 17), zeros(17), zeros(17, 17)
+∇f, ∇l, ∇2l = zeros(13, 17), zeros(17), zeros(17, 17)
 
 dynamics_diff!(∇f, xₜ, uₜ, 0)
 running_cost_diff!(∇l, ∇2l, xₜ, uₜ, 0)
@@ -102,7 +100,7 @@ running_cost_diff!(∇l, ∇2l, xₜ, uₜ, 0)
 ## augmented forms
 aug_E = augmented_coordinate_jacobian(xₜ)
 
-aug_∇f = ∇f * aug_E # QuadrotorODE.jacobian(xₜ) * 
+aug_∇f = QuadrotorODE.jacobian(xₜ)' * ∇f * aug_E 
 aug_∇l = aug_E' * ∇l
 aug_∇2l = aug_E' * ∇2l * aug_E
 

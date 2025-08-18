@@ -102,7 +102,7 @@ function backward_pass!(workset, algorithm, δ)
 
         # gradient and hessian of the argument
         g .= aug_E[k]' * (∇l[k] + ∇f[k]' * E[k] * vx[k+1])
-        H .= aug_E[k]' * (∇2l[k] + ∇f[k]' * vxx[k+1] * ∇f[k]) * aug_E[k]
+        H .= aug_E[k]' * (∇2l[k] + ∇f[k]' * E[k] * vxx[k+1] * E[k]' * ∇f[k]) * aug_E[k]
 
         ## additional terms of the DDP algorithm
         if algorithm == :ddp
