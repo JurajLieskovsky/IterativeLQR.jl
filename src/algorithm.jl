@@ -65,6 +65,16 @@ function stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, f
     return nothing
 end
 
+function coordinate_jacobian_calculation(workset, coordinate_jacobian)
+    @unpack N = workset
+    @unpack x = nominal_trajectory(workset)
+    @unpack E = workset.coordinate_jacobians
+
+    @threads for k in 1:N
+        E[k] .= coordinate_jacobian(x[k])
+    end
+end
+
 function cost_regularization!(workset, δ)
     @unpack N = workset
     @unpack ∇2l = workset.cost_derivatives
@@ -217,6 +227,9 @@ function iLQR!(
                 differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!, algorithm)
             end
         end
+
+        # coordinate jacobian calculation
+        coordinate_jacobian_calculation(workset, coordinate_jacobian)
 
         # regularization
         reg = (regularization == :cost) ? @elapsed(cost_regularization!(workset, δ)) : NaN
