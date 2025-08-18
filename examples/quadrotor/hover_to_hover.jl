@@ -34,9 +34,13 @@ us₀ = [u₀ for _ in 1:N]
 
 # Coordinate jacobian
 function augmented_coordinate_jacobian(x)
-    aug_E = zeros(Float64, 17, 16)
-    aug_E[1:13, 1:12] .= QuadrotorODE.jacobian(x)
-    aug_E[14:17, 13:16] .= Matrix{Float64}(I, 4, 4)
+    nx = QuadrotorODE.nx
+    nz = QuadrotorODE.nz
+    nu = QuadrotorODE.nu
+
+    aug_E = zeros(Float64, nx + nu, nz + nu)
+    aug_E[1:nx, 1:nz] .= QuadrotorODE.jacobian(x)
+    aug_E[nx+1:nx+nu, nz+1:nz+nu] .= Matrix{Float64}(I, nu, nu)
     return aug_E
 end
 
@@ -48,9 +52,12 @@ function dynamics!(xnew, x, u, k, normalize=true)
 end
 
 function dynamics_diff!(∇f, x, u, k)
-    xnew = zeros(13)
+    nx = QuadrotorODE.nx
+    nu = QuadrotorODE.nu
 
-    jac = ForwardDiff.jacobian((xnew_, arg_) -> dynamics!(xnew_, arg_[1:13], arg_[14:17], k, false), xnew, vcat(x, u))
+    xnew = zeros(nx)
+
+    jac = ForwardDiff.jacobian((xnew_, arg_) -> dynamics!(xnew_, arg_[1:nx], arg_[nx+1:nx+nu], k, false), xnew, vcat(x, u))
 
     aug_E = augmented_coordinate_jacobian(x)
     E = QuadrotorODE.jacobian(xnew)
@@ -72,10 +79,13 @@ function running_cost(x, u, _)
 end
 
 function running_cost_diff!(∇l, ∇2l, x, u, k)
-    g, H = zeros(17), zeros(17, 17)
+    nx = QuadrotorODE.nx
+    nu = QuadrotorODE.nu
+
+    g, H = zeros(nx+nu), zeros(nx+nu, nx+nu)
     result = DiffResults.DiffResult(0.0, (g, H))
 
-    @views ForwardDiff.hessian!(result, arg -> running_cost(arg[1:13], arg[14:17], k), vcat(x, u))
+    @views ForwardDiff.hessian!(result, arg -> running_cost(arg[1:nx], arg[nx+1:nx+nu], k), vcat(x, u))
 
     aug_E = augmented_coordinate_jacobian(x)
 
@@ -89,7 +99,7 @@ end
 ## Taylor expansions of the system's dynamics and running cost around equilibrium
 ∇f, ∇l, ∇2l = zeros(12, 16), zeros(16), zeros(16, 16)
 
-@benchmark dynamics_diff!(∇f, xₜ, uₜ, 0)
+dynamics_diff!(∇f, xₜ, uₜ, 0)
 running_cost_diff!(∇l, ∇2l, xₜ, uₜ, 0)
 
 ## Check that first and second order conditions for local minima are satisfied
