@@ -32,12 +32,12 @@ function dynamics!(xnew, x, u, _)
     return nothing
 end
 
-function dynamics_diff!(jac, x, u, k)
+function dynamics_diff!(∇f, x, u, k)
     nx = CartPoleODE.nx
     nu = CartPoleODE.nu
 
     @views ForwardDiff.jacobian!(
-        jac,
+        ∇f,
         (xnew, arg) -> dynamics!(xnew, arg[1:nx], arg[nx+1:nx+nu], k),
         zeros(nx),
         vcat(x, u)
@@ -65,11 +65,11 @@ end
 # running_cost(_, u, _) = 1e-2 * h * u[1]^2
 running_cost(x, u, _) = 1 + cos(x[2]) + 1e1 * x[1]^2 + 5e-2 * u[1]^2
 
-function running_cost_diff!(grad, hess, x, u, k)
+function running_cost_diff!(∇l, ∇2l, x, u, k)
     nx = CartPoleODE.nx
     nu = CartPoleODE.nu
 
-    H = DiffResults.DiffResult(0.0, (grad, hess))
+    H = DiffResults.DiffResult(0.0, (∇l, ∇2l))
 
     @views ForwardDiff.hessian!(
         H,
