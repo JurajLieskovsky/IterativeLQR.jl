@@ -38,6 +38,20 @@ struct PolicyUpdate{T}
     end
 end
 
+struct CoordinateJacobians{T}
+    aug_E::Vector{Matrix{T}}
+
+    function CoordinateJacobians{T}(nx, ndx, nu, N) where {T}
+        aug_E = [zeros(T, nx + nu, ndx + nu) for _ in 1:N]
+
+        for i in 1:N
+            aug_E[i][nx+1:nx+nu, ndx+1:ndx+nu] .= Matrix{T}(I, nu, nu)
+        end
+        
+        return new(aug_E)
+    end
+end
+
 struct DynamicsDerivatives{T}
     ∇f::Vector{Matrix{T}}
     fx::Vector{SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}}
@@ -126,6 +140,7 @@ struct Workset{T}
     trajectory::Tuple{Trajectory{T},Trajectory{T}}
     value_function::ValueFunction{T}
     policy_update::PolicyUpdate{T}
+    coordinate_jacobians::CoordinateJacobians{T}
     dynamics_derivatives::DynamicsDerivatives{T}
     cost_derivatives::CostDerivatives{T}
     subproblem_objective_derivatives::SubproblemObjectiveDerivatives{T}
@@ -136,12 +151,13 @@ struct Workset{T}
         trajectory = (Trajectory{T}(nx, nu, N), Trajectory{T}(nx, nu, N))
         value_function = ValueFunction{T}(ndx, N)
         policy_update = PolicyUpdate{T}(ndx, nu, N)
+        coordinate_jacobians = CoordinateJacobians{T}(nx, ndx, nu, N)
         dynamics_derivatives = DynamicsDerivatives{T}(ndx, nu, N)
         cost_derivatives = CostDerivatives{T}(ndx, nu, N)
 
         subproblem_objective_derivatives = SubproblemObjectiveDerivatives{T}(ndx, nu)
 
-        return new(N, nx, ndx, nu, 1, 2, trajectory, value_function, policy_update, dynamics_derivatives, cost_derivatives, subproblem_objective_derivatives)
+        return new(N, nx, ndx, nu, 1, 2, trajectory, value_function, policy_update, coordinate_jacobians, dynamics_derivatives, cost_derivatives, subproblem_objective_derivatives)
     end
 end
 
