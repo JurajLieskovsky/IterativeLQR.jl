@@ -23,12 +23,12 @@ N = 300
 h = T / N
 
 # Target state
-xₜ = vcat([0, 0, 2.0], [1, 0, 0, 0], zeros(3), zeros(3))
+xₜ = vcat([0, 0, 1.0], [1, 0, 0, 0], zeros(3), zeros(3))
 uₜ = quadrotor.m * quadrotor.g / 4 * ones(4)
 
 # Initial state and inputs
 θ₀ = 3 * pi / 4
-x₀ = vcat([0, 0, 2.0], [cos(θ₀/2), sin(θ₀/2), 0, 0], zeros(3), zeros(3))
+x₀ = vcat([0, 0, 1.0], [cos(θ₀/2), sin(θ₀/2), 0, 0], zeros(3), zeros(3))
 u₀ = uₜ
 us₀ = [u₀ for _ in 1:N]
 
@@ -143,7 +143,7 @@ IterativeLQR.set_initial_inputs!(workset, us₀)
 
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    stacked_derivatives=false, state_difference=QuadrotorODE.state_difference, regularization=:arg,
+    stacked_derivatives=false, state_difference=QuadrotorODE.state_difference, regularization=:none,
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
@@ -152,8 +152,8 @@ vis = (@isdefined vis) ? vis : Visualizer()
 render(vis)
 
 ## quadrotor and target
-MeshCatBenchmarkMechanisms.set_quadrotor!(vis, 2 * quadrotor.a, 0.12, 0.25)
-MeshCatBenchmarkMechanisms.set_target!(vis, 0.12)
+MeshCatBenchmarkMechanisms.set_quadrotor!(vis, 2 * quadrotor.a, 0.07, 0.12)
+MeshCatBenchmarkMechanisms.set_target!(vis, 0.07)
 
 ## initial configuration
 MeshCatBenchmarkMechanisms.set_quadrotor_state!(vis, nominal_trajectory(workset).x[1])
