@@ -35,18 +35,18 @@ function dynamics!(xnew, x, u, _)
 end
 
 
-function dynamics_diff!(jac, x, u, _)
+function dynamics_diff!(∇f, x, u, _)
     nz = QuadrotorODE.nz
     nu = QuadrotorODE.nu
 
     @views ForwardDiff.jacobian!(
-        jac,
+        ∇f,
         arg -> QuadrotorODE.tangential_dynamics(quadrotor, x, arg[1:nz], arg[nz+1:nz+nu]),
         vcat(zeros(nz), u)
     )
 
-    jac .*= h
-    view(jac, diagind(jac)) .+= 1
+    ∇f .*= h
+    view(∇f, diagind(∇f)) .+= 1
 
     return nothing
 end
@@ -54,11 +54,11 @@ end
 # Running cost
 running_cost(_, u, _) = h * (2e-2 * u' * u - 1e-1 * sum(log.(u)))
 
-function running_cost_diff!(grad, hess, x, u, k)
+function running_cost_diff!(∇l, ∇2l, x, u, k)
     nz = QuadrotorODE.nz
     nu = QuadrotorODE.nu
 
-    H = DiffResults.DiffResult(0.0, (grad, hess))
+    H = DiffResults.DiffResult(0.0, (∇l, ∇2l))
 
     @views ForwardDiff.hessian!(
         H,
