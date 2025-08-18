@@ -70,7 +70,7 @@ function coordinate_jacobian_calculation(workset, coordinate_jacobian)
     @unpack x = nominal_trajectory(workset)
     @unpack E = workset.coordinate_jacobians
 
-    @threads for k in 1:N
+    @threads for k in 1:N+1
         E[k] .= coordinate_jacobian(x[k])
     end
 end
@@ -90,7 +90,7 @@ function cost_regularization!(workset, δ)
 end
 
 function backward_pass!(workset, algorithm, δ)
-    @unpack N, ndx, nu = workset
+    @unpack N, nx, ndx, nu = workset
     @unpack Δv, vx, vxx = workset.value_function
     @unpack d, K = workset.policy_update
     @unpack g, qx, qu, H, qxx, quu, qux = workset.subproblem_objective_derivatives
@@ -101,13 +101,13 @@ function backward_pass!(workset, algorithm, δ)
     @inbounds for k in N:-1:1
 
         # gradient and hessian of the argument
-        g .= aug_E[k]' * (∇l[k] + ∇f[k]' * E[k] * vx[k+1])
-        H .= aug_E[k]' * (∇2l[k] + ∇f[k]' * E[k] * vxx[k+1] * E[k]' * ∇f[k]) * aug_E[k]
+        g .= aug_E[k]' * (∇l[k] + ∇f[k]' * E[k+1] * vx[k+1])
+        H .= aug_E[k]' * (∇2l[k] + ∇f[k]' * E[k+1] * vxx[k+1] * E[k+1]' * ∇f[k]) * aug_E[k]
 
         ## additional terms of the DDP algorithm
         if algorithm == :ddp
             for i in 1:ndx
-                H .+= view(∇2f[k], i, :, :) * vx[k+1][i]
+                H .+= aug_E[k]' * (view(∇2f[k], i, :, :) * E[k+1][i,:] * vx[k+1]) * aug_E[k]
             end
         end
 
