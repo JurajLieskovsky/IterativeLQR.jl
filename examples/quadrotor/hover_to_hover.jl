@@ -45,10 +45,10 @@ function dynamics_diff!(∇f, x, u, k)
 
     jac = ForwardDiff.jacobian((xnew_, arg_) -> dynamics!(xnew_, arg_[1:13], arg_[14:17], k, false), xnew, vcat(x, u))
 
-    cE = BlockDiagonal([QuadrotorODE.jacobian(x), Matrix{Float64}(I, 4, 4)])
-    nE = QuadrotorODE.jacobian(xnew)
+    aug_E = hvcat((2, 2), QuadrotorODE.jacobian(x), zeros(13, 4), zeros(4, 12), Matrix{Float64}(I, 4, 4))
+    E = QuadrotorODE.jacobian(xnew)
 
-    ∇f .= nE' * jac * cE
+    ∇f .= E' * jac * aug_E
 
     return nothing
 end
@@ -70,10 +70,10 @@ function running_cost_diff!(∇l, ∇2l, x, u, k)
 
     @views ForwardDiff.hessian!(result, arg -> running_cost(arg[1:13], arg[14:17], k), vcat(x, u))
 
-    E = BlockDiagonal([QuadrotorODE.jacobian(x), Matrix{Float64}(I, 4, 4)])
+    aug_E = hvcat((2, 2), QuadrotorODE.jacobian(x), zeros(13, 4), zeros(4, 12), Matrix{Float64}(I, 4, 4))
 
-    ∇l .= E' * result.derivs[1]
-    ∇2l .= E' * result.derivs[2] * E
+    ∇l .= aug_E' * result.derivs[1]
+    ∇2l .= aug_E' * result.derivs[2] * aug_E
 
     return nothing
 end
