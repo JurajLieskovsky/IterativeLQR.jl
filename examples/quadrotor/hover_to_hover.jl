@@ -56,14 +56,14 @@ function dynamics_diff!(fx, fu, x, u, k)
 end
 
 # Running cost
-zaxis = [0, 0, 1]
+zRz(q⃗) = 1 - 2*(q⃗[1]^2 + q⃗[2]^2) # k̂⋅R(q)k̂
 
 function running_cost(x, u, _)
     r, q, v, ω = x[1:3], x[4:7], x[8:10], x[11:13]
+    q⃗ = q[2:4]
     dr = r - xₜ[1:3]
-    dq⃗ = q[2:4]
-    du = u - rot(conjugate(q), zaxis)' * zaxis * uₜ
-    return 1e1 * dr'dr + 1e1 * dq⃗'dq⃗ + v'v + ω'ω + du'du
+    du = u - zRz(q⃗) * uₜ
+    return 1e1 * dr'dr + 1e1 * q⃗'q⃗ + v'v + ω'ω + du'du
 end
 
 function running_cost_diff!(lx, lu, lxx, lxu, luu, x, u, k)
