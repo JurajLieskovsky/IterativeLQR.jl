@@ -55,11 +55,7 @@ function dynamics_diff!(∇f, x, u, k)
     nx = QuadrotorODE.nx
     nu = QuadrotorODE.nu
 
-    xnew = zeros(nx)
-
-    jac = ForwardDiff.jacobian((xnew_, arg_) -> dynamics!(xnew_, arg_[1:nx], arg_[nx+1:nx+nu], k, false), xnew, vcat(x, u))
-
-    ∇f .= jac
+    @views ForwardDiff.jacobian!(∇f, (xnew, arg) -> dynamics!(xnew, arg[1:nx], arg[nx+1:nx+nu], k, false), zeros(nx), vcat(x, u))
 
     return nothing
 end
@@ -79,13 +75,8 @@ function running_cost_diff!(∇l, ∇2l, x, u, k)
     nx = QuadrotorODE.nx
     nu = QuadrotorODE.nu
 
-    g, H = zeros(nx+nu), zeros(nx+nu, nx+nu)
-    result = DiffResults.DiffResult(0.0, (g, H))
-
+    result = DiffResults.DiffResult(0.0, (∇l, ∇2l))
     @views ForwardDiff.hessian!(result, arg -> running_cost(arg[1:nx], arg[nx+1:nx+nu], k), vcat(x, u))
-
-    ∇l .= result.derivs[1]
-    ∇2l .= result.derivs[2]
 
     return nothing
 end
