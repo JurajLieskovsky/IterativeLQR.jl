@@ -3,6 +3,7 @@ using Revise
 using IterativeLQR
 using IterativeLQR: nominal_trajectory, active_trajectory
 using QuadrotorODE
+using QuadrotorODE.Quaternions: rot, conjugate
 using MeshCatBenchmarkMechanisms
 
 using LinearAlgebra
@@ -55,11 +56,13 @@ function dynamics_diff!(fx, fu, x, u, k)
 end
 
 # Running cost
+zaxis = [0, 0, 1]
+
 function running_cost(x, u, _)
     r, q, v, ω = x[1:3], x[4:7], x[8:10], x[11:13]
     dr = r - xₜ[1:3]
     dq⃗ = q[2:4]
-    du = u - uₜ
+    du = u - rot(conjugate(q), zaxis)' * zaxis * uₜ
     return 1e1 * dr'dr + 1e1 * dq⃗'dq⃗ + v'v + ω'ω + du'du
 end
 
@@ -140,7 +143,7 @@ IterativeLQR.set_initial_inputs!(workset, us₀)
 
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    stacked_derivatives=false, state_difference=QuadrotorODE.state_difference, regularization=:none,
+    stacked_derivatives=false, state_difference=QuadrotorODE.state_difference, regularization=:arg,
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
