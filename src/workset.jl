@@ -91,16 +91,16 @@ struct CostDerivatives{T}
     lux::Vector{SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}}
     lxu::Vector{SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}}
 
-    function CostDerivatives{T}(ndx, nu, N) where {T}
-        ∇l = [Vector{T}(undef, ndx + nu) for _ in 1:N]
-        lx = [view(∇l[k], 1:ndx) for k in 1:N]
-        lu = [view(∇l[k], ndx+1:ndx+nu) for k in 1:N]
+    function CostDerivatives{T}(nx, nu, N) where {T}
+        ∇l = [Vector{T}(undef, nx + nu) for _ in 1:N]
+        lx = [view(∇l[k], 1:nx) for k in 1:N]
+        lu = [view(∇l[k], nx+1:nx+nu) for k in 1:N]
 
-        ∇2l = [Matrix{T}(undef, ndx + nu, ndx + nu) for _ in 1:N]
-        lxx = [view(∇2l[k], 1:ndx, 1:ndx) for k in 1:N]
-        luu = [view(∇2l[k], ndx+1:ndx+nu, ndx+1:ndx+nu) for k in 1:N]
-        lux = [view(∇2l[k], ndx+1:ndx+nu, 1:ndx) for k in 1:N]
-        lxu = [view(∇2l[k], 1:ndx, ndx+1:ndx+nu) for k in 1:N]
+        ∇2l = [Matrix{T}(undef, nx + nu, nx + nu) for _ in 1:N]
+        lxx = [view(∇2l[k], 1:nx, 1:nx) for k in 1:N]
+        luu = [view(∇2l[k], nx+1:nx+nu, nx+1:nx+nu) for k in 1:N]
+        lux = [view(∇2l[k], nx+1:nx+nu, 1:nx) for k in 1:N]
+        lxu = [view(∇2l[k], 1:nx, nx+1:nx+nu) for k in 1:N]
 
         return new(∇l, lx, lu, ∇2l, lxx, luu, lux, lxu)
     end
@@ -155,7 +155,7 @@ struct Workset{T}
         policy_update = PolicyUpdate{T}(ndx, nu, N)
         coordinate_jacobians = CoordinateJacobians{T}(nx, ndx, nu, N)
         dynamics_derivatives = DynamicsDerivatives{T}(ndx, nu, N)
-        cost_derivatives = CostDerivatives{T}(ndx, nu, N)
+        cost_derivatives = CostDerivatives{T}(nx, nu, N)
 
         subproblem_objective_derivatives = SubproblemObjectiveDerivatives{T}(ndx, nu)
 

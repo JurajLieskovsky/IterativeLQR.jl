@@ -89,26 +89,31 @@ function running_cost_diff!(∇l, ∇2l, x, u, k)
 
     aug_E = augmented_coordinate_jacobian(x)
 
-    ∇l .= aug_E' * result.derivs[1]
-    ∇2l .= aug_E' * result.derivs[2] * aug_E
+    ∇l .= result.derivs[1]
+    ∇2l .= result.derivs[2]
 
     return nothing
 end
 
 # Final cost
 ## Taylor expansions of the system's dynamics and running cost around equilibrium
-∇f, ∇l, ∇2l = zeros(12, 16), zeros(16), zeros(16, 16)
+∇f, ∇l, ∇2l = zeros(12, 16), zeros(17), zeros(17, 17)
 
 dynamics_diff!(∇f, xₜ, uₜ, 0)
 running_cost_diff!(∇l, ∇2l, xₜ, uₜ, 0)
 
+## augmented forms
+aug_E = augmented_coordinate_jacobian(xₜ)
+aug_∇l = aug_E' * ∇l
+aug_∇2l = aug_E' * ∇2l * aug_E
+
 ## Check that first and second order conditions for local minima are satisfied
 ## This also asserts convexity
-@assert isposdef(∇2l)
-@assert all(isapprox.(∇l, 0))
+@assert isposdef(aug_∇2l)
+@assert all(isapprox.(aug_∇l, 0))
 
 ## value function's matrix
-S, _ = ared(∇f[:, 1:12], ∇f[:, 13:16], ∇2l[13:16, 13:16], ∇2l[1:12, 1:12], ∇2l[1:12, 13:16])
+S, _ = ared(∇f[:, 1:12], ∇f[:, 13:16], aug_∇2l[13:16, 13:16], aug_∇2l[1:12, 1:12], aug_∇2l[1:12, 13:16])
 
 ## resulting final cost
 function final_cost(x, _)
