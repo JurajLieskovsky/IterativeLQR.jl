@@ -32,18 +32,6 @@ x₀ = vcat([0, 0, 1.0], [cos(θ₀ / 2), sin(θ₀ / 2), 0, 0], zeros(3), zeros
 u₀ = uₜ
 us₀ = [u₀ for _ in 1:N]
 
-# Coordinate jacobian
-function augmented_coordinate_jacobian(x)
-    nx = QuadrotorODE.nx
-    nz = QuadrotorODE.nz
-    nu = QuadrotorODE.nu
-
-    aug_E = zeros(Float64, nx + nu, nz + nu)
-    aug_E[1:nx, 1:nz] .= QuadrotorODE.jacobian(x)
-    aug_E[nx+1:nx+nu, nz+1:nz+nu] .= Matrix{Float64}(I, nu, nu)
-    return aug_E
-end
-
 # Dynamics
 function dynamics!(xnew, x, u, k, normalize=true)
     xnew .= x + h * QuadrotorODE.dynamics(quadrotor, x, u)
@@ -89,6 +77,17 @@ dynamics_diff!(∇f, xₜ, uₜ, 0)
 running_cost_diff!(∇l, ∇2l, xₜ, uₜ, 0)
 
 ## augmented forms
+function augmented_coordinate_jacobian(x)
+    nx = QuadrotorODE.nx
+    nz = QuadrotorODE.nz
+    nu = QuadrotorODE.nu
+
+    aug_E = zeros(Float64, nx + nu, nz + nu)
+    aug_E[1:nx, 1:nz] .= QuadrotorODE.jacobian(x)
+    aug_E[nx+1:nx+nu, nz+1:nz+nu] .= Matrix{Float64}(I, nu, nu)
+    return aug_E
+end
+
 aug_E = augmented_coordinate_jacobian(xₜ)
 
 aug_∇f = QuadrotorODE.jacobian(xₜ)' * ∇f * aug_E 
