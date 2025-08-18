@@ -13,7 +13,6 @@ using DataFrames, CSV
 using BenchmarkTools
 using Infiltrator
 using MatrixEquations
-using BlockDiagonals
 
 # Quadrotor model
 quadrotor = QuadrotorODE.System(9.81, 0.5, diagm([0.0023, 0.0023, 0.004]), 0.1750, 1.0, 0.0245)
@@ -45,7 +44,10 @@ function dynamics_diff!(∇f, x, u, k)
 
     jac = ForwardDiff.jacobian((xnew_, arg_) -> dynamics!(xnew_, arg_[1:13], arg_[14:17], k, false), xnew, vcat(x, u))
 
-    aug_E = hvcat((2, 2), QuadrotorODE.jacobian(x), zeros(13, 4), zeros(4, 12), Matrix{Float64}(I, 4, 4))
+    aug_E = zeros(Float64, 17, 16)
+    aug_E[1:13, 1:12] .= QuadrotorODE.jacobian(x)
+    aug_E[14:17, 13:16] .= Matrix{Float64}(I, 4, 4)
+
     E = QuadrotorODE.jacobian(xnew)
 
     ∇f .= E' * jac * aug_E
@@ -70,7 +72,9 @@ function running_cost_diff!(∇l, ∇2l, x, u, k)
 
     @views ForwardDiff.hessian!(result, arg -> running_cost(arg[1:13], arg[14:17], k), vcat(x, u))
 
-    aug_E = hvcat((2, 2), QuadrotorODE.jacobian(x), zeros(13, 4), zeros(4, 12), Matrix{Float64}(I, 4, 4))
+    aug_E = zeros(Float64, 17, 16)
+    aug_E[1:13, 1:12] .= QuadrotorODE.jacobian(x)
+    aug_E[14:17, 13:16] .= Matrix{Float64}(I, 4, 4)
 
     ∇l .= aug_E' * result.derivs[1]
     ∇2l .= aug_E' * result.derivs[2] * aug_E
@@ -82,7 +86,7 @@ end
 ## Taylor expansions of the system's dynamics and running cost around equilibrium
 ∇f, ∇l, ∇2l = zeros(12, 16), zeros(16), zeros(16, 16)
 
-dynamics_diff!(∇f, xₜ, uₜ, 0)
+@benchmark dynamics_diff!(∇f, xₜ, uₜ, 0)
 running_cost_diff!(∇l, ∇2l, xₜ, uₜ, 0)
 
 ## Check that first and second order conditions for local minima are satisfied
