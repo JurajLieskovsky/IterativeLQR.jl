@@ -59,10 +59,9 @@ function dynamics_diff!(∇f, x, u, k)
 
     jac = ForwardDiff.jacobian((xnew_, arg_) -> dynamics!(xnew_, arg_[1:nx], arg_[nx+1:nx+nu], k, false), xnew, vcat(x, u))
 
-    aug_E = augmented_coordinate_jacobian(x)
     E = QuadrotorODE.jacobian(xnew)
 
-    ∇f .= E' * jac * aug_E
+    ∇f .= E' * jac
 
     return nothing
 end
@@ -87,8 +86,6 @@ function running_cost_diff!(∇l, ∇2l, x, u, k)
 
     @views ForwardDiff.hessian!(result, arg -> running_cost(arg[1:nx], arg[nx+1:nx+nu], k), vcat(x, u))
 
-    aug_E = augmented_coordinate_jacobian(x)
-
     ∇l .= result.derivs[1]
     ∇2l .= result.derivs[2]
 
@@ -97,13 +94,15 @@ end
 
 # Final cost
 ## Taylor expansions of the system's dynamics and running cost around equilibrium
-∇f, ∇l, ∇2l = zeros(12, 16), zeros(17), zeros(17, 17)
+∇f, ∇l, ∇2l = zeros(12, 17), zeros(17), zeros(17, 17)
 
 dynamics_diff!(∇f, xₜ, uₜ, 0)
 running_cost_diff!(∇l, ∇2l, xₜ, uₜ, 0)
 
 ## augmented forms
 aug_E = augmented_coordinate_jacobian(xₜ)
+
+aug_∇f = ∇f * aug_E # QuadrotorODE.jacobian(xₜ) * 
 aug_∇l = aug_E' * ∇l
 aug_∇2l = aug_E' * ∇2l * aug_E
 
@@ -113,7 +112,7 @@ aug_∇2l = aug_E' * ∇2l * aug_E
 @assert all(isapprox.(aug_∇l, 0))
 
 ## value function's matrix
-S, _ = ared(∇f[:, 1:12], ∇f[:, 13:16], aug_∇2l[13:16, 13:16], aug_∇2l[1:12, 1:12], aug_∇2l[1:12, 13:16])
+S, _ = ared(aug_∇f[:, 1:12], aug_∇f[:, 13:16], aug_∇2l[13:16, 13:16], aug_∇2l[1:12, 1:12], aug_∇2l[1:12, 13:16])
 
 ## resulting final cost
 function final_cost(x, _)

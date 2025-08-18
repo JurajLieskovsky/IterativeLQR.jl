@@ -96,13 +96,13 @@ function backward_pass!(workset, algorithm, δ)
     @unpack g, qx, qu, H, qxx, quu, qux = workset.subproblem_objective_derivatives
     @unpack ∇f, ∇2f = workset.dynamics_derivatives
     @unpack ∇l, ∇2l = workset.cost_derivatives
-    @unpack aug_E = workset.coordinate_jacobians
+    @unpack aug_E, E = workset.coordinate_jacobians
 
     @inbounds for k in N:-1:1
 
         # gradient and hessian of the argument
-        g .= aug_E[k]' * ∇l[k] + ∇f[k]' * vx[k+1]
-        H .= aug_E[k]' * ∇2l[k] * aug_E[k] + ∇f[k]' * vxx[k+1] * ∇f[k]
+        g .= aug_E[k]' * (∇l[k] + ∇f[k]' * E[k] * vx[k+1])
+        H .= aug_E[k]' * (∇2l[k] + ∇f[k]' * vxx[k+1] * ∇f[k]) * aug_E[k]
 
         ## additional terms of the DDP algorithm
         if algorithm == :ddp
