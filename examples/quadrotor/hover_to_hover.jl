@@ -80,19 +80,19 @@ end
 
 # Final cost
 ## Taylor expansions of the system's dynamics and running cost around equilibrium
-A, B = zeros(12,12), zeros(12,4)
-lx_eq, lu_eq, Q, lxu_eq, R = zeros(12), zeros(4), zeros(12,12), zeros(12,4), zeros(4,4)
+fx_eq, fu_eq = zeros(12,12), zeros(12,4)
+lx_eq, lu_eq, lxx_eq, lxu_eq, luu_eq = zeros(12), zeros(4), zeros(12,12), zeros(12,4), zeros(4,4)
 
-dynamics_diff!(A, B, xₜ, uₜ, 0)
-running_cost_diff!(lx_eq, lu_eq, Q, lxu_eq, R, xₜ, uₜ, 0)
+dynamics_diff!(fx_eq, fu_eq, xₜ, uₜ, 0)
+running_cost_diff!(lx_eq, lu_eq, lxx_eq, lxu_eq, luu_eq, xₜ, uₜ, 0)
 
 ## check that running cost has a convex approximation and local minimum at equilibrium
-@assert isposdef(R)
-@assert isposdef(Q) # more stict than necessary
-@assert all(map(der -> all(isapprox.(der, 0)), (lx_eq, lu_eq, lxu_eq)))
+@assert isposdef([lxx_eq lxu_eq; lxu_eq' luu_eq]) # more stict than necessary 
+@assert all(isapprox.(lx_eq, 0))
+@assert all(isapprox.(lu_eq, 0))
 
 ## value function's matrix
-S, _ = ared(A, B, R, Q)
+S, _ = ared(fx_eq, fu_eq, luu_eq, lxx_eq, lxu_eq)
 
 ## resulting final cost
 function final_cost(x, _)
@@ -140,7 +140,7 @@ IterativeLQR.set_initial_inputs!(workset, us₀)
 
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    stacked_derivatives=false, state_difference=QuadrotorODE.state_difference, regularization=:cost,
+    stacked_derivatives=false, state_difference=QuadrotorODE.state_difference, regularization=:none,
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
