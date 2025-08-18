@@ -40,9 +40,11 @@ end
 
 struct CoordinateJacobians{T}
     aug_E::Vector{Matrix{T}}
+    E::Vector{SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}}
 
     function CoordinateJacobians{T}(nx, ndx, nu, N) where {T}
         aug_E = [zeros(T, nx + nu, ndx + nu) for _ in 1:N]
+        E = [view(aug_E[k], 1:nx, 1:ndx) for k in 1:N]
 
         for i in 1:N
             aug_E[i][nx+1:nx+nu, ndx+1:ndx+nu] .= Matrix{T}(I, nu, nu)
