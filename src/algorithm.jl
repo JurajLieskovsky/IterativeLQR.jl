@@ -101,15 +101,30 @@ function backward_pass!(workset, algorithm, δ)
     @inbounds for k in N:-1:1
 
         # gradient and hessian of the argument
-        g .= aug_E[k]' * (∇l[k] + ∇f[k]' * E[k+1] * vx[k+1])
-        H .= aug_E[k]' * (∇2l[k] + ∇f[k]' * E[k+1] * vxx[k+1] * E[k+1]' * ∇f[k]) * aug_E[k]
+        if ndx == nx
+            g .= ∇l[k] + ∇f[k]' * vx[k+1]
+            H .= ∇2l[k] + ∇f[k]' * vxx[k+1] * ∇f[k]
 
-        ## additional terms of the DDP algorithm
-        if algorithm == :ddp
-            vxx_full = E[k+1] * vx[k+1]
-            for i in 1:nx
-                H .+= aug_E[k]' * (view(∇2f[k], i, :, :) * vxx_full[i]) * aug_E[k]
+            ## additional terms of the DDP algorithm
+            if algorithm == :ddp
+                for i in 1:nx
+                    H .+= view(∇2f[k], i, :, :) * vx[k+1][i]
+                end
             end
+        else
+            grad = ∇l[k] + ∇f[k]' * E[k+1] * vx[k+1]
+            hess = ∇2l[k] + ∇f[k]' * E[k+1] * vxx[k+1] * E[k+1]' * ∇f[k]
+
+            ## additional terms of the DDP algorithm
+            if algorithm == :ddp
+                vxx_full = E[k+1] * vx[k+1]
+                for i in 1:nx
+                    hess .+= view(∇2f[k], i, :, :) * vxx_full[i]
+                end
+            end
+
+            g .= aug_E[k]' * grad
+            H .= aug_E[k]' * hess * aug_E[k]
         end
 
         # regularization
