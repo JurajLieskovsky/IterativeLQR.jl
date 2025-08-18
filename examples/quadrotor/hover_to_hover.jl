@@ -25,7 +25,8 @@ xₜ = vcat([0, 0, 2.0], [1, 0, 0, 0], zeros(3), zeros(3))
 uₜ = quadrotor.m * quadrotor.g / 4 * ones(4)
 
 # Initial state and inputs
-x₀ = vcat([1, -1, 1.0], [cos(3*pi/16), sin(3*pi/16), 0, 0], zeros(3), zeros(3))
+θ₀ = 3 * pi / 4
+x₀ = vcat([1, -1, 1.0], [cos(θ₀/2), sin(θ₀/2), 0, 0], zeros(3), zeros(3))
 u₀ = uₜ
 us₀ = [u₀ for _ in 1:N]
 
