@@ -13,6 +13,7 @@ using DataFrames, CSV
 using BenchmarkTools
 using Infiltrator
 using MatrixEquations
+using BlockDiagonals
 
 # Quadrotor model
 quadrotor = QuadrotorODE.System(9.81, 0.5, diagm([0.0023, 0.0023, 0.004]), 0.1750, 1.0, 0.0245)
@@ -39,16 +40,15 @@ function dynamics!(xnew, x, u, k, normalize=true)
     return nothing
 end
 
-function dynamics_diff!(fx, fu, x, u, k)
+function dynamics_diff!(∇f, x, u, k)
     xnew = zeros(13)
 
-    ∇f = ForwardDiff.jacobian((xnew_, arg_) -> dynamics!(xnew_, arg_[1:13], arg_[14:17], k, false), xnew, vcat(x, u))
+    jac = ForwardDiff.jacobian((xnew_, arg_) -> dynamics!(xnew_, arg_[1:13], arg_[14:17], k, false), xnew, vcat(x, u))
 
-    cE = QuadrotorODE.jacobian(x)
+    cE = BlockDiagonal([QuadrotorODE.jacobian(x), Matrix{Float64}(I, 4, 4)])
     nE = QuadrotorODE.jacobian(xnew)
 
-    fx .= nE' * ∇f[:, 1:13] * cE
-    fu .= nE' * ∇f[:, 14:17]
+    ∇f .= nE' * jac * cE
 
     return nothing
 end
@@ -64,37 +64,34 @@ function running_cost(x, u, _)
     return 1e1 * dr'dr + 1e1 * q⃗'q⃗ + v'v + ω'ω + du'du
 end
 
-function running_cost_diff!(lx, lu, lxx, lxu, luu, x, u, k)
-    E = QuadrotorODE.jacobian(x)
-
-    g, H = zeros(17), zeros(17,17)
+function running_cost_diff!(∇l, ∇2l, x, u, k)
+    g, H = zeros(17), zeros(17, 17)
     result = DiffResults.DiffResult(0.0, (g, H))
 
-    @views ForwardDiff.hessian!(result, arg -> running_cost(arg[1:13], arg[14:17], k), vcat(x,u))
-    lx .= E' * result.derivs[1][1:13]
-    lu .= result.derivs[1][14:17]
-    lxx .= E' * result.derivs[2][1:13,1:13] * E
-    lxu .= E' * result.derivs[2][1:13,14:17]
-    luu .= result.derivs[2][14:17,14:17]
+    @views ForwardDiff.hessian!(result, arg -> running_cost(arg[1:13], arg[14:17], k), vcat(x, u))
+
+    E = BlockDiagonal([QuadrotorODE.jacobian(x), Matrix{Float64}(I, 4, 4)])
+
+    ∇l .= E' * result.derivs[1]
+    ∇2l .= E' * result.derivs[2] * E
 
     return nothing
 end
 
 # Final cost
 ## Taylor expansions of the system's dynamics and running cost around equilibrium
-fx_eq, fu_eq = zeros(12, 12), zeros(12, 4)
-lx_eq, lu_eq, lxx_eq, lxu_eq, luu_eq = zeros(12), zeros(4), zeros(12, 12), zeros(12, 4), zeros(4, 4)
+∇f, ∇l, ∇2l = zeros(12, 16), zeros(16), zeros(16, 16)
 
-dynamics_diff!(fx_eq, fu_eq, xₜ, uₜ, 0)
-running_cost_diff!(lx_eq, lu_eq, lxx_eq, lxu_eq, luu_eq, xₜ, uₜ, 0)
+dynamics_diff!(∇f, xₜ, uₜ, 0)
+running_cost_diff!(∇l, ∇2l, xₜ, uₜ, 0)
 
-## check that running cost has a convex approximation and local minimum at equilibrium
-@assert isposdef([lxx_eq lxu_eq; lxu_eq' luu_eq]) # more stict than necessary 
-@assert all(isapprox.(lx_eq, 0))
-@assert all(isapprox.(lu_eq, 0))
+## Check that first and second order conditions for local minima are satisfied
+## This also asserts convexity
+@assert isposdef(∇2l)
+@assert all(isapprox.(∇l, 0))
 
 ## value function's matrix
-S, _ = ared(fx_eq, fu_eq, luu_eq, lxx_eq, lxu_eq)
+S, _ = ared(∇f[:, 1:12], ∇f[:, 13:16], ∇2l[13:16, 13:16], ∇2l[1:12, 1:12], ∇2l[1:12, 13:16])
 
 ## resulting final cost
 function final_cost(x, _)
@@ -142,7 +139,7 @@ IterativeLQR.set_initial_inputs!(workset, us₀)
 
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    stacked_derivatives=false, state_difference=QuadrotorODE.state_difference, regularization=:none,
+    stacked_derivatives=true, state_difference=QuadrotorODE.state_difference, regularization=:none,
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
