@@ -106,8 +106,9 @@ function backward_pass!(workset, algorithm, δ)
 
         ## additional terms of the DDP algorithm
         if algorithm == :ddp
-            for i in 1:ndx
-                H .+= aug_E[k]' * (view(∇2f[k], i, :, :) * E[k+1][i,:] * vx[k+1]) * aug_E[k]
+            vxx_full = E[k+1] * vx[k+1]
+            for i in 1:nx
+                H .+= aug_E[k]' * (view(∇2f[k], i, :, :) * vxx_full[i]) * aug_E[k]
             end
         end
 

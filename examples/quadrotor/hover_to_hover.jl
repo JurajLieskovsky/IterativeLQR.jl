@@ -48,6 +48,21 @@ function dynamics_diff!(∇f, x, u, k)
     return nothing
 end
 
+function dynamics_diff!(∇f, ∇2f, x, u, k)
+    nx = QuadrotorODE.nx
+    nu = QuadrotorODE.nu
+
+    function stacked_dynamics(arg)
+        xnew = zeros(eltype(arg), nx)
+        dynamics!(xnew, view(arg, 1:nx), view(arg, nx+1:nx+nu), k)
+        return xnew
+    end
+
+    ForwardDiff.jacobian!(∇2f, (jac, arg) -> ForwardDiff.jacobian!(jac, stacked_dynamics, arg), ∇f, vcat(x, u))
+
+    return nothing
+end
+
 # Running cost
 zRz(q⃗) = 1 - 2 * (q⃗[1]^2 + q⃗[2]^2) # k̂⋅R(q)k̂
 
@@ -149,7 +164,7 @@ IterativeLQR.set_initial_inputs!(workset, us₀)
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
     stacked_derivatives=true, state_difference=QuadrotorODE.state_difference, coordinate_jacobian=QuadrotorODE.jacobian,
-    regularization=:none,
+    regularization=:arg, algorithm=:ddp, δ=1e-3,
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
