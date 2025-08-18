@@ -32,6 +32,14 @@ x₀ = vcat([0, 0, 1.0], [cos(θ₀ / 2), sin(θ₀ / 2), 0, 0], zeros(3), zeros
 u₀ = uₜ
 us₀ = [u₀ for _ in 1:N]
 
+# Coordinate jacobian
+function augmented_coordinate_jacobian(x)
+    aug_E = zeros(Float64, 17, 16)
+    aug_E[1:13, 1:12] .= QuadrotorODE.jacobian(x)
+    aug_E[14:17, 13:16] .= Matrix{Float64}(I, 4, 4)
+    return aug_E
+end
+
 # Dynamics
 function dynamics!(xnew, x, u, k, normalize=true)
     xnew .= x + h * QuadrotorODE.dynamics(quadrotor, x, u)
@@ -44,10 +52,7 @@ function dynamics_diff!(∇f, x, u, k)
 
     jac = ForwardDiff.jacobian((xnew_, arg_) -> dynamics!(xnew_, arg_[1:13], arg_[14:17], k, false), xnew, vcat(x, u))
 
-    aug_E = zeros(Float64, 17, 16)
-    aug_E[1:13, 1:12] .= QuadrotorODE.jacobian(x)
-    aug_E[14:17, 13:16] .= Matrix{Float64}(I, 4, 4)
-
+    aug_E = augmented_coordinate_jacobian(x)
     E = QuadrotorODE.jacobian(xnew)
 
     ∇f .= E' * jac * aug_E
@@ -72,9 +77,7 @@ function running_cost_diff!(∇l, ∇2l, x, u, k)
 
     @views ForwardDiff.hessian!(result, arg -> running_cost(arg[1:13], arg[14:17], k), vcat(x, u))
 
-    aug_E = zeros(Float64, 17, 16)
-    aug_E[1:13, 1:12] .= QuadrotorODE.jacobian(x)
-    aug_E[14:17, 13:16] .= Matrix{Float64}(I, 4, 4)
+    aug_E = augmented_coordinate_jacobian(x)
 
     ∇l .= aug_E' * result.derivs[1]
     ∇2l .= aug_E' * result.derivs[2] * aug_E
