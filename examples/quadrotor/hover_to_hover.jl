@@ -42,14 +42,13 @@ end
 function dynamics_diff!(fx, fu, x, u, k)
     xnew = zeros(13)
 
-    A = ForwardDiff.jacobian((xnew_, x_) -> dynamics!(xnew_, x_, u, k, false), xnew, x)
-    B = ForwardDiff.jacobian((xnew_, u_) -> dynamics!(xnew_, x, u_, k, false), xnew, u)
+    ∇f = ForwardDiff.jacobian((xnew_, arg_) -> dynamics!(xnew_, arg_[1:13], arg_[14:17], k, false), xnew, vcat(x, u))
 
     cE = QuadrotorODE.jacobian(x)
     nE = QuadrotorODE.jacobian(xnew)
 
-    fx .= nE' * A * cE
-    fu .= nE' * B
+    fx .= nE' * ∇f[:, 1:13] * cE
+    fu .= nE' * ∇f[:, 14:17]
 
     return nothing
 end
