@@ -28,7 +28,7 @@ uₜ = quadrotor.m * quadrotor.g / 4 * ones(4)
 
 # Initial state and inputs
 θ₀ = 3 * pi / 4
-x₀ = vcat([0, 0, 1.0], [cos(θ₀/2), sin(θ₀/2), 0, 0], zeros(3), zeros(3))
+x₀ = vcat([0, 0, 1.0], [cos(θ₀ / 2), sin(θ₀ / 2), 0, 0], zeros(3), zeros(3))
 u₀ = uₜ
 us₀ = [u₀ for _ in 1:N]
 
@@ -38,7 +38,6 @@ function dynamics!(xnew, x, u, k, normalize=true)
     normalize && QuadrotorODE.normalize_state!(xnew)
     return nothing
 end
-
 
 function dynamics_diff!(fx, fu, x, u, k)
     xnew = zeros(13)
@@ -56,7 +55,7 @@ function dynamics_diff!(fx, fu, x, u, k)
 end
 
 # Running cost
-zRz(q⃗) = 1 - 2*(q⃗[1]^2 + q⃗[2]^2) # k̂⋅R(q)k̂
+zRz(q⃗) = 1 - 2 * (q⃗[1]^2 + q⃗[2]^2) # k̂⋅R(q)k̂
 
 function running_cost(x, u, _)
     r, q, v, ω = x[1:3], x[4:7], x[8:10], x[11:13]
@@ -83,8 +82,8 @@ end
 
 # Final cost
 ## Taylor expansions of the system's dynamics and running cost around equilibrium
-fx_eq, fu_eq = zeros(12,12), zeros(12,4)
-lx_eq, lu_eq, lxx_eq, lxu_eq, luu_eq = zeros(12), zeros(4), zeros(12,12), zeros(12,4), zeros(4,4)
+fx_eq, fu_eq = zeros(12, 12), zeros(12, 4)
+lx_eq, lu_eq, lxx_eq, lxu_eq, luu_eq = zeros(12), zeros(4), zeros(12, 12), zeros(12, 4), zeros(4, 4)
 
 dynamics_diff!(fx_eq, fu_eq, xₜ, uₜ, 0)
 running_cost_diff!(lx_eq, lu_eq, lxx_eq, lxu_eq, luu_eq, xₜ, uₜ, 0)
