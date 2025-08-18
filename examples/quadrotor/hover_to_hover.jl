@@ -67,14 +67,15 @@ end
 function running_cost_diff!(lx, lu, lxx, lxu, luu, x, u, k)
     E = QuadrotorODE.jacobian(x)
 
-    ∇x(x, u) = ForwardDiff.gradient(x_ -> running_cost(x_, u, k), x)
-    ∇u(x, u) = ForwardDiff.gradient(u_ -> running_cost(x, u_, k), u)
+    g, H = zeros(17), zeros(17,17)
+    result = DiffResults.DiffResult(0.0, (g, H))
 
-    lx .= E' * ∇x(x, u)
-    lu .= ∇u(x, u)
-    lxx .= E' * ForwardDiff.jacobian(x_ -> ∇x(x_, u), x) * E
-    lxu .= E' * ForwardDiff.jacobian(u_ -> ∇x(x, u_), u)
-    luu .= ForwardDiff.jacobian(u_ -> ∇u(x, u_), u)
+    @views ForwardDiff.hessian!(result, arg -> running_cost(arg[1:13], arg[14:17], k), vcat(x,u))
+    lx .= E' * result.derivs[1][1:13]
+    lu .= result.derivs[1][14:17]
+    lxx .= E' * result.derivs[2][1:13,1:13] * E
+    lxu .= E' * result.derivs[2][1:13,14:17]
+    luu .= result.derivs[2][14:17,14:17]
 
     return nothing
 end
