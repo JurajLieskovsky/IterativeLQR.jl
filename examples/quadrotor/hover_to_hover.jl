@@ -92,7 +92,7 @@ function augmented_coordinate_jacobian(x)
     nz = QuadrotorODE.nz
     nu = QuadrotorODE.nu
 
-    aug_E = zeros(Float64, nx + nu, nz + nu)
+    aug_E = zeros(eltype(x), nx + nu, nz + nu)
     aug_E[1:nx, 1:nz] .= QuadrotorODE.jacobian(x)
     aug_E[nx+1:nx+nu, nz+1:nz+nu] .= Matrix{Float64}(I, nu, nu)
     return aug_E
