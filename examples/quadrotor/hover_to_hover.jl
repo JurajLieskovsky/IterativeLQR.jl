@@ -1,3 +1,4 @@
+using QuadrotorODE: state_difference
 using Revise
 
 using IterativeLQR
@@ -25,12 +26,6 @@ h = T / N
 # Target state
 xₜ = vcat([0, 0, 1.0], [1, 0, 0, 0], zeros(3), zeros(3))
 uₜ = quadrotor.m * quadrotor.g / 4 * ones(4)
-
-# Initial state and inputs
-θ₀ = 3 * pi / 4
-x₀ = vcat([0, 0, 1.0], [cos(θ₀ / 2), sin(θ₀ / 2), 0, 0], zeros(3), zeros(3))
-u₀ = uₜ
-us₀ = [u₀ for _ in 1:N]
 
 # Dynamics
 function dynamics!(xnew, x, u, k, normalize=true)
@@ -71,7 +66,7 @@ function running_cost(x, u, _)
     q⃗ = q[2:4]
     dr = r - xₜ[1:3]
     du = u - zRz(q⃗) * uₜ
-    return 1e1 * dr'dr + 1e1 * q⃗'q⃗ + v'v + ω'ω + du'du
+    return dr'dr + q⃗'q⃗ + 1e-1 * v'v + 1e-1 * ω'ω + 1e-1 * du'du
 end
 
 function running_cost_diff!(∇l, ∇2l, x, u, k)
@@ -115,7 +110,18 @@ aug_∇2l = aug_E' * ∇2l * aug_E
 @assert all(isapprox.(aug_∇l, 0))
 
 ## value function's matrix
-S, _ = ared(aug_∇f[:, 1:12], aug_∇f[:, 13:16], aug_∇2l[13:16, 13:16], aug_∇2l[1:12, 1:12], aug_∇2l[1:12, 13:16])
+K, S = begin
+    A = aug_∇f[:, 1:12]
+    B = aug_∇f[:, 13:16]
+    R = aug_∇2l[13:16, 13:16]
+    Q = aug_∇2l[1:12, 1:12]
+    M = aug_∇2l[1:12, 13:16]
+
+    S, _ = ared(A, B, R, Q, M)
+    K = inv(R + B' * S * B) * B' * S * A
+
+    K, S
+end
 
 ## resulting final cost
 function final_cost(x, _)
@@ -156,15 +162,36 @@ function plotting_callback(workset)
     return plt
 end
 
-# Trajectory optimization
+# Workset
 workset = IterativeLQR.Workset{Float64}(13, 4, N, 12)
-IterativeLQR.set_initial_state!(workset, x₀)
-IterativeLQR.set_initial_inputs!(workset, us₀)
 
+# Initial state and inputs
+θ₀ = 3 * pi / 4
+x₀ = vcat([0, 0, 1.0], [cos(θ₀ / 2), sin(θ₀ / 2), 0, 0], zeros(3), zeros(3))
+
+if false
+    xs = nominal_trajectory(workset).x
+    us = nominal_trajectory(workset).u
+    ls = nominal_trajectory(workset).l
+
+    xs[1] = x₀
+    for k in 1:N
+        us[k] = uₜ - K * QuadrotorODE.state_difference(xs[k], xₜ)
+        dynamics!(xs[k+1], xs[k], us[k], k)
+        ls[k] = running_cost(xs[k], us[k], k)
+    end
+    ls[N+1] = final_cost(xs[N+1], N + 1)
+
+else
+    IterativeLQR.set_initial_state!(workset, x₀)
+    IterativeLQR.set_initial_inputs!(workset,[uₜ for _ in 1:N])
+end
+
+# Trajectory optimization
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
     stacked_derivatives=true, state_difference=QuadrotorODE.state_difference, coordinate_jacobian=QuadrotorODE.jacobian,
-    regularization=:arg, algorithm=:ddp, δ=1e-3,
+    regularization=:arg, algorithm=:ilqr,
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
