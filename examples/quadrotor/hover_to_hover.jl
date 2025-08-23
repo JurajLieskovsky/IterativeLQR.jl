@@ -185,13 +185,13 @@ if warmstart
     IterativeLQR.set_initial_state!(workset, xₜ)
     IterativeLQR.set_initial_inputs!(workset, [uₜ for _ in 1:N])
 
-    df = IterativeLQR.iLQR!(
+    IterativeLQR.iLQR!(
         workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
         stacked_derivatives=true,
         state_difference=(x, xref) -> QuadrotorODE.state_difference(x, xref, :rp),
         coordinate_jacobian=QuadrotorODE.jacobian,
         regularization=regularization, algorithm=algorithm,
-        verbose=true, logging=true, plotting_callback=plotting_callback
+        verbose=true, plotting_callback=plotting_callback
     )
 end
 
