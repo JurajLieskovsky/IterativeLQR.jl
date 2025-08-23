@@ -208,7 +208,7 @@ end
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
     maxiter=200, ρ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16), termination_threshold=1e-4,
-    rollout=true, verbose=true, logging=false, plotting_callback=nothing,
+    rollout=:full, verbose=true, logging=false, plotting_callback=nothing,
     stacked_derivatives=false, state_difference=-, coordinate_jacobian=nothing, regularization=:cost, algorithm=:ilqr
 )
     @assert workset.ndx == workset.nx || coordinate_jacobian !== nothing
@@ -220,7 +220,7 @@ function iLQR!(
     dataframe = logging ? iteration_dataframe() : nothing
 
     # initial trajectory rollout
-    if rollout
+    if rollout == :full
         rlt = @elapsed begin
             successful, J = trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
         end
@@ -230,6 +230,20 @@ function iLQR!(
 
         if !successful
             return nothing
+        end
+    elseif rollout == :partial
+        for α in α_values
+            rlt = @elapsed begin
+                successful, J, ΔJ = forward_pass!(workset, dynamics!, state_difference, running_cost, final_cost, α)
+            end
+
+            verbose && print_iteration!(line_count, 0, NaN, J, ΔJ, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
+            logging && log_iteration!(dataframe, 0, NaN, J, ΔJ, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
+
+            if successful
+                swap_trajectories!(workset)
+                break
+            end
         end
     end
 

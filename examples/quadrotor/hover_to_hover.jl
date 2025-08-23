@@ -35,7 +35,7 @@ u₀ = uₜ
 # Algorithm, regularization, and warmstart
 algorithm = :ddp
 regularization = :none # !!! cost regularization in tangent space isn't properly implemented yet
-warmstart = false
+warmstart = true
 
 # Dynamics
 function dynamics!(xnew, x, u, k, normalize=true)
@@ -187,8 +187,10 @@ if warmstart
 
     df = IterativeLQR.iLQR!(
         workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-        stacked_derivatives=false, regularization=false,
+        stacked_derivatives=true,
         state_difference=(x, xref) -> QuadrotorODE.state_difference(x, xref, :rp),
+        coordinate_jacobian=QuadrotorODE.jacobian,
+        regularization=regularization, algorithm=algorithm,
         verbose=true, logging=true, plotting_callback=plotting_callback
     )
 end
@@ -199,7 +201,9 @@ warmstart || IterativeLQR.set_initial_inputs!(workset, [u₀ for _ in 1:N])
 
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    stacked_derivatives=true, state_difference=(x, xref) -> QuadrotorODE.state_difference(x, xref, :rp), coordinate_jacobian=QuadrotorODE.jacobian,
+    stacked_derivatives=true, rollout=:partial,
+    state_difference=(x, xref) -> QuadrotorODE.state_difference(x, xref, :rp),
+    coordinate_jacobian=QuadrotorODE.jacobian,
     regularization=regularization, algorithm=algorithm,
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
