@@ -104,32 +104,33 @@ function backward_pass!(workset, algorithm, δ)
         if ndx == nx
             g .= ∇l[k] + ∇f[k]' * vx[k+1]
             H .= ∇2l[k] + ∇f[k]' * vxx[k+1] * ∇f[k]
-
-            ## additional terms of the DDP algorithm
-            if algorithm == :ddp
-                for i in 1:nx
-                    tmp .+= view(∇2f[k], i, :, :) * vx[k+1][i]
-                end
-            end
         else
             grad = ∇l[k] + ∇f[k]' * E[k+1] * vx[k+1]
             hess = ∇2l[k] + ∇f[k]' * E[k+1] * vxx[k+1] * E[k+1]' * ∇f[k]
 
+            g .= aug_E[k]' * grad
+            H .= aug_E[k]' * hess * aug_E[k]
+        end
+
+        if algorithm == :ddp
+            tmp = zeros(nx+nu,nx+nu)
+
             ## additional terms of the DDP algorithm
-            if algorithm == :ddp
-                tmp = zeros(nx+nu,nx+nu)
+            if ndx == nx
+                for i in 1:nx
+                    tmp .+= view(∇2f[k], i, :, :) * vx[k+1][i]
+                end
+
+                min_regularization!(tmp, δ)
+                H .+= tmp
+            else
                 vxx_full = E[k+1] * vx[k+1]
                 for i in 1:nx
                     tmp .+= view(∇2f[k], i, :, :) * vxx_full[i]
                 end
                 ttmp = aug_E[k]' * tmp * aug_E[k]
+
                 min_regularization!(ttmp, δ)
-            end
-
-            g .= aug_E[k]' * grad
-            H .= aug_E[k]' * hess * aug_E[k]
-
-            if algorithm == :ddp
                 H .+= ttmp
             end
         end
@@ -138,7 +139,7 @@ function backward_pass!(workset, algorithm, δ)
         isnan(δ) || min_regularization!(H, δ)
 
         # control update
-        F = cholesky(Symmetric(quu))
+        F = @infiltry cholesky(Symmetric(quu))
         d[k] = -(F \ qu)
         K[k] = -(F \ qux)
 
@@ -213,13 +214,7 @@ function iLQR!(
     rollout=true, verbose=true, logging=false, plotting_callback=nothing,
     stacked_derivatives=false, state_difference=-, coordinate_jacobian=nothing, regularization=:cost, algorithm=:ilqr
 )
-    @assert workset.ndx != workset.nx && coordinate_jacobian !== nothing
-
-    # warn if incorrect regularization is chosen
-    if algorithm == :ddp && regularization != :arg 
-        @warn "`regularization=:cost` does not guarantee a succesful backward pass in the DDP algorithm. " *
-        "To avoid potential errors set `regularization=:arg`."
-    end
+    @assert workset.ndx == workset.nx || coordinate_jacobian !== nothing
    
     # line count for printing
     line_count = Ref(0)
@@ -253,14 +248,14 @@ function iLQR!(
         end
 
         # coordinate jacobian calculation
-        coordinate_jacobian_calculation(workset, coordinate_jacobian)
+        coordinate_jacobian !== nothing && coordinate_jacobian_calculation(workset, coordinate_jacobian)
 
         # regularization
         reg = (regularization == :cost) ? @elapsed(cost_regularization!(workset, δ)) : NaN
 
         # backward pass
         bwd = @elapsed begin
-            Δv1, Δv2, d_∞ = backward_pass!(workset, algorithm, regularization == :arg ? δ : NaN)
+            Δv1, Δv2, d_∞ = backward_pass!(workset, algorithm, δ)
         end
 
         # forward pass
