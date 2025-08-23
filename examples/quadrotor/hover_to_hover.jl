@@ -31,6 +31,10 @@ x₀ = vcat([0, 0, 1.0], [cos(θ₀ / 2), sin(θ₀ / 2), 0, 0], zeros(3), zeros
 xₜ = vcat([0, 0, 1.0], [1, 0, 0, 0], zeros(3), zeros(3))
 uₜ = quadrotor.m * quadrotor.g / 4 * ones(4)
 
+# Algorithm and regularization
+algorithm = :ddp
+regularization = :cost
+
 # Dynamics
 function dynamics!(xnew, x, u, k, normalize=true)
     xnew .= x + h * QuadrotorODE.dynamics(quadrotor, x, u)
@@ -196,7 +200,7 @@ end
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
     stacked_derivatives=true, state_difference=(x, x0) -> QuadrotorODE.state_difference(x, x0, :qv), coordinate_jacobian=QuadrotorODE.jacobian,
-    regularization=:cost, algorithm=:ddp,
+    regularization=regularization, algorithm=algorithm,
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
 

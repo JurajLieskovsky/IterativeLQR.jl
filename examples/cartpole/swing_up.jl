@@ -23,6 +23,10 @@ h = T / N
 us₀ = [zeros(1) for _ in 1:N]
 x₀ = [0, pi * 1e-3, 0, 0]
 
+# Algorithm and regularization
+algorithm = :ddp
+regularization = :cost
+
 # Dynamics
 function dynamics!(xnew, x, u, _)
     CartPoleODE.f!(cartpole, xnew, x, u)
@@ -113,13 +117,10 @@ end
 workset = IterativeLQR.Workset{Float64}(4, 1, N)
 IterativeLQR.set_initial_state!(workset, x₀)
 
-alg = :ddp
-reg = :cost
-
 IterativeLQR.set_initial_inputs!(workset, us₀)
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    stacked_derivatives=true, regularization=reg, algorithm=alg,
+    stacked_derivatives=true, regularization=regularization, algorithm=algorithm,
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
