@@ -38,7 +38,7 @@ function dynamics_diff!(∇f, x, u, k)
 
     @views ForwardDiff.jacobian!(
         ∇f,
-        (xnew, arg) -> dynamics!(xnew, arg[1:nx], arg[nx+1:nx+nu], k),
+        (xnew, arg) -> dynamics!(xnew, view(arg, 1:nx), view(arg, nx+1:nx+nu), k),
         zeros(nx),
         vcat(x, u)
     )
@@ -73,7 +73,7 @@ function running_cost_diff!(∇l, ∇2l, x, u, k)
 
     @views ForwardDiff.hessian!(
         H,
-        arg -> running_cost(arg[1:nx], arg[nx+1:nx+nu], k),
+        arg -> running_cost(view(arg, 1:nx), view(arg, nx+1:nx+nu), k),
         vcat(x, u)
     )
 

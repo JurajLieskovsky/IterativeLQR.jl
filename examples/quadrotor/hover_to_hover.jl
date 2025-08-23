@@ -38,7 +38,7 @@ function dynamics_diff!(∇f, x, u, k)
     nx = QuadrotorODE.nx
     nu = QuadrotorODE.nu
 
-    @views ForwardDiff.jacobian!(∇f, (xnew, arg) -> dynamics!(xnew, arg[1:nx], arg[nx+1:nx+nu], k, false), zeros(nx), vcat(x, u))
+    @views ForwardDiff.jacobian!(∇f, (xnew, arg) -> dynamics!(xnew, view(arg, 1:nx), view(arg, nx+1:nx+nu), k, false), zeros(nx), vcat(x, u))
 
     return nothing
 end
@@ -65,7 +65,7 @@ function running_cost(x, u, _)
     r, q, v, ω = x[1:3], x[4:7], x[8:10], x[11:13]
     q⃗ = q[2:4]
     dr = r - xₜ[1:3]
-    du = u - uₜ
+    du = u - zRz(q⃗) * uₜ
     return dr'dr + q⃗'q⃗ + 1e-1 * v'v + 1e-1 * ω'ω + 1e-1 * du'du
 end
 
@@ -74,7 +74,7 @@ function running_cost_diff!(∇l, ∇2l, x, u, k)
     nu = QuadrotorODE.nu
 
     result = DiffResults.DiffResult(0.0, (∇l, ∇2l))
-    @views ForwardDiff.hessian!(result, arg -> running_cost(arg[1:nx], arg[nx+1:nx+nu], k), vcat(x, u))
+    @views ForwardDiff.hessian!(result, arg -> running_cost(view(arg, 1:nx), view(arg, nx+1:nx+nu), k), vcat(x, u))
 
     return nothing
 end
@@ -100,7 +100,7 @@ end
 
 aug_E = augmented_coordinate_jacobian(xₜ)
 
-aug_∇f = QuadrotorODE.jacobian(xₜ)' * ∇f * aug_E 
+aug_∇f = QuadrotorODE.jacobian(xₜ)' * ∇f * aug_E
 aug_∇l = aug_E' * ∇l
 aug_∇2l = aug_E' * ∇2l * aug_E
 
@@ -125,7 +125,7 @@ end
 
 ## resulting final cost
 function final_cost(x, _)
-    dx = QuadrotorODE.state_difference(x, xₜ)
+    dx = QuadrotorODE.state_difference(x, xₜ, :rp)
     return dx' * S * dx
 end
 
@@ -184,13 +184,13 @@ if false
 
 else
     IterativeLQR.set_initial_state!(workset, x₀)
-    IterativeLQR.set_initial_inputs!(workset,[uₜ for _ in 1:N])
+    IterativeLQR.set_initial_inputs!(workset, [uₜ for _ in 1:N])
 end
 
 # Trajectory optimization
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    stacked_derivatives=true, state_difference=QuadrotorODE.state_difference, coordinate_jacobian=QuadrotorODE.jacobian,
+    stacked_derivatives=true, state_difference=(x, x0) -> QuadrotorODE.state_difference(x, x0, :qv), coordinate_jacobian=QuadrotorODE.jacobian,
     regularization=:cost, algorithm=:ddp,
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
