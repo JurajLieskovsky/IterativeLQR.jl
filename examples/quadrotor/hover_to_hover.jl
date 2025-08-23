@@ -23,17 +23,19 @@ T = 3
 N = 300
 h = T / N
 
-# Initial state and inputs
-θ₀ = 3 * pi / 4
-x₀ = vcat([0, 0, 1.0], [cos(θ₀ / 2), sin(θ₀ / 2), 0, 0], zeros(3), zeros(3))
-
 # Target state
 xₜ = vcat([0, 0, 1.0], [1, 0, 0, 0], zeros(3), zeros(3))
 uₜ = quadrotor.m * quadrotor.g / 4 * ones(4)
 
-# Algorithm and regularization
+# Initial state and inputs
+θ₀ = 3 * pi / 4
+x₀ = vcat([0, 0, 1.0], [cos(θ₀ / 2), sin(θ₀ / 2), 0, 0], zeros(3), zeros(3))
+u₀ = zeros(QuadrotorODE.nu)
+
+# Algorithm, regularization, and warmstart
 algorithm = :ddp
 regularization = :cost
+warmstart = false
 
 # Dynamics
 function dynamics!(xnew, x, u, k, normalize=true)
@@ -178,28 +180,26 @@ end
 # Workset
 workset = IterativeLQR.Workset{Float64}(13, 4, N, 12)
 
-if false
-    xs = nominal_trajectory(workset).x
-    us = nominal_trajectory(workset).u
-    ls = nominal_trajectory(workset).l
-
-    xs[1] = x₀
-    for k in 1:N
-        us[k] = uₜ - K * QuadrotorODE.state_difference(xs[k], xₜ)
-        dynamics!(xs[k+1], xs[k], us[k], k)
-        ls[k] = running_cost(xs[k], us[k], k)
-    end
-    ls[N+1] = final_cost(xs[N+1], N + 1)
-
-else
-    IterativeLQR.set_initial_state!(workset, x₀)
+## warmstart by first creating a stabilizing controller at equilibrium
+if warmstart
+    IterativeLQR.set_initial_state!(workset, xₜ)
     IterativeLQR.set_initial_inputs!(workset, [uₜ for _ in 1:N])
+
+    df = IterativeLQR.iLQR!(
+        workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
+        stacked_derivatives=false, regularization=false,
+        state_difference=(x, xref) -> QuadrotorODE.state_difference(x, xref, :qv),
+        verbose=true, logging=true, plotting_callback=plotting_callback
+    )
 end
 
-# Trajectory optimization
+## re-stabilization
+IterativeLQR.set_initial_state!(workset, x₀)
+warmstart || IterativeLQR.set_initial_inputs!(workset, [u₀ for _ in 1:N])
+
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    stacked_derivatives=true, state_difference=(x, x0) -> QuadrotorODE.state_difference(x, x0, :qv), coordinate_jacobian=QuadrotorODE.jacobian,
+    stacked_derivatives=true, state_difference=(x, xref) -> QuadrotorODE.state_difference(x, xref, :qv), coordinate_jacobian=QuadrotorODE.jacobian,
     regularization=regularization, algorithm=algorithm,
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
