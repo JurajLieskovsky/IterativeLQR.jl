@@ -113,7 +113,7 @@ end
 workset = IterativeLQR.Workset{Float64}(4, 1, N)
 IterativeLQR.set_initial_state!(workset, x₀)
 
-alg = :ilqr
+alg = :ddp
 reg = :cost
 
 IterativeLQR.set_initial_inputs!(workset, us₀)
