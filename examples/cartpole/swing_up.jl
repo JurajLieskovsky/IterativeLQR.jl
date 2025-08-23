@@ -20,7 +20,7 @@ N = 200
 h = T / N
 
 # Initial state and inputs
-us₀ = [zeros(1) for _ in 1:N]
+u₀ = zeros(CartPoleODE.nu)
 x₀ = [0, pi * 1e-3, 0, 0]
 
 # Algorithm and regularization
@@ -117,7 +117,7 @@ end
 workset = IterativeLQR.Workset{Float64}(4, 1, N)
 IterativeLQR.set_initial_state!(workset, x₀)
 
-IterativeLQR.set_initial_inputs!(workset, us₀)
+IterativeLQR.set_initial_inputs!(workset, [u₀ for _ in 1:N])
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
     stacked_derivatives=true, regularization=regularization, algorithm=algorithm,
