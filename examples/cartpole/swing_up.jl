@@ -11,21 +11,21 @@ using DataFrames, CSV
 using Infiltrator
 using BenchmarkTools
 
-# Horizon length, initial state and inputs
-T = 2
-x₀ = [0, pi * 1e-3, 0, 0]
-N = 200
-
-us₀ = [zeros(1) for _ in 1:N]
+# Cartpole model
+cartpole = CartPoleODE.Model(9.81, 1, 0.1, 0.2)
 
 # Horizon and timestep
+T = 2
+N = 200
 h = T / N
 
-# Dynamics
-model = CartPoleODE.Model(9.81, 1, 0.1, 0.2)
+# Initial state and inputs
+us₀ = [zeros(1) for _ in 1:N]
+x₀ = [0, pi * 1e-3, 0, 0]
 
+# Dynamics
 function dynamics!(xnew, x, u, _)
-    CartPoleODE.f!(model, xnew, x, u)
+    CartPoleODE.f!(cartpole, xnew, x, u)
     xnew .*= h
     xnew .+= x
 
@@ -123,22 +123,12 @@ df = IterativeLQR.iLQR!(
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
-# Benchmark
-display(@benchmark begin
-    IterativeLQR.set_initial_inputs!(workset, us₀)
-    IterativeLQR.iLQR!(
-        workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-        stacked_derivatives=true, regularization=reg, algorithm=alg,
-        verbose=false
-    )
-end)
-
 # Visualization
 (@isdefined vis) || (vis = Visualizer())
 render(vis)
 
 ## cart-pole
-MeshCatBenchmarkMechanisms.set_cartpole!(vis, 0.1, 0.05, 0.05, model.l, 0.02)
+MeshCatBenchmarkMechanisms.set_cartpole!(vis, 0.1, 0.05, 0.05, cartpole.l, 0.02)
 
 ## initial configuration
 MeshCatBenchmarkMechanisms.set_cartpole_state!(vis, nominal_trajectory(workset).x[1])

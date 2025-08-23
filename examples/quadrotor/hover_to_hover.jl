@@ -23,6 +23,10 @@ T = 3
 N = 300
 h = T / N
 
+# Initial state and inputs
+θ₀ = 3 * pi / 4
+x₀ = vcat([0, 0, 1.0], [cos(θ₀ / 2), sin(θ₀ / 2), 0, 0], zeros(3), zeros(3))
+
 # Target state
 xₜ = vcat([0, 0, 1.0], [1, 0, 0, 0], zeros(3), zeros(3))
 uₜ = quadrotor.m * quadrotor.g / 4 * ones(4)
@@ -169,10 +173,6 @@ end
 
 # Workset
 workset = IterativeLQR.Workset{Float64}(13, 4, N, 12)
-
-# Initial state and inputs
-θ₀ = 3 * pi / 4
-x₀ = vcat([0, 0, 1.0], [cos(θ₀ / 2), sin(θ₀ / 2), 0, 0], zeros(3), zeros(3))
 
 if false
     xs = nominal_trajectory(workset).x
