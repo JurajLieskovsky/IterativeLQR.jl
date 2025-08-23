@@ -178,7 +178,7 @@ function plotting_callback(workset)
 end
 
 # Workset
-workset = IterativeLQR.Workset{Float64}(13, 4, N, 12)
+workset = IterativeLQR.Workset{Float64}(QuadrotorODE.nx, QuadrotorODE.nu, N, QuadrotorODE.nz)
 
 ## warmstart by first creating a stabilizing controller at equilibrium
 if warmstart

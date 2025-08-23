@@ -114,7 +114,7 @@ function plotting_callback(workset)
 end
 
 # Trajectory optimization
-workset = IterativeLQR.Workset{Float64}(4, 1, N)
+workset = IterativeLQR.Workset{Float64}(CartPoleODE.nx, CartPoleODE.nu, N)
 IterativeLQR.set_initial_state!(workset, x₀)
 
 IterativeLQR.set_initial_inputs!(workset, [u₀ for _ in 1:N])
