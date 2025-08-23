@@ -38,7 +38,12 @@ function dynamics_diff!(∇f, x, u, k)
     nx = QuadrotorODE.nx
     nu = QuadrotorODE.nu
 
-    @views ForwardDiff.jacobian!(∇f, (xnew, arg) -> dynamics!(xnew, view(arg, 1:nx), view(arg, nx+1:nx+nu), k, false), zeros(nx), vcat(x, u))
+    @views ForwardDiff.jacobian!(
+        ∇f,
+        (xnew, arg) -> dynamics!(xnew, view(arg, 1:nx), view(arg, nx+1:nx+nu), k, false),
+        zeros(nx),
+        vcat(x, u)
+    )
 
     return nothing
 end
