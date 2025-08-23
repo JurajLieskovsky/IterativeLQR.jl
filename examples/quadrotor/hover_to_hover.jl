@@ -65,7 +65,7 @@ function running_cost(x, u, _)
     r, q, v, ω = x[1:3], x[4:7], x[8:10], x[11:13]
     q⃗ = q[2:4]
     dr = r - xₜ[1:3]
-    du = u - zRz(q⃗) * uₜ
+    du = u - uₜ
     return dr'dr + q⃗'q⃗ + 1e-1 * v'v + 1e-1 * ω'ω + 1e-1 * du'du
 end
 
@@ -191,7 +191,7 @@ end
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
     stacked_derivatives=true, state_difference=QuadrotorODE.state_difference, coordinate_jacobian=QuadrotorODE.jacobian,
-    regularization=:arg, algorithm=:ilqr,
+    regularization=:cost, algorithm=:ddp,
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
