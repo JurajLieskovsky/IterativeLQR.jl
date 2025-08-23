@@ -108,7 +108,7 @@ function backward_pass!(workset, algorithm, δ)
             ## additional terms of the DDP algorithm
             if algorithm == :ddp
                 for i in 1:nx
-                    H .+= view(∇2f[k], i, :, :) * vx[k+1][i]
+                    tmp .+= view(∇2f[k], i, :, :) * vx[k+1][i]
                 end
             end
         else
@@ -117,14 +117,21 @@ function backward_pass!(workset, algorithm, δ)
 
             ## additional terms of the DDP algorithm
             if algorithm == :ddp
+                tmp = zeros(nx+nu,nx+nu)
                 vxx_full = E[k+1] * vx[k+1]
                 for i in 1:nx
-                    hess .+= view(∇2f[k], i, :, :) * vxx_full[i]
+                    tmp .+= view(∇2f[k], i, :, :) * vxx_full[i]
                 end
+                ttmp = aug_E[k]' * tmp * aug_E[k]
+                min_regularization!(ttmp, δ)
             end
 
             g .= aug_E[k]' * grad
             H .= aug_E[k]' * hess * aug_E[k]
+
+            if algorithm == :ddp
+                H .+= ttmp
+            end
         end
 
         # regularization
