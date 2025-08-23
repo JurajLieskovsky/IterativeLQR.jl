@@ -208,6 +208,8 @@ df = IterativeLQR.iLQR!(
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
+CSV.write("quadrotor/results/quadrotor-$algorithm-$(warmstart ? "warmstart" : "").csv", df)
+
 # Visualization
 vis = (@isdefined vis) ? vis : Visualizer()
 render(vis)
