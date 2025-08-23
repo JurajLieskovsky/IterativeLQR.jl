@@ -34,7 +34,7 @@ u₀ = uₜ
 
 # Algorithm, regularization, and warmstart
 algorithm = :ddp
-regularization = :cost
+regularization = :none
 warmstart = false
 
 # Dynamics
