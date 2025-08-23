@@ -35,7 +35,7 @@ u₀ = uₜ
 # Algorithm, regularization, and warmstart
 algorithm = :ddp
 regularization = :none # !!! cost regularization in tangent space isn't properly implemented yet
-warmstart = true
+warmstart = false
 
 # Dynamics
 function dynamics!(xnew, x, u, k, normalize=true)
