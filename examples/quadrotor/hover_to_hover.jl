@@ -188,7 +188,7 @@ if warmstart
     df = IterativeLQR.iLQR!(
         workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
         stacked_derivatives=false, regularization=false,
-        state_difference=(x, xref) -> QuadrotorODE.state_difference(x, xref, :qv),
+        state_difference=(x, xref) -> QuadrotorODE.state_difference(x, xref, :rp),
         verbose=true, logging=true, plotting_callback=plotting_callback
     )
 end
@@ -199,7 +199,7 @@ warmstart || IterativeLQR.set_initial_inputs!(workset, [u₀ for _ in 1:N])
 
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    stacked_derivatives=true, state_difference=(x, xref) -> QuadrotorODE.state_difference(x, xref, :qv), coordinate_jacobian=QuadrotorODE.jacobian,
+    stacked_derivatives=true, state_difference=(x, xref) -> QuadrotorODE.state_difference(x, xref, :rp), coordinate_jacobian=QuadrotorODE.jacobian,
     regularization=regularization, algorithm=algorithm,
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
