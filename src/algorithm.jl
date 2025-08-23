@@ -89,7 +89,7 @@ function cost_regularization!(workset, δ)
     return nothing
 end
 
-function backward_pass!(workset, algorithm, δ)
+function backward_pass!(workset, algorithm)
     @unpack N, nx, ndx, nu = workset
     @unpack Δv, vx, vxx = workset.value_function
     @unpack d, K = workset.policy_update
@@ -121,7 +121,7 @@ function backward_pass!(workset, algorithm, δ)
                     tmp .+= view(∇2f[k], i, :, :) * vx[k+1][i]
                 end
 
-                min_regularization!(tmp, δ)
+                min_regularization!(tmp, 0)
                 H .+= tmp
             else
                 vxx_full = E[k+1] * vx[k+1]
@@ -130,13 +130,10 @@ function backward_pass!(workset, algorithm, δ)
                 end
                 ttmp = aug_E[k]' * tmp * aug_E[k]
 
-                min_regularization!(ttmp, δ)
+                min_regularization!(ttmp, 0)
                 H .+= ttmp
             end
         end
-
-        # regularization
-        isnan(δ) || min_regularization!(H, δ)
 
         # control update
         F = @infiltry cholesky(Symmetric(quu))
@@ -255,7 +252,7 @@ function iLQR!(
 
         # backward pass
         bwd = @elapsed begin
-            Δv1, Δv2, d_∞ = backward_pass!(workset, algorithm, δ)
+            Δv1, Δv2, d_∞ = backward_pass!(workset, algorithm)
         end
 
         # forward pass
