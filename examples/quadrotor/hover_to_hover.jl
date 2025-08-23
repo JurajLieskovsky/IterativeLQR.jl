@@ -30,7 +30,7 @@ uₜ = quadrotor.m * quadrotor.g / 4 * ones(4)
 # Initial state and inputs
 θ₀ = 3 * pi / 4
 x₀ = vcat([0, 0, 1.0], [cos(θ₀ / 2), sin(θ₀ / 2), 0, 0], zeros(3), zeros(3))
-u₀ = zeros(QuadrotorODE.nu)
+u₀ = uₜ
 
 # Algorithm, regularization, and warmstart
 algorithm = :ddp
