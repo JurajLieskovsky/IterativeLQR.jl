@@ -30,7 +30,7 @@ function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cos
             # has not been tested
             dynamics_diff!(fx[k], fu[k], fxx[k], fxu[k], fuu[k], x[k], u[k], k)
             for i in 1:ndx
-                fux[k][i,:,:] .= fxu[k][i,:,:]'
+                fux[k][i, :, :] .= fxu[k][i, :, :]'
             end
         end
 
@@ -105,34 +105,18 @@ function backward_pass!(workset, algorithm)
             g .= ∇l[k] + ∇f[k]' * vx[k+1]
             H .= ∇2l[k] + ∇f[k]' * vxx[k+1] * ∇f[k]
         else
-            grad = ∇l[k] + ∇f[k]' * E[k+1] * vx[k+1]
-            hess = ∇2l[k] + ∇f[k]' * E[k+1] * vxx[k+1] * E[k+1]' * ∇f[k]
-
-            g .= aug_E[k]' * grad
-            H .= aug_E[k]' * hess * aug_E[k]
+            g .= aug_E[k]' * (∇l[k] + ∇f[k]' * E[k+1] * vx[k+1])
+            H .= aug_E[k]' * (∇2l[k] + ∇f[k]' * E[k+1] * vxx[k+1] * E[k+1]' * ∇f[k]) * aug_E[k]
         end
 
+        ## additional tensor-vector multiplication terms of the DDP algorithm
         if algorithm == :ddp
-            tmp = zeros(nx+nu,nx+nu)
-
-            ## additional terms of the DDP algorithm
-            if ndx == nx
-                for i in 1:nx
-                    tmp .+= view(∇2f[k], i, :, :) * vx[k+1][i]
-                end
-
-                min_regularization!(tmp, 0)
-                H .+= tmp
-            else
-                vxx_full = E[k+1] * vx[k+1]
-                for i in 1:nx
-                    tmp .+= view(∇2f[k], i, :, :) * vxx_full[i]
-                end
-                ttmp = aug_E[k]' * tmp * aug_E[k]
-
-                min_regularization!(ttmp, 0)
-                H .+= ttmp
-            end
+            tensor_product = mapreduce(
+                (mat, el) -> mat * el, +, eachslice(∇2f[k], dims=1), E[k+1] * vx[k+1]
+            )
+            tmp = ndx == nx ? tensor_product : aug_E[k]' * tensor_product * aug_E[k]
+            min_regularization!(tmp, 0)
+            H .+= tmp
         end
 
         # control update
@@ -212,7 +196,7 @@ function iLQR!(
     stacked_derivatives=false, state_difference=-, coordinate_jacobian=nothing, regularization=:cost, algorithm=:ilqr
 )
     @assert workset.ndx == workset.nx || coordinate_jacobian !== nothing
-   
+
     # line count for printing
     line_count = Ref(0)
 
