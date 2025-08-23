@@ -34,7 +34,7 @@ u₀ = uₜ
 
 # Algorithm, regularization, and warmstart
 algorithm = :ddp
-regularization = :cost
+regularization = :none # !!! cost regularization in tangent space isn't properly implemented yet
 warmstart = false
 
 # Dynamics
@@ -80,7 +80,7 @@ function running_cost(x, u, _)
     r, q, v, ω = x[1:3], x[4:7], x[8:10], x[11:13]
     q⃗ = q[2:4]
     dr = r - xₜ[1:3]
-    du = u - zRz(q⃗) * uₜ
+    du = u - uₜ # change to `du = u - zRz(q⃗) * uₜ` after I figure out the regularization
     return dr'dr + q⃗'q⃗ + 1e-1 * v'v + 1e-1 * ω'ω + 1e-1 * du'du
 end
 
