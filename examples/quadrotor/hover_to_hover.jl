@@ -42,9 +42,9 @@ regularization = :none
 warmstart = false
 
 # Dynamics
-function dynamics!(xnew, x, u, k, normalize=true)
+function dynamics!(xnew, x, u, _)
     xnew .= x + h * QuadrotorODE.dynamics(quadrotor, x, u)
-    normalize && QuadrotorODE.normalize_state!(xnew)
+    QuadrotorODE.normalize_state!(xnew)
     return nothing
 end
 
@@ -54,7 +54,7 @@ function dynamics_diff!(∇f, x, u, k)
 
     @views ForwardDiff.jacobian!(
         ∇f,
-        (xnew, arg) -> dynamics!(xnew, view(arg, 1:nx), view(arg, nx+1:nx+nu), k, false),
+        (xnew, arg) -> dynamics!(xnew, view(arg, 1:nx), view(arg, nx+1:nx+nu), k),
         zeros(nx),
         vcat(x, u)
     )
