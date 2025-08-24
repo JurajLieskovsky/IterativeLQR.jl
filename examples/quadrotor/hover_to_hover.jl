@@ -38,7 +38,7 @@ u₀(_) = zRz(x₀[5:7]) * uₜ
 
 # Algorithm, regularization, and warmstart
 algorithm = :ilqr
-regularization = :cost
+regularization = :none
 warmstart = false
 
 # Dynamics
