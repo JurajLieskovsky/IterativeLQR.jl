@@ -115,6 +115,7 @@ function backward_pass!(workset, algorithm)
     @unpack ∇f, ∇2f = workset.dynamics_derivatives
     @unpack aug_E, E = workset.coordinate_jacobians
 
+    # cost derivatives pre-converted into the tangent space if ndx != nx
     @unpack ∇l, ∇2l = ndx == nx ? workset.cost_derivatives : workset.tangent_cost_derivatives
     @unpack Φx, Φxx = ndx == nx ? workset.cost_derivatives : workset.tangent_cost_derivatives
 
@@ -137,6 +138,7 @@ function backward_pass!(workset, algorithm)
             tensor_product = mapreduce(
                 (mat, el) -> mat * el, +, eachslice(∇2f[k], dims=1), ndx == nx ? vx[k+1] : E[k+1] * vx[k+1]
             )
+            # conversion to the tangent space if necessary and regularization
             tmp = ndx == nx ? tensor_product : aug_E[k]' * tensor_product * aug_E[k]
             min_regularization!(tmp, 0)
             H .+= tmp
