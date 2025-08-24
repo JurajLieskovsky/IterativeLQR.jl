@@ -10,6 +10,7 @@ using Plots
 using DataFrames, CSV
 using Infiltrator
 using BenchmarkTools
+using LinearAlgebra
 
 # Cartpole model
 cartpole = CartPoleODE.Model(9.81, 1, 0.1, 0.2)
@@ -20,8 +21,9 @@ N = 200
 h = T / N
 
 # Initial state and inputs
-x₀ = [0, 1e-3 * pi, 0, 0]
-u₀ = zeros(CartPoleODE.nu)
+θ₀ = 0 * pi
+x₀ = [0, θ₀, 0, 0]
+u₀(k) = sin((k - 1) / N - 1) * ones(CartPoleODE.nu)
 
 # Algorithm and regularization
 algorithm = :ilqr
@@ -67,7 +69,7 @@ end
 
 # Running cost
 Q = diagm([1e1, 1e2, 1, 1])
-R = I(1)
+R = Matrix{Float64}(I, 1, 1)
 
 function running_cost(x, u, _)
     dx = [x[1], cos(x[2] / 2), x[3], x[4]]
@@ -131,7 +133,7 @@ end
 workset = IterativeLQR.Workset{Float64}(CartPoleODE.nx, CartPoleODE.nu, N)
 IterativeLQR.set_initial_state!(workset, x₀)
 
-IterativeLQR.set_initial_inputs!(workset, [u₀ for _ in 1:N])
+IterativeLQR.set_initial_inputs!(workset, [u₀(k) for k in 1:N])
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
     stacked_derivatives=true, regularization=regularization, algorithm=algorithm,

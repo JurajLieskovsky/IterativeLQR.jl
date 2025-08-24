@@ -11,6 +11,7 @@ using DataFrames, CSV
 using Infiltrator
 using BenchmarkTools
 using LinearAlgebra
+using MatrixEquations
 
 # Cartpole model
 cartpole = UCNCartPoleODE.Model(9.81, 1, 0.1, 0.2)
@@ -25,9 +26,9 @@ xₜ = [0.0, 0, 1, 0, 0]
 uₜ = zeros(UCNCartPoleODE.nu)
 
 # Initial state and inputs
-θ = 1e-3 * pi
-x₀ = [0, cos(θ / 2), sin(θ / 2), 0, 0]
-u₀ = uₜ
+θ₀ = 0 * pi
+x₀ = [0, cos(θ₀ / 2), sin(θ₀ / 2), 0, 0]
+u₀(k) = sin((k - 1) / N - 1) * ones(UCNCartPoleODE.nu)
 
 # Algorithm and regularization
 algorithm = :ilqr
@@ -71,7 +72,7 @@ end
 
 # Running cost
 Q = diagm([1e1, 1e2, 1, 1])
-R = 1e-0 * Matrix(I(1))
+R = Matrix{Float64}(I, 1, 1)
 
 function running_cost(x, u, _)
     dx = UCNCartPoleODE.state_difference(x, xₜ)
@@ -140,7 +141,7 @@ end
 workset = IterativeLQR.Workset{Float64}(UCNCartPoleODE.nx, UCNCartPoleODE.nu, N, UCNCartPoleODE.nd)
 IterativeLQR.set_initial_state!(workset, x₀)
 
-IterativeLQR.set_initial_inputs!(workset, [u₀ for _ in 1:N])
+IterativeLQR.set_initial_inputs!(workset, [u₀(k) for k in 1:N])
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
     stacked_derivatives=true, regularization=regularization, algorithm=algorithm,
