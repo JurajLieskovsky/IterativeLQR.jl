@@ -96,12 +96,7 @@ end
 
 function cost_regularization!(workset, δ)
     @unpack N, nx, ndx = workset
-
-    if ndx == nx
-        @unpack ∇2l, Φxx = workset.cost_derivatives
-    else
-        @unpack ∇2l, Φxx = workset.tangent_cost_derivatives
-    end
+    @unpack ∇2l, Φxx = ndx == nx ? workset.cost_derivatives : workset.tangent_cost_derivatives
     
     @threads for k in 1:N
         min_regularization!(∇2l[k], δ)
@@ -120,11 +115,8 @@ function backward_pass!(workset, algorithm)
     @unpack ∇f, ∇2f = workset.dynamics_derivatives
     @unpack aug_E, E = workset.coordinate_jacobians
 
-    if ndx == nx
-        @unpack ∇l, ∇2l, Φx, Φxx = workset.cost_derivatives
-    else
-        @unpack ∇l, ∇2l, Φx, Φxx = workset.tangent_cost_derivatives
-    end
+    @unpack ∇l, ∇2l = ndx == nx ? workset.cost_derivatives : workset.tangent_cost_derivatives
+    @unpack Φx, Φxx = ndx == nx ? workset.cost_derivatives : workset.tangent_cost_derivatives
 
     vx[N+1] .= Φx
     vxx[N+1] .= Φxx
