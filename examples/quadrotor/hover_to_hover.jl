@@ -145,14 +145,8 @@ function final_cost(x, _)
 end
 
 function final_cost_diff!(Φx, Φxx, x, k)
-    E = QuadrotorODE.jacobian(x)
-
-    grad, hess = zeros(13), zeros(13, 13)
-    H = DiffResults.DiffResult(0.0, (grad, hess))
+    H = DiffResults.DiffResult(0.0, (Φx, Φxx))
     ForwardDiff.hessian!(H, x_ -> final_cost(x_, k), x)
-
-    Φx .= E' * H.derivs[1]
-    Φxx .= E' * H.derivs[2] * E
 
     return nothing
 end

@@ -21,7 +21,7 @@ function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cos
     @unpack x, u = nominal_trajectory(workset)
     @unpack fx, fu, fxx, fux, fxu, fuu = workset.dynamics_derivatives
     @unpack lx, lu, lxx, lux, lxu, luu = workset.cost_derivatives
-    @unpack vx, vxx = workset.value_function
+    @unpack Φx, Φxx = workset.cost_derivatives
 
     @threads for k in 1:N
         if algorithm == :ilqr
@@ -38,7 +38,7 @@ function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cos
         lux[k] .= lxu[k]'
     end
 
-    final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
+    final_cost_diff!(Φx, Φxx, x[N+1], N + 1)
 
     return nothing
 end
@@ -49,6 +49,7 @@ function stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, f
     @unpack ∇f, ∇2f = workset.dynamics_derivatives
     @unpack ∇l, ∇2l = workset.cost_derivatives
     @unpack vx, vxx = workset.value_function
+    @unpack Φx, Φxx = workset.cost_derivatives
 
     @threads for k in 1:N
         if algorithm == :ilqr
@@ -60,7 +61,7 @@ function stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, f
         running_cost_diff!(∇l[k], ∇2l[k], x[k], u[k], k)
     end
 
-    final_cost_diff!(vx[N+1], vxx[N+1], x[N+1], N + 1)
+    final_cost_diff!(Φx, Φxx, x[N+1], N + 1)
 
     return nothing
 end
@@ -77,14 +78,13 @@ end
 
 function cost_regularization!(workset, δ)
     @unpack N = workset
-    @unpack ∇2l = workset.cost_derivatives
-    @unpack vxx = workset.value_function
+    @unpack ∇2l, Φxx = workset.cost_derivatives
 
     @threads for k in 1:N
         min_regularization!(∇2l[k], δ)
     end
 
-    min_regularization!(vxx[N+1], δ)
+    min_regularization!(Φxx, δ)
 
     return nothing
 end
@@ -95,8 +95,11 @@ function backward_pass!(workset, algorithm)
     @unpack d, K = workset.policy_update
     @unpack g, qx, qu, H, qxx, quu, qux = workset.subproblem_objective_derivatives
     @unpack ∇f, ∇2f = workset.dynamics_derivatives
-    @unpack ∇l, ∇2l = workset.cost_derivatives
+    @unpack ∇l, ∇2l, Φx, Φxx = workset.cost_derivatives
     @unpack aug_E, E = workset.coordinate_jacobians
+
+    vx[N+1] .= E[N+1]' * Φx
+    vxx[N+1] .= E[N+1]' * Φxx * E[N+1]
 
     @inbounds for k in N:-1:1
 

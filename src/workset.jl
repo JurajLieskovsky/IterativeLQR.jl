@@ -91,6 +91,9 @@ struct CostDerivatives{T}
     lux::Vector{SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}}
     lxu::Vector{SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}}
 
+    Φx::Vector{T}
+    Φxx::Matrix{T}
+
     function CostDerivatives{T}(nx, nu, N) where {T}
         ∇l = [Vector{T}(undef, nx + nu) for _ in 1:N]
         lx = [view(∇l[k], 1:nx) for k in 1:N]
@@ -102,7 +105,10 @@ struct CostDerivatives{T}
         lux = [view(∇2l[k], nx+1:nx+nu, 1:nx) for k in 1:N]
         lxu = [view(∇2l[k], 1:nx, nx+1:nx+nu) for k in 1:N]
 
-        return new(∇l, lx, lu, ∇2l, lxx, luu, lux, lxu)
+        Φx = Vector{T}(undef, nx)
+        Φxx = Matrix{T}(undef, nx, nx)
+
+        return new(∇l, lx, lu, ∇2l, lxx, luu, lux, lxu, Φx, Φxx)
     end
 end
 
