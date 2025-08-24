@@ -135,7 +135,7 @@ function backward_pass!(workset, algorithm)
         ## additional tensor-vector multiplication terms of the DDP algorithm
         if algorithm == :ddp
             tensor_product = mapreduce(
-                (mat, el) -> mat * el, +, eachslice(∇2f[k], dims=1), E[k+1] * vx[k+1]
+                (mat, el) -> mat * el, +, eachslice(∇2f[k], dims=1), ndx == nx ? vx[k+1] : E[k+1] * vx[k+1]
             )
             tmp = ndx == nx ? tensor_product : aug_E[k]' * tensor_product * aug_E[k]
             min_regularization!(tmp, 0)
