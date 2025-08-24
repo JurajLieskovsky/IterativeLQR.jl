@@ -97,7 +97,7 @@ end
 function cost_regularization!(workset, δ)
     @unpack N, nx, ndx = workset
     @unpack ∇2l, Φxx = ndx == nx ? workset.cost_derivatives : workset.tangent_cost_derivatives
-    
+
     @threads for k in 1:N
         min_regularization!(∇2l[k], δ)
     end
@@ -162,8 +162,9 @@ function backward_pass!(workset, algorithm)
     Δ2 = mapreduce(Δ -> Δ[2], +, Δv)
 
     d_∞ = mapreduce(d_k -> mapreduce(abs, max, d_k), max, d)
+    d_2 = sqrt(mapreduce(d_k -> d_k'd_k, +, d))
 
-    return Δ1, Δ2, d_∞
+    return Δ1, Δ2, d_∞, d_2
 end
 
 function forward_pass!(workset, dynamics!, difference, running_cost, final_cost, α)
@@ -193,25 +194,25 @@ function forward_pass!(workset, dynamics!, difference, running_cost, final_cost,
     return true, sum(l), sum(l) - sum(l_ref)
 end
 
-function print_iteration!(line_count, i, α, J, ΔJ, Δv, d_inf, accepted, diff, reg, bwd, fwd)
+function print_iteration!(line_count, i, α, J, ΔJ, Δv, d_inf, d_2, accepted, diff, reg, bwd, fwd)
     line_count[] % 10 == 0 && @printf(
-        "%-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s\n",
-        "iter", "α", "J", "ΔJ", "ΔV", "d∞", "accepted", "diff", "reg", "bwd", "fwd"
+        "%-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s\n",
+        "iter", "α", "J", "ΔJ", "ΔV", "d∞", "d2", "accepted", "diff", "reg", "bwd", "fwd"
     )
     @printf(
-        "%-9i %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9s %-9.3g %-9.3g %-9.3g %-9.3g\n",
-        i, α, J, ΔJ, Δv, d_inf, accepted, diff, reg, bwd, fwd
+        "%-9i %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9s %-9.3g %-9.3g %-9.3g %-9.3g\n",
+        i, α, J, ΔJ, Δv, d_inf, d_2, accepted, diff, reg, bwd, fwd
     )
     line_count[] += 1
 end
 
 iteration_dataframe() = DataFrame(
-    i=Int[], α=Float64[], J=Float64[], ΔJ=Float64[], ΔV=Float64[], d_inf=Float64[], accepted=Bool[],
+    i=Int[], α=Float64[], J=Float64[], ΔJ=Float64[], ΔV=Float64[], d_inf=Float64[], d_2=Float64[], accepted=Bool[],
     diff=Float64[], reg=Float64[], bwd=Float64[], fwd=Float64[]
 )
 
-function log_iteration!(dataframe, i, α, J, ΔJ, Δv, d_inf, accepted, diff, reg, bwd, fwd)
-    push!(dataframe, (i, α, J, ΔJ, Δv, d_inf, accepted, diff, reg, bwd, fwd))
+function log_iteration!(dataframe, i, α, J, ΔJ, Δv, d_inf, d_2, accepted, diff, reg, bwd, fwd)
+    push!(dataframe, (i, α, J, ΔJ, Δv, d_inf, d_2, accepted, diff, reg, bwd, fwd))
 end
 
 function iLQR!(
@@ -234,8 +235,8 @@ function iLQR!(
             successful, J = trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
         end
 
-        verbose && print_iteration!(line_count, 0, NaN, J, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
-        logging && log_iteration!(dataframe, 0, NaN, J, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
+        verbose && print_iteration!(line_count, 0, NaN, J, NaN, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
+        logging && log_iteration!(dataframe, 0, NaN, J, NaN, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
 
         if !successful
             return nothing
@@ -246,8 +247,8 @@ function iLQR!(
                 successful, J, ΔJ = forward_pass!(workset, dynamics!, state_difference, running_cost, final_cost, α)
             end
 
-            verbose && print_iteration!(line_count, 0, NaN, J, ΔJ, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
-            logging && log_iteration!(dataframe, 0, NaN, J, ΔJ, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
+            verbose && print_iteration!(line_count, 0, NaN, J, ΔJ, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
+            logging && log_iteration!(dataframe, 0, NaN, J, ΔJ, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
 
             if successful
                 swap_trajectories!(workset)
@@ -278,7 +279,7 @@ function iLQR!(
 
         # backward pass
         bwd = @elapsed begin
-            Δv1, Δv2, d_∞ = backward_pass!(workset, algorithm)
+            Δv1, Δv2, d_∞, d_2 = backward_pass!(workset, algorithm)
         end
 
         # forward pass
@@ -295,8 +296,8 @@ function iLQR!(
             accepted = successful && ΔJ < 0 && ΔJ <= ρ * Δv
 
             # printout
-            verbose && print_iteration!(line_count, i, α, J, ΔJ, Δv, d_∞, accepted, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
-            logging && log_iteration!(dataframe, i, α, J, ΔJ, Δv, d_∞, accepted, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
+            verbose && print_iteration!(line_count, i, α, J, ΔJ, Δv, d_∞, d_2, accepted, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
+            logging && log_iteration!(dataframe, i, α, J, ΔJ, Δv, d_∞, d_2, accepted, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
 
             # solution copying and regularization parameter adjustment
             if accepted
