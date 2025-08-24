@@ -2,7 +2,7 @@ using Revise
 
 using IterativeLQR
 using IterativeLQR: nominal_trajectory
-using CartPoleODE
+using UCNCartPoleODE
 using MeshCatBenchmarkMechanisms
 
 using ForwardDiff, DiffResults
@@ -10,35 +10,39 @@ using Plots
 using DataFrames, CSV
 using Infiltrator
 using BenchmarkTools
+using LinearAlgebra
 
 # Cartpole model
-cartpole = CartPoleODE.Model(9.81, 1, 0.1, 0.2)
+cartpole = UCNCartPoleODE.Model(9.81, 1, 0.1, 0.2)
 
 # Horizon and timestep
 T = 2
 N = 200
 h = T / N
 
+# Target state
+xₜ = [0.0, 0, 1, 0, 0]
+uₜ = zeros(UCNCartPoleODE.nu)
+
 # Initial state and inputs
-x₀ = [0, 1e-3 * pi, 0, 0]
-u₀ = zeros(CartPoleODE.nu)
+θ = 1e-3 * pi
+x₀ = [0, cos(θ / 2), sin(θ / 2), 0, 0]
+u₀ = uₜ
 
 # Algorithm and regularization
 algorithm = :ilqr
-regularization = :cost
+regularization = :none
 
 # Dynamics
 function dynamics!(xnew, x, u, _)
-    CartPoleODE.f!(cartpole, xnew, x, u)
-    xnew .*= h
-    xnew .+= x
-
+    xnew .= x + h * UCNCartPoleODE.f(cartpole, x, u)
+    UCNCartPoleODE.normalize_state!(x)
     return nothing
 end
 
 function dynamics_diff!(∇f, x, u, k)
-    nx = CartPoleODE.nx
-    nu = CartPoleODE.nu
+    nx = UCNCartPoleODE.nx
+    nu = UCNCartPoleODE.nu
 
     @views ForwardDiff.jacobian!(
         ∇f,
@@ -51,8 +55,8 @@ function dynamics_diff!(∇f, x, u, k)
 end
 
 function dynamics_diff!(∇f, ∇2f, x, u, k)
-    nx = CartPoleODE.nx
-    nu = CartPoleODE.nu
+    nx = UCNCartPoleODE.nx
+    nu = UCNCartPoleODE.nu
 
     function stacked_dynamics(arg)
         xnew = zeros(eltype(arg), nx)
@@ -67,17 +71,17 @@ end
 
 # Running cost
 Q = diagm([1e1, 1e2, 1, 1])
-R = I(1)
+R = 1e-0 * Matrix(I(1))
 
 function running_cost(x, u, _)
-    dx = [x[1], cos(x[2] / 2), x[3], x[4]]
-    du = u
+    dx = UCNCartPoleODE.state_difference(x, xₜ)
+    du = u - uₜ
     return 0.5 * (dx' * Q * dx + du' * R * du)
 end
 
 function running_cost_diff!(∇l, ∇2l, x, u, k)
-    nx = CartPoleODE.nx
-    nu = CartPoleODE.nu
+    nx = UCNCartPoleODE.nx
+    nu = UCNCartPoleODE.nu
 
     H = DiffResults.DiffResult(0.0, (∇l, ∇2l))
 
@@ -91,14 +95,19 @@ function running_cost_diff!(∇l, ∇2l, x, u, k)
 end
 
 # Final cost
+S, _ = begin
+    ∇f, ∇l, ∇2l = zeros(5, 6), zeros(6), zeros(6, 6)
+    dynamics_diff!(∇f, xₜ, uₜ, 0)
+
+    E = UCNCartPoleODE.jacobian(xₜ)
+    A = E' * ∇f[:, 1:5] * E
+    B = E' * ∇f[:, 6:6]
+
+    MatrixEquations.ared(A, B, R, Q)
+end
+
 function final_cost(x, _)
-    S = [
-        1220.03 -2933.78 688.133 -206.76
-        -2933.78 30350.4 -3136.43 1975.89
-        688.133 -3136.43 683.13 -220.279
-        -206.76 1975.89 -220.279 138.723
-    ]
-    dx = [x[1], cos(x[2] / 2), x[3], x[4]]
+    dx = UCNCartPoleODE.state_difference(x, xₜ)
     return dx' * S * dx
 end
 
@@ -113,8 +122,8 @@ function plotting_callback(workset)
     range = 0:workset.N
 
     states = mapreduce(x -> x', vcat, nominal_trajectory(workset).x)
-    state_labels = ["x₁" "x₂" "x₃" "x₄"]
-    position_plot = plot(range, states[:, 1:2], label=state_labels[1:1, 1:2])
+    state_labels = ["x₁" "x₂" "x₃" "x₄" "x₅"]
+    position_plot = plot(range, states[:, 1:3], label=state_labels[1:1, 1:3])
 
     inputs = mapreduce(u -> u', vcat, nominal_trajectory(workset).u)
     input_plot = plot(range, vcat(inputs, inputs[end, :]'), label="u", seriestype=:steppost)
@@ -128,19 +137,22 @@ function plotting_callback(workset)
 end
 
 # Trajectory optimization
-workset = IterativeLQR.Workset{Float64}(CartPoleODE.nx, CartPoleODE.nu, N)
+workset = IterativeLQR.Workset{Float64}(UCNCartPoleODE.nx, UCNCartPoleODE.nu, N, UCNCartPoleODE.nd)
 IterativeLQR.set_initial_state!(workset, x₀)
 
 IterativeLQR.set_initial_inputs!(workset, [u₀ for _ in 1:N])
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
     stacked_derivatives=true, regularization=regularization, algorithm=algorithm,
-    verbose=true, logging=true, plotting_callback=plotting_callback
+    verbose=true, logging=true, plotting_callback=plotting_callback,
+    coordinate_jacobian=UCNCartPoleODE.jacobian,
+    state_difference=UCNCartPoleODE.state_difference
 )
 
-CSV.write("cartpole/results/cartpole-$algorithm.csv", df)
+CSV.write("ucn_cartpole/results/ucn_cartpole-$algorithm.csv", df)
 
 # Visualization
+#=
 (@isdefined vis) || (vis = Visualizer())
 render(vis)
 
@@ -158,3 +170,4 @@ for (i, x) in enumerate(nominal_trajectory(workset).x)
     end
 end
 setanimation!(vis, anim, play=false)
+=#
