@@ -27,9 +27,11 @@ h = T / N
 xₜ = vcat([0, 0, 1.0], [1, 0, 0, 0], zeros(3), zeros(3))
 uₜ = quadrotor.m * quadrotor.g / 4 * ones(4)
 
-# Initial state and inputs
-zRz(q⃗) = 1 - 2 * (q⃗[1]^2 + q⃗[2]^2) # k̂⋅R(q)k̂
+# Directional utility for thrust gravity compensation
+# Calculates the dot product between the z-axes of a global and local frame
+zRz(q⃗) = 1 - 2 * (q⃗[1]^2 + q⃗[2]^2)
 
+# Initial state and inputs
 θ₀ = 3 * pi / 4
 x₀ = vcat([0, 0, 1.0], [cos(θ₀ / 2), sin(θ₀ / 2), 0, 0], zeros(3), zeros(3))
 u₀(_) = zRz(x₀[5:7]) * uₜ
