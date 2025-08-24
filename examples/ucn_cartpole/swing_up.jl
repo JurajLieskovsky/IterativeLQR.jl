@@ -153,22 +153,23 @@ df = IterativeLQR.iLQR!(
 CSV.write("ucn_cartpole/results/ucn_cartpole-$algorithm.csv", df)
 
 # Visualization
-#=
 (@isdefined vis) || (vis = Visualizer())
 render(vis)
+
+## utility for converting to a state that uses an angle instead of a UCN
+xq2xθ(x) = [x[1], 2 * atan(x[3], x[2]), x[4], x[5]]
 
 ## cart-pole
 MeshCatBenchmarkMechanisms.set_cartpole!(vis, 0.1, 0.05, 0.05, cartpole.l, 0.02)
 
 ## initial configuration
-MeshCatBenchmarkMechanisms.set_cartpole_state!(vis, nominal_trajectory(workset).x[1])
+MeshCatBenchmarkMechanisms.set_cartpole_state!(vis, xq2xθ(nominal_trajectory(workset).x[1]))
 
 ## animation
 anim = MeshCatBenchmarkMechanisms.Animation(vis, fps=1 / h)
 for (i, x) in enumerate(nominal_trajectory(workset).x)
     atframe(anim, i) do
-        MeshCatBenchmarkMechanisms.set_cartpole_state!(vis, x)
+        MeshCatBenchmarkMechanisms.set_cartpole_state!(vis, xq2xθ(x))
     end
 end
 setanimation!(vis, anim, play=false)
-=#
