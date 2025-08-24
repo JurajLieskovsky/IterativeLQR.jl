@@ -28,12 +28,14 @@ xₜ = vcat([0, 0, 1.0], [1, 0, 0, 0], zeros(3), zeros(3))
 uₜ = quadrotor.m * quadrotor.g / 4 * ones(4)
 
 # Initial state and inputs
+zRz(q⃗) = 1 - 2 * (q⃗[1]^2 + q⃗[2]^2) # k̂⋅R(q)k̂
+
 θ₀ = 3 * pi / 4
 x₀ = vcat([0, 0, 1.0], [cos(θ₀ / 2), sin(θ₀ / 2), 0, 0], zeros(3), zeros(3))
-u₀ = uₜ
+u₀(_) = zRz(x₀[5:7]) * uₜ
 
 # Algorithm, regularization, and warmstart
-algorithm = :ddp
+algorithm = :ilqr
 regularization = :cost
 warmstart = false
 
@@ -74,14 +76,12 @@ function dynamics_diff!(∇f, ∇2f, x, u, k)
 end
 
 # Running cost
-zRz(q⃗) = 1 - 2 * (q⃗[1]^2 + q⃗[2]^2) # k̂⋅R(q)k̂
-
 function running_cost(x, u, _)
     r, q, v, ω = x[1:3], x[4:7], x[8:10], x[11:13]
     q⃗ = q[2:4]
     dr = r - xₜ[1:3]
     du = u - zRz(q⃗) * uₜ
-    return dr'dr + q⃗'q⃗ + 1e-1 * v'v + 1e-1 * ω'ω + 1e-1 * du'du
+    return dr'dr + 1e1 * q⃗'q⃗ + 1e-1 * v'v + 1e-1 * ω'ω + 1e-1 * du'du
 end
 
 function running_cost_diff!(∇l, ∇2l, x, u, k)
@@ -128,9 +128,9 @@ aug_∇2l = aug_E' * ∇2l * aug_E
 K, S = begin
     A = aug_∇f[:, 1:12]
     B = aug_∇f[:, 13:16]
-    R = aug_∇2l[13:16, 13:16]
-    Q = aug_∇2l[1:12, 1:12]
-    M = aug_∇2l[1:12, 13:16]
+    R = 2*aug_∇2l[13:16, 13:16]
+    Q = 2*aug_∇2l[1:12, 1:12]
+    M = 2*aug_∇2l[1:12, 13:16]
 
     S, _ = ared(A, B, R, Q, M)
     K = inv(R + B' * S * B) * B' * S * A
@@ -140,7 +140,7 @@ end
 
 ## resulting final cost
 function final_cost(x, _)
-    dx = QuadrotorODE.state_difference(x, xₜ, :rp)
+    dx = QuadrotorODE.state_difference(x, xₜ, :qv)
     return dx' * S * dx
 end
 
@@ -182,7 +182,7 @@ if warmstart
     IterativeLQR.iLQR!(
         workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
         stacked_derivatives=true,
-        state_difference=(x, xref) -> QuadrotorODE.state_difference(x, xref, :rp),
+        state_difference=(x, xref) -> QuadrotorODE.state_difference(x, xref, :qv),
         coordinate_jacobian=QuadrotorODE.jacobian,
         regularization=regularization, algorithm=algorithm,
         verbose=true, plotting_callback=plotting_callback
@@ -191,12 +191,12 @@ end
 
 ## re-stabilization
 IterativeLQR.set_initial_state!(workset, x₀)
-warmstart || IterativeLQR.set_initial_inputs!(workset, [u₀ for _ in 1:N])
+warmstart || IterativeLQR.set_initial_inputs!(workset, [u₀(k) for k in 1:N])
 
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
     stacked_derivatives=true, rollout=warmstart ? :partial : :full,
-    state_difference=(x, xref) -> QuadrotorODE.state_difference(x, xref, :rp),
+    state_difference=(x, xref) -> QuadrotorODE.state_difference(x, xref, :qv),
     coordinate_jacobian=QuadrotorODE.jacobian,
     regularization=regularization, algorithm=algorithm,
     verbose=true, logging=true, plotting_callback=plotting_callback
