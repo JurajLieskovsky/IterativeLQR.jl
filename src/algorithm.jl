@@ -76,10 +76,33 @@ function coordinate_jacobian_calculation(workset, coordinate_jacobian)
     end
 end
 
-function cost_regularization!(workset, δ)
+function cost_derivatives_coordinate_transformation(workset)
     @unpack N = workset
-    @unpack ∇2l, Φxx = workset.cost_derivatives
+    @unpack E, aug_E = workset.coordinate_jacobians
 
+    full = workset.cost_derivatives
+    tangent = workset.tangent_cost_derivatives
+
+    @threads for k in 1:N
+        tangent.∇l[k] .= aug_E[k]' * full.∇l[k]
+        tangent.∇2l[k] .= aug_E[k]' * full.∇2l[k] * aug_E[k]
+    end
+
+    tangent.Φx .= E[N+1]' * full.Φx
+    tangent.Φxx .= E[N+1]' * full.Φxx * E[N+1]
+
+    return nothing
+end
+
+function cost_regularization!(workset, δ)
+    @unpack N, nx, ndx = workset
+
+    if ndx == nx
+        @unpack ∇2l, Φxx = workset.cost_derivatives
+    else
+        @unpack ∇2l, Φxx = workset.tangent_cost_derivatives
+    end
+    
     @threads for k in 1:N
         min_regularization!(∇2l[k], δ)
     end
@@ -95,11 +118,16 @@ function backward_pass!(workset, algorithm)
     @unpack d, K = workset.policy_update
     @unpack g, qx, qu, H, qxx, quu, qux = workset.subproblem_objective_derivatives
     @unpack ∇f, ∇2f = workset.dynamics_derivatives
-    @unpack ∇l, ∇2l, Φx, Φxx = workset.cost_derivatives
     @unpack aug_E, E = workset.coordinate_jacobians
 
-    vx[N+1] .= E[N+1]' * Φx
-    vxx[N+1] .= E[N+1]' * Φxx * E[N+1]
+    if ndx == nx
+        @unpack ∇l, ∇2l, Φx, Φxx = workset.cost_derivatives
+    else
+        @unpack ∇l, ∇2l, Φx, Φxx = workset.tangent_cost_derivatives
+    end
+
+    vx[N+1] .= Φx
+    vxx[N+1] .= Φxx
 
     @inbounds for k in N:-1:1
 
@@ -108,8 +136,8 @@ function backward_pass!(workset, algorithm)
             g .= ∇l[k] + ∇f[k]' * vx[k+1]
             H .= ∇2l[k] + ∇f[k]' * vxx[k+1] * ∇f[k]
         else
-            g .= aug_E[k]' * (∇l[k] + ∇f[k]' * E[k+1] * vx[k+1])
-            H .= aug_E[k]' * (∇2l[k] + ∇f[k]' * E[k+1] * vxx[k+1] * E[k+1]' * ∇f[k]) * aug_E[k]
+            g .= ∇l[k] + aug_E[k]' * (∇f[k]' * E[k+1] * vx[k+1])
+            H .= ∇2l[k] + aug_E[k]' * (∇f[k]' * E[k+1] * vxx[k+1] * E[k+1]' * ∇f[k]) * aug_E[k]
         end
 
         ## additional tensor-vector multiplication terms of the DDP algorithm
@@ -247,6 +275,9 @@ function iLQR!(
 
         # coordinate jacobian calculation
         coordinate_jacobian !== nothing && coordinate_jacobian_calculation(workset, coordinate_jacobian)
+
+        # conversion of cost derivatives into tangential plane
+        workset.ndx != workset.nx && cost_derivatives_coordinate_transformation(workset)
 
         # regularization
         reg = (regularization == :cost) ? @elapsed(cost_regularization!(workset, δ)) : NaN

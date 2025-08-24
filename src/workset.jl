@@ -151,6 +151,7 @@ struct Workset{T}
     coordinate_jacobians::CoordinateJacobians{T}
     dynamics_derivatives::DynamicsDerivatives{T}
     cost_derivatives::CostDerivatives{T}
+    tangent_cost_derivatives::CostDerivatives{T}
     subproblem_objective_derivatives::SubproblemObjectiveDerivatives{T}
 
     function Workset{T}(nx, nu, N, ndx=nothing) where {T}
@@ -162,10 +163,11 @@ struct Workset{T}
         coordinate_jacobians = CoordinateJacobians{T}(nx, ndx, nu, N)
         dynamics_derivatives = DynamicsDerivatives{T}(nx, nu, N)
         cost_derivatives = CostDerivatives{T}(nx, nu, N)
+        tangent_cost_derivatives = CostDerivatives{T}(ndx, nu, N)
 
         subproblem_objective_derivatives = SubproblemObjectiveDerivatives{T}(ndx, nu)
 
-        return new(N, nx, ndx, nu, 1, 2, trajectory, value_function, policy_update, coordinate_jacobians, dynamics_derivatives, cost_derivatives, subproblem_objective_derivatives)
+        return new(N, nx, ndx, nu, 1, 2, trajectory, value_function, policy_update, coordinate_jacobians, dynamics_derivatives, cost_derivatives, tangent_cost_derivatives, subproblem_objective_derivatives)
     end
 end
 
