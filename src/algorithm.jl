@@ -145,7 +145,7 @@ function backward_pass!(workset, algorithm)
         end
 
         # control update
-        F = @infiltry cholesky(Symmetric(quu))
+        F = cholesky(Symmetric(quu))
         d[k] = -(F \ qu)
         K[k] = -(F \ qux)
 
