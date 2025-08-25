@@ -27,7 +27,7 @@ u₀(k) = sin((k - 1) / N - 1) * ones(CartPoleODE.nu)
 
 # Algorithm and regularization
 algorithm = :ilqr
-regularization = :none
+regularization = :cost
 
 # Dynamics
 function dynamics!(xnew, x, u, _)
