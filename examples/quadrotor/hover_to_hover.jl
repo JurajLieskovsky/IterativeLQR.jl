@@ -97,50 +97,26 @@ function running_cost_diff!(∇l, ∇2l, x, u, k)
 end
 
 # Final cost
-## Taylor expansions of the system's dynamics and running cost around equilibrium
-∇f, ∇l, ∇2l = zeros(13, 17), zeros(17), zeros(17, 17)
-
-dynamics_diff!(∇f, xₜ, uₜ, 0)
-running_cost_diff!(∇l, ∇2l, xₜ, uₜ, 0)
-
-## augmented forms
-function augmented_coordinate_jacobian(x)
+## infinite horizion LQR value function's matrix
+S,_ = begin
     nx = QuadrotorODE.nx
-    nz = QuadrotorODE.nz
     nu = QuadrotorODE.nu
 
-    aug_E = zeros(eltype(x), nx + nu, nz + nu)
-    aug_E[1:nx, 1:nz] .= QuadrotorODE.jacobian(x)
-    aug_E[nx+1:nx+nu, nz+1:nz+nu] .= Matrix{Float64}(I, nu, nu)
-    return aug_E
+    ∇f, ∇l, ∇2l = zeros(nx, nx+nu), zeros(nx+nu), zeros(nx+nu, nx+nu)
+    dynamics_diff!(∇f, xₜ, uₜ, 0)
+    running_cost_diff!(∇l, ∇2l, xₜ, uₜ, 0)
+
+    E = QuadrotorODE.jacobian(xₜ)
+
+    A = E' * ∇f[:,1:nx] * E
+    B = E' * ∇f[:,nx+1:nx+nu]
+    Q = 2 * E' * ∇2l[1:nx, 1:nx] * E
+    R = 2 * ∇2l[nx+1:nx+nu, nx+1:nx+nu]
+
+    MatrixEquations.ared(A, B, R, Q)
 end
 
-aug_E = augmented_coordinate_jacobian(xₜ)
-
-aug_∇f = QuadrotorODE.jacobian(xₜ)' * ∇f * aug_E
-aug_∇l = aug_E' * ∇l
-aug_∇2l = aug_E' * ∇2l * aug_E
-
-## Check that first and second order conditions for local minima are satisfied
-## This also asserts convexity
-@assert isposdef(aug_∇2l)
-@assert all(isapprox.(aug_∇l, 0))
-
-## value function's matrix
-K, S = begin
-    A = aug_∇f[:, 1:12]
-    B = aug_∇f[:, 13:16]
-    R = 2*aug_∇2l[13:16, 13:16]
-    Q = 2*aug_∇2l[1:12, 1:12]
-    M = 2*aug_∇2l[1:12, 13:16]
-
-    S, _ = ared(A, B, R, Q, M)
-    K = inv(R + B' * S * B) * B' * S * A
-
-    K, S
-end
-
-## resulting final cost
+## resulting final cost and its partial derivatives
 function final_cost(x, _)
     dx = QuadrotorODE.state_difference(x, xₜ)
     return dx' * S * dx
