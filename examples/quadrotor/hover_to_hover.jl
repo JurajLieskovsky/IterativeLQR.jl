@@ -1,10 +1,8 @@
-using QuadrotorODE: state_difference
 using Revise
 
 using IterativeLQR
 using IterativeLQR: nominal_trajectory, active_trajectory
 using QuadrotorODE
-using QuadrotorODE.Quaternions: rot, conjugate
 using MeshCatBenchmarkMechanisms
 
 using LinearAlgebra
@@ -98,18 +96,18 @@ end
 
 # Final cost
 ## infinite horizion LQR value function's matrix
-S,_ = begin
+S, _ = begin
     nx = QuadrotorODE.nx
     nu = QuadrotorODE.nu
 
-    ∇f, ∇l, ∇2l = zeros(nx, nx+nu), zeros(nx+nu), zeros(nx+nu, nx+nu)
+    ∇f, ∇l, ∇2l = zeros(nx, nx + nu), zeros(nx + nu), zeros(nx + nu, nx + nu)
     dynamics_diff!(∇f, xₜ, uₜ, 0)
     running_cost_diff!(∇l, ∇2l, xₜ, uₜ, 0)
 
     E = QuadrotorODE.jacobian(xₜ)
 
-    A = E' * ∇f[:,1:nx] * E
-    B = E' * ∇f[:,nx+1:nx+nu]
+    A = E' * ∇f[:, 1:nx] * E
+    B = E' * ∇f[:, nx+1:nx+nu]
     Q = 2 * E' * ∇2l[1:nx, 1:nx] * E
     R = 2 * ∇2l[nx+1:nx+nu, nx+1:nx+nu]
 
