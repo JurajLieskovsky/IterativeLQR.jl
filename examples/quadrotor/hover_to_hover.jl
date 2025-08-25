@@ -142,7 +142,7 @@ end
 
 ## resulting final cost
 function final_cost(x, _)
-    dx = QuadrotorODE.state_difference(x, xₜ, :qv)
+    dx = QuadrotorODE.state_difference(x, xₜ)
     return dx' * S * dx
 end
 
@@ -184,7 +184,7 @@ if warmstart
     IterativeLQR.iLQR!(
         workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
         stacked_derivatives=true,
-        state_difference=(x, xref) -> QuadrotorODE.state_difference(x, xref, :qv),
+        state_difference=QuadrotorODE.state_difference,
         coordinate_jacobian=QuadrotorODE.jacobian,
         regularization=regularization, algorithm=algorithm,
         verbose=true, plotting_callback=plotting_callback
@@ -198,7 +198,7 @@ warmstart || IterativeLQR.set_initial_inputs!(workset, [u₀(k) for k in 1:N])
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
     stacked_derivatives=true, rollout=warmstart ? :partial : :full,
-    state_difference=(x, xref) -> QuadrotorODE.state_difference(x, xref, :qv),
+    state_difference=QuadrotorODE.state_difference,
     coordinate_jacobian=QuadrotorODE.jacobian,
     regularization=regularization, algorithm=algorithm,
     verbose=true, logging=true, plotting_callback=plotting_callback
