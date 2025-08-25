@@ -97,12 +97,15 @@ end
 
 # Final cost
 S, _ = begin
-    ∇f, ∇l, ∇2l = zeros(5, 6), zeros(6), zeros(6, 6)
+    nx = UCNCartPoleODE.nx
+    nu = UCNCartPoleODE.nu
+
+    ∇f = zeros(nx, nx + nu)
     dynamics_diff!(∇f, xₜ, uₜ, 0)
 
     E = UCNCartPoleODE.jacobian(xₜ)
-    A = E' * ∇f[:, 1:5] * E
-    B = E' * ∇f[:, 6:6]
+    A = E' * ∇f[:, 1:nx] * E
+    B = E' * ∇f[:, nx+1:nx+nu]
 
     MatrixEquations.ared(A, B, R, Q)
 end
