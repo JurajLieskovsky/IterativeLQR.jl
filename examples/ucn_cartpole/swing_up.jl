@@ -28,7 +28,7 @@ uₜ = zeros(UCNCartPoleODE.nu)
 # Initial state and inputs
 θ₀ = 0 * pi
 x₀ = [0, cos(θ₀ / 2), sin(θ₀ / 2), 0, 0]
-u₀(k) = sin((k - 1) / N - 1) * ones(UCNCartPoleODE.nu)
+u₀(k) = cos((k - 1) / N - 1) * ones(UCNCartPoleODE.nu)
 
 # Algorithm and regularization
 algorithm = :ilqr
