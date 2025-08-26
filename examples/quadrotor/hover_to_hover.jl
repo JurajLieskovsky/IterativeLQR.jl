@@ -18,7 +18,7 @@ quadrotor = QuadrotorODE.System(9.81, 0.5, diagm([0.0023, 0.0023, 0.004]), 0.175
 
 # Horizon and timestep
 T = 3
-N = 300
+N = 600
 h = T / N
 
 # Target state
@@ -80,8 +80,8 @@ function running_cost(x, u, _)
     r, q, v, ω = x[1:3], x[4:7], x[8:10], x[11:13]
     q⃗ = q[2:4]
     dr = r - xₜ[1:3]
-    du = u - zRz(q⃗) * uₜ
-    return dr'dr + 1e1 * q⃗'q⃗ + 1e-1 * v'v + 1e-1 * ω'ω + 1e-1 * du'du
+    du = u - uₜ
+    return h * (dr'dr + q⃗'q⃗ / 4 + 1e-1 * v'v + 1e-1 * ω'ω + 1e-1 * du'du)
 end
 
 function running_cost_diff!(∇l, ∇2l, x, u, k)
