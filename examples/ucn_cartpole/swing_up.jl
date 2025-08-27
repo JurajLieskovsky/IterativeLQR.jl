@@ -76,7 +76,7 @@ R = h * Matrix{Float64}(I, 1, 1)
 function running_cost(x, u, _)
     dx = UCNCartPoleODE.state_difference(x, xₜ)
     du = u - uₜ
-    return 0.5 * (dx' * Q * dx + du' * R * du)
+    return dx' * Q * dx + du' * R * du
 end
 
 function running_cost_diff!(∇l, ∇2l, x, u, k)
