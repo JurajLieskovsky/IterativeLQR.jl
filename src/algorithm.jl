@@ -107,7 +107,7 @@ function cost_regularization!(workset, δ)
     return nothing
 end
 
-function backward_pass!(workset, algorithm)
+function backward_pass!(workset, algorithm, μ)
     @unpack N, nx, ndx, nu = workset
     @unpack Δv, vx, vxx = workset.value_function
     @unpack d, K = workset.policy_update
@@ -139,10 +139,10 @@ function backward_pass!(workset, algorithm)
                 (mat, el) -> mat * el, +, eachslice(∇2f[k], dims=1), ndx == nx ? vx[k+1] : E[k+1] * vx[k+1]
             )
             # conversion to the tangent space if necessary and regularization
-            tmp = ndx == nx ? tensor_product : aug_E[k]' * tensor_product * aug_E[k]
-            min_regularization!(tmp, 0)
-            H .+= tmp
+            H .+= ndx == nx ? tensor_product : aug_E[k]' * tensor_product * aug_E[k]
         end
+
+        view(quu, diagind(quu)) .+= μ
 
         # control update
         F = cholesky(Symmetric(quu))
@@ -218,8 +218,10 @@ end
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
     maxiter=200, ρ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16), termination_threshold=1e-4,
+    μ = 0, μ_min = 1e-6, γ=10,
     rollout=:full, verbose=true, logging=false, plotting_callback=nothing,
-    stacked_derivatives=false, state_difference=-, coordinate_jacobian=nothing, regularization=:cost, algorithm=:ilqr
+    stacked_derivatives=false, state_difference=-, coordinate_jacobian=nothing,
+    algorithm=:ilqr
 )
     @assert workset.ndx == workset.nx || coordinate_jacobian !== nothing
 
@@ -274,13 +276,18 @@ function iLQR!(
         # conversion of cost derivatives into tangential plane
         workset.ndx != workset.nx && cost_derivatives_coordinate_transformation(workset)
 
-        # regularization
-        reg = (regularization == :cost) ? @elapsed(cost_regularization!(workset, δ)) : NaN
-
         # backward pass
-        bwd = @elapsed begin
-            Δv1, Δv2, d_∞, d_2 = backward_pass!(workset, algorithm)
+        Δv1, Δv2, d_∞, d_2 = try
+            backward_pass!(workset, algorithm, μ)
+        catch _
+            μ = μ == 0 ? μ_min : μ * γ
+            verbose && print_iteration!(line_count, i, NaN, NaN, NaN, NaN, NaN, NaN, false, diff * 1e3, NaN, NaN, NaN)
+            logging && log_iteration!(dataframe, i, NaN, NaN, NaN, NaN, NaN, NaN, false, diff * 1e3, NaN, NaN, NaN)
+            continue
         end
+
+        reg=NaN
+        bwd=NaN
 
         # forward pass
         accepted = false
@@ -307,8 +314,13 @@ function iLQR!(
             end
         end
 
-        if !accepted || (d_∞ <= termination_threshold)
+        if !accepted && (d_∞ <= termination_threshold)
             break
+        elseif !accepted
+            μ = μ == 0 ? μ_min : μ * γ
+        else
+            μ /= γ
+            μ = μ < μ_min ? 0 : μ
         end
     end
 

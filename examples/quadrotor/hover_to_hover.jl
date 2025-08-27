@@ -35,8 +35,7 @@ x₀ = vcat([0, 0, 1.0], [cos(θ₀ / 2), sin(θ₀ / 2), 0, 0], zeros(3), zeros
 u₀(_) = zRz(x₀[5:7]) * uₜ
 
 # Algorithm, regularization, and warmstart
-algorithm = :ilqr
-regularization = :none
+algorithm = :ddp
 warmstart = false
 
 # Dynamics
@@ -160,7 +159,7 @@ if warmstart
         stacked_derivatives=true,
         state_difference=QuadrotorODE.state_difference,
         coordinate_jacobian=QuadrotorODE.jacobian,
-        regularization=regularization, algorithm=algorithm,
+        algorithm=algorithm,
         verbose=true, plotting_callback=plotting_callback
     )
 end
@@ -174,7 +173,7 @@ df = IterativeLQR.iLQR!(
     stacked_derivatives=true, rollout=warmstart ? :partial : :full,
     state_difference=QuadrotorODE.state_difference,
     coordinate_jacobian=QuadrotorODE.jacobian,
-    regularization=regularization, algorithm=algorithm,
+    algorithm=algorithm,
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
 

@@ -17,8 +17,8 @@ using MatrixEquations
 cartpole = UCNCartPoleODE.Model(9.81, 1, 0.1, 0.2)
 
 # Horizon and timestep
-T = 2
-N = 200
+T = 1.5
+N = 150
 h = T / N
 
 # Target state
@@ -28,11 +28,10 @@ uₜ = zeros(UCNCartPoleODE.nu)
 # Initial state and inputs
 θ₀ = 0 * pi
 x₀ = [0, cos(θ₀ / 2), sin(θ₀ / 2), 0, 0]
-u₀(k) = cos((k - 1) / N - 1) * ones(UCNCartPoleODE.nu)
+u₀(k) = cos(2 * pi * (k - 1) / N - 1) * ones(UCNCartPoleODE.nu)
 
 # Algorithm and regularization
 algorithm = :ilqr
-regularization = :none
 
 # Dynamics
 function dynamics!(xnew, x, u, _)
@@ -71,8 +70,8 @@ function dynamics_diff!(∇f, ∇2f, x, u, k)
 end
 
 # Running cost
-Q = diagm([1e1, 1e2, 1, 1])
-R = Matrix{Float64}(I, 1, 1)
+Q = h * diagm([1e1, 1e2, 1, 1])
+R = h * Matrix{Float64}(I, 1, 1)
 
 function running_cost(x, u, _)
     dx = UCNCartPoleODE.state_difference(x, xₜ)
@@ -147,7 +146,7 @@ IterativeLQR.set_initial_state!(workset, x₀)
 IterativeLQR.set_initial_inputs!(workset, [u₀(k) for k in 1:N])
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    stacked_derivatives=true, regularization=regularization, algorithm=algorithm,
+    stacked_derivatives=true, algorithm=algorithm,
     verbose=true, logging=true, plotting_callback=plotting_callback,
     coordinate_jacobian=UCNCartPoleODE.jacobian,
     state_difference=UCNCartPoleODE.state_difference

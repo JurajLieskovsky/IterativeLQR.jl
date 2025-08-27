@@ -27,7 +27,6 @@ u₀(k) = cos((k - 1) / N - 1) * ones(CartPoleODE.nu)
 
 # Algorithm and regularization
 algorithm = :ilqr
-regularization = :cost
 
 # Dynamics
 function dynamics!(xnew, x, u, _)
@@ -136,7 +135,7 @@ IterativeLQR.set_initial_state!(workset, x₀)
 IterativeLQR.set_initial_inputs!(workset, [u₀(k) for k in 1:N])
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    stacked_derivatives=true, regularization=regularization, algorithm=algorithm,
+    stacked_derivatives=true, algorithm=algorithm,
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
