@@ -32,7 +32,7 @@ u₀(k) = cos(2 * pi * (k - 1) / N - 1) * ones(UCNCartPoleODE.nu)
 
 # Algorithm and regularization
 algorithm = :ilqr
-regularization = (:ddp,)
+regularization = ()
 
 # Dynamics
 function dynamics!(xnew, x, u, _)
@@ -153,7 +153,9 @@ df = IterativeLQR.iLQR!(
     state_difference=UCNCartPoleODE.state_difference
 )
 
-CSV.write("ucn_cartpole/results/ucn_cartpole-$algorithm.csv", df)
+# Save iterations log to csv
+regularization_string = isempty(regularization) ? "" : mapreduce(a -> "-$a", *, regularization)
+CSV.write("ucn_cartpole/results/ucn_cartpole-$algorithm$regularization_string.csv", df)
 
 # Visualization
 (@isdefined vis) || (vis = Visualizer())

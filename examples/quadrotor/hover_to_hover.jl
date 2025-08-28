@@ -36,7 +36,7 @@ u₀(_) = zRz(x₀[5:7]) * uₜ
 
 # Algorithm, regularization, and warmstart
 algorithm = :ilqr
-regularization = (:cost, :ddp)
+regularization = ()
 warmstart = false
 
 # Dynamics
@@ -80,7 +80,7 @@ function running_cost(x, u, _)
     r, q, v, ω = x[1:3], x[4:7], x[8:10], x[11:13]
     q⃗ = q[2:4]
     dr = r - xₜ[1:3]
-    du = u - uₜ
+    du = u - uₜ # u - zRz(q⃗) * uₜ
     return h * (dr'dr + q⃗'q⃗ / 4 + 1e-1 * v'v + 1e-1 * ω'ω + 1e-1 * du'du)
 end
 
@@ -178,7 +178,11 @@ df = IterativeLQR.iLQR!(
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
-CSV.write("quadrotor/results/quadrotor-$algorithm$(warmstart ? "-warmstart" : "").csv", df)
+
+# Save iterations log to csv
+warmstart_string = warmstart ? "-warmstart" : ""
+regularization_string = isempty(regularization) ? "" : mapreduce(a -> "-$a", *, regularization)
+CSV.write("quadrotor/results/quadrotor-$algorithm$warmstart_string$regularization_string.csv", df)
 
 # Visualization
 vis = (@isdefined vis) ? vis : Visualizer()
