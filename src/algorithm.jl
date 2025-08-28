@@ -107,7 +107,7 @@ function cost_regularization!(workset, δ)
     return nothing
 end
 
-function backward_pass!(workset, algorithm)
+function backward_pass!(workset, algorithm, regularization, δ)
     @unpack N, nx, ndx, nu = workset
     @unpack Δv, vx, vxx = workset.value_function
     @unpack d, K = workset.policy_update
@@ -138,11 +138,14 @@ function backward_pass!(workset, algorithm)
             tensor_product = mapreduce(
                 (mat, el) -> mat * el, +, eachslice(∇2f[k], dims=1), ndx == nx ? vx[k+1] : E[k+1] * vx[k+1]
             )
-            # conversion to the tangent space if necessary and regularization
             tmp = ndx == nx ? tensor_product : aug_E[k]' * tensor_product * aug_E[k]
-            min_regularization!(tmp, 0)
+
+            (:ddp in regularization) && min_regularization!(tmp, 0)
             H .+= tmp
         end
+
+        # regularization of the entire sub-problem's Hessian
+        (:arg in regularization) && min_regularization!(H, δ)
 
         # control update
         F = cholesky(Symmetric(quu))
@@ -219,7 +222,7 @@ function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
     maxiter=200, ρ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16), termination_threshold=1e-4,
     rollout=:full, verbose=true, logging=false, plotting_callback=nothing,
-    stacked_derivatives=false, state_difference=-, coordinate_jacobian=nothing, regularization=:cost, algorithm=:ilqr
+    stacked_derivatives=false, state_difference=-, coordinate_jacobian=nothing, regularization=(:cost, :ddp), algorithm=:ilqr
 )
     @assert workset.ndx == workset.nx || coordinate_jacobian !== nothing
 
@@ -275,11 +278,11 @@ function iLQR!(
         workset.ndx != workset.nx && cost_derivatives_coordinate_transformation(workset)
 
         # regularization
-        reg = (regularization == :cost) ? @elapsed(cost_regularization!(workset, δ)) : NaN
+        reg = :cost in regularization ? @elapsed(cost_regularization!(workset, δ)) : NaN
 
         # backward pass
         bwd = @elapsed begin
-            Δv1, Δv2, d_∞, d_2 = backward_pass!(workset, algorithm)
+            Δv1, Δv2, d_∞, d_2 = backward_pass!(workset, algorithm, regularization, δ)
         end
 
         # forward pass

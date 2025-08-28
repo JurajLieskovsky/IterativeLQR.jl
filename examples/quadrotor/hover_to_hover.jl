@@ -36,7 +36,7 @@ u₀(_) = zRz(x₀[5:7]) * uₜ
 
 # Algorithm, regularization, and warmstart
 algorithm = :ilqr
-regularization = :none
+regularization = (:cost, :ddp)
 warmstart = false
 
 # Dynamics
@@ -160,7 +160,7 @@ if warmstart
         stacked_derivatives=true,
         state_difference=QuadrotorODE.state_difference,
         coordinate_jacobian=QuadrotorODE.jacobian,
-        regularization=regularization, algorithm=algorithm,
+        algorithm=algorithm,
         verbose=true, plotting_callback=plotting_callback
     )
 end

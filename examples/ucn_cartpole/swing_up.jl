@@ -32,7 +32,7 @@ u₀(k) = cos(2 * pi * (k - 1) / N - 1) * ones(UCNCartPoleODE.nu)
 
 # Algorithm and regularization
 algorithm = :ilqr
-regularization = :none
+regularization = (:ddp,)
 
 # Dynamics
 function dynamics!(xnew, x, u, _)
