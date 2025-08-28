@@ -23,7 +23,7 @@ h = T / N
 # Initial state and inputs
 θ₀ = 0 * pi
 x₀ = [0, θ₀, 0, 0]
-u₀(k) = cos((k - 1) / N - 1) * ones(CartPoleODE.nu)
+u₀(k) = cos(2 * pi * (k - 1) / N - 1) * ones(CartPoleODE.nu)
 
 # Algorithm and regularization
 algorithm = :ilqr
@@ -68,13 +68,13 @@ function dynamics_diff!(∇f, ∇2f, x, u, k)
 end
 
 # Running cost
-Q = diagm([1e1, 1e2, 1, 1])
-R = Matrix{Float64}(I, 1, 1)
+Q = h * diagm([1e1, 1e2, 1, 1])
+R = h * Matrix{Float64}(I, 1, 1)
 
 function running_cost(x, u, _)
     dx = [x[1], cos(x[2] / 2), x[3], x[4]]
     du = u
-    return 0.5 * (dx' * Q * dx + du' * R * du)
+    return dx' * Q * dx + du' * R * du
 end
 
 function running_cost_diff!(∇l, ∇2l, x, u, k)
@@ -95,10 +95,10 @@ end
 # Final cost
 function final_cost(x, _)
     S = [
-        1220.03 -2933.78 688.133 -206.76
-        -2933.78 30350.4 -3136.43 1975.89
-        688.133 -3136.43 683.13 -220.279
-        -206.76 1975.89 -220.279 138.723
+        12.2003 -29.3378 6.88133 -2.0676
+        -29.3378 303.504 -31.3643 19.7589
+        6.88133 -31.3643 6.8313 -2.20279
+        -2.0676 19.7589 -2.20279 1.38723
     ]
     dx = [x[1], cos(x[2] / 2), x[3], x[4]]
     return dx' * S * dx
