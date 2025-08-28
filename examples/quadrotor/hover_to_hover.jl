@@ -35,7 +35,7 @@ x₀ = vcat([0, 0, 1.0], [cos(θ₀ / 2), sin(θ₀ / 2), 0, 0], zeros(3), zeros
 u₀(_) = zRz(x₀[5:7]) * uₜ
 
 # Algorithm, regularization, and warmstart
-algorithm = :ddp
+algorithm = :ilqr
 warmstart = false
 
 # Dynamics
@@ -177,7 +177,8 @@ df = IterativeLQR.iLQR!(
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
-CSV.write("quadrotor/results/quadrotor-$algorithm$(warmstart ? "-warmstart" : "").csv", df)
+warmstart_string = (warmstart ? "-warmstart" : "")
+CSV.write("quadrotor/results/quadrotor-$algorithm$warmstart_string-μ.csv", df)
 
 # Visualization
 vis = (@isdefined vis) ? vis : Visualizer()

@@ -139,7 +139,7 @@ df = IterativeLQR.iLQR!(
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
-CSV.write("cartpole/results/cartpole-$algorithm.csv", df)
+CSV.write("cartpole/results/cartpole-$algorithm-μ.csv", df)
 
 # Visualization
 (@isdefined vis) || (vis = Visualizer())

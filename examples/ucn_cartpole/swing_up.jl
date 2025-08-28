@@ -152,7 +152,7 @@ df = IterativeLQR.iLQR!(
     state_difference=UCNCartPoleODE.state_difference
 )
 
-CSV.write("ucn_cartpole/results/ucn_cartpole-$algorithm.csv", df)
+CSV.write("ucn_cartpole/results/ucn_cartpole-$algorithm-μ.csv", df)
 
 # Visualization
 (@isdefined vis) || (vis = Visualizer())
