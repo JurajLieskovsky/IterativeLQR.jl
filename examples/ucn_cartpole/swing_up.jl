@@ -17,8 +17,8 @@ using MatrixEquations
 cartpole = UCNCartPoleODE.Model(9.81, 1, 0.1, 0.2)
 
 # Horizon and timestep
-T = 1.5
-N = 150
+T = 2
+N = 200
 h = T / N
 
 # Target state

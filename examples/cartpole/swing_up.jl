@@ -23,7 +23,7 @@ h = T / N
 # Initial state and inputs
 θ₀ = 0 * pi
 x₀ = [0, θ₀, 0, 0]
-u₀(k) = cos((k - 1) / N - 1) * ones(CartPoleODE.nu)
+u₀(k) = cos(2 * pi * (k - 1) / N - 1) * ones(CartPoleODE.nu)
 
 # Algorithm and regularization
 algorithm = :ilqr
