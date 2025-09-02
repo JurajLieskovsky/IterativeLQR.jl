@@ -9,12 +9,19 @@ function regularize!(H, δ, approach)
 end
 
 function eigenvalue_regularization!(H, δ)
-    λ, V = try
-        eigen(Symmetric(H))
+    # remove potential asymetries
+    H .+= H'
+    H ./= 2
+
+    # calculate eigenvalues and eigenvectors
+    λ, _, _, V = try
+        LinearAlgebra.LAPACK.geev!('N','V', H)
     catch e
         @warn("Eigen value decompostion failed during regularization with $e")
         return nothing
     end
+
+    # minimally perturb eigenvalues and reconstruct matrix
     λ_reg = map(e -> e < δ ? δ : e, λ)
     H .= V * diagm(λ_reg) * V'
     return nothing
