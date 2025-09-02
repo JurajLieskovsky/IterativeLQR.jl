@@ -1,31 +1,26 @@
-function min_regularization!(H, δ)
-    λ, V = eigen(Symmetric(H))
+function regularize!(H, δ, approach)
+    if approach == :eig
+        eigenvalue_regularization!(H, δ)
+    elseif approach == :gmw
+        gmw_regularization!(H, δ)
+    else
+        error("undefined regularization approach")
+    end
+end
+
+function eigenvalue_regularization!(H, δ)
+    λ, V = try
+        eigen(Symmetric(H))
+    catch _
+        eigen(H)
+    end
     λ_reg = map(e -> e < δ ? δ : e, λ)
     H .= V * diagm(λ_reg) * V'
     return nothing
 end
 
-function bunchkaufman_regularization!(H, δ)
-    S = bunchkaufman(Symmetric(H, :L))
-    λ, V = eigen(S.D)
-    λ_reg = map(e -> e < δ ? δ : e, λ)
-    H .= V * diagm(λ_reg) * V'
-    view(H, S.p, S.p) .= S.L * H * S.L'
+function gmw_regularization!(H, δ)
+    F = GMW.factorize(H, δ)
+    GMW.reconstruct!(H, F)
     return nothing
 end
-
-function flip_regularization!(H, δ)
-    λ, V = eigen(Symmetric(H))
-    λ_reg = map(e -> e < δ ? max(δ, -e) : e, λ)
-    H .= V * diagm(λ_reg) * V'
-    return nothing
-end
-
-function holy_regularization!(H)
-    # the approach is frankly **** for some PSD matrices
-    # therefore the factorization is run only for benchmarking
-    _ = cholesky(Positive, H)
-    # H .= F.L * F.L'
-    return nothing
-end
-

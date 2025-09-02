@@ -31,8 +31,9 @@ x₀ = [0, cos(θ₀ / 2), sin(θ₀ / 2), 0, 0]
 u₀(k) = cos(2 * pi * (k - 1) / N - 1) * ones(UCNCartPoleODE.nu)
 
 # Algorithm and regularization
-algorithm = :ilqr
-regularization = ()
+algorithm = :ddp
+regularization = (:arg,)
+regularization_approach = :eig
 
 # Dynamics
 function dynamics!(xnew, x, u, _)
@@ -147,7 +148,8 @@ IterativeLQR.set_initial_state!(workset, x₀)
 IterativeLQR.set_initial_inputs!(workset, [u₀(k) for k in 1:N])
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    stacked_derivatives=true, regularization=regularization, algorithm=algorithm,
+    stacked_derivatives=true, algorithm=algorithm,
+    regularization=regularization, regularization_approach=regularization_approach,
     verbose=true, logging=true, plotting_callback=plotting_callback,
     coordinate_jacobian=UCNCartPoleODE.jacobian,
     state_difference=UCNCartPoleODE.state_difference
@@ -155,7 +157,8 @@ df = IterativeLQR.iLQR!(
 
 # Save iterations log to csv
 regularization_string = isempty(regularization) ? "" : mapreduce(a -> "-$a", *, regularization)
-CSV.write("ucn_cartpole/results/ucn_cartpole-$algorithm$regularization_string.csv", df)
+CSV.write("ucn_cartpole/results/ucn_cartpole-$algorithm$regularization_string-$regularization_approach.csv", df)
+CSV.write("cartpole/results/cartpole-$algorithm-ucn.csv", df)
 
 # Visualization
 (@isdefined vis) || (vis = Visualizer())

@@ -17,8 +17,8 @@ using MatrixEquations
 quadrotor = QuadrotorODE.System(9.81, 0.5, diagm([0.0023, 0.0023, 0.004]), 0.1750, 1.0, 0.0245)
 
 # Horizon and timestep
-T = 3
-N = 600
+T = 2
+N = 400
 h = T / N
 
 # Target state
@@ -36,7 +36,8 @@ u₀(_) = zRz(x₀[5:7]) * uₜ
 
 # Algorithm, regularization, and warmstart
 algorithm = :ilqr
-regularization = ()
+regularization = (:cost,)
+regularization_approach = :eig
 warmstart = false
 
 # Dynamics
@@ -80,7 +81,7 @@ function running_cost(x, u, _)
     r, q, v, ω = x[1:3], x[4:7], x[8:10], x[11:13]
     q⃗ = q[2:4]
     dr = r - xₜ[1:3]
-    du = u - uₜ # u - zRz(q⃗) * uₜ
+    du = u - zRz(q⃗) * uₜ
     return h * (dr'dr + q⃗'q⃗ / 4 + 1e-1 * v'v + 1e-1 * ω'ω + 1e-1 * du'du)
 end
 
@@ -171,18 +172,18 @@ warmstart || IterativeLQR.set_initial_inputs!(workset, [u₀(k) for k in 1:N])
 
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    stacked_derivatives=true, rollout=warmstart ? :partial : :full,
+    stacked_derivatives=true, algorithm=algorithm, rollout=warmstart ? :partial : :full,
+    regularization=regularization, regularization_approach=regularization_approach,
     state_difference=QuadrotorODE.state_difference,
     coordinate_jacobian=QuadrotorODE.jacobian,
-    regularization=regularization, algorithm=algorithm,
-    verbose=true, logging=true, plotting_callback=plotting_callback
+    verbose=true, logging=true, plotting_callback=plotting_callback,
 )
 
 
 # Save iterations log to csv
 warmstart_string = warmstart ? "-warmstart" : ""
 regularization_string = isempty(regularization) ? "" : mapreduce(a -> "-$a", *, regularization)
-CSV.write("quadrotor/results/quadrotor-$algorithm$warmstart_string$regularization_string.csv", df)
+CSV.write("quadrotor/results/quadrotor-$algorithm$warmstart_string$regularization_string-$regularization_approach.csv", df)
 
 # Visualization
 vis = (@isdefined vis) ? vis : Visualizer()
