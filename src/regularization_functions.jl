@@ -14,12 +14,7 @@ function eigenvalue_regularization!(H, δ)
     H ./= 2
 
     # calculate eigenvalues and eigenvectors
-    λ, _, _, V = try
-        LinearAlgebra.LAPACK.geev!('N','V', H)
-    catch e
-        @warn("Eigen value decompostion failed during regularization with $e")
-        return nothing
-    end
+    λ, _, _, V = LinearAlgebra.LAPACK.geev!('N', 'V', H)
 
     # minimally perturb eigenvalues and reconstruct matrix
     map!(e -> e < δ ? δ : e, λ, λ)
