@@ -14,6 +14,8 @@ function eigenvalue_regularization!(H, δ)
     H ./= 2
 
     # calculate eigenvalues and eigenvectors
+    #  imaginary components of eigenvalues can be ignored
+    #  as the matrix is symmetric
     λ, _, _, V = LinearAlgebra.LAPACK.geev!('N', 'V', H)
 
     # minimally perturb eigenvalues and reconstruct matrix
@@ -24,7 +26,12 @@ function eigenvalue_regularization!(H, δ)
 end
 
 function gmw_regularization!(H, δ)
+    # perform gill-murray-wright modified Cholesky factorization
+    #  assumes the matrix is symmetric and only uses lower part
     F = GMW.factorize(H, δ)
+
+    # reconstruct the now positive-definite matrix
     GMW.reconstruct!(H, F)
+
     return nothing
 end
