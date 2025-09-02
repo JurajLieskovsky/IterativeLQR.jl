@@ -11,8 +11,9 @@ end
 function eigenvalue_regularization!(H, δ)
     λ, V = try
         eigen(Symmetric(H))
-    catch _
-        eigen(H)
+    catch e
+        @warn("Eigen value decompostion failed during regularization with $e")
+        return nothing
     end
     λ_reg = map(e -> e < δ ? δ : e, λ)
     H .= V * diagm(λ_reg) * V'
