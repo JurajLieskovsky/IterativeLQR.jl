@@ -22,8 +22,9 @@ function eigenvalue_regularization!(H, δ)
     end
 
     # minimally perturb eigenvalues and reconstruct matrix
-    λ_reg = map(e -> e < δ ? δ : e, λ)
-    H .= V * diagm(λ_reg) * V'
+    map!(e -> e < δ ? δ : e, λ, λ)
+    H .= V * Diagonal(λ) * V'
+
     return nothing
 end
 
