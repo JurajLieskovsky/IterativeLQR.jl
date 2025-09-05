@@ -227,8 +227,8 @@ end
 
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
-    maxiter=200, ρ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16), termination_threshold=1e-4,
-    μ=0, μ_min=1e-6, γ=2,
+    maxiter=400, ρ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16), termination_threshold=1e-4,
+    μ_min=1e-6, μ=0, Δ₀=2, Δ=0,
     rollout=:full, verbose=true, logging=false, plotting_callback=nothing,
     stacked_derivatives=false, state_difference=-, coordinate_jacobian=nothing,
     algorithm=:ilqr, regularization=:cost
@@ -292,7 +292,11 @@ function iLQR!(
         catch _
             verbose && print_iteration!(line_count, i, μ, NaN, NaN, NaN, NaN, NaN, NaN, false, diff * 1e3, NaN, NaN, NaN)
             logging && log_iteration!(dataframe, i, μ, NaN, NaN, NaN, NaN, NaN, NaN, false, diff * 1e3, NaN, NaN, NaN)
-            μ = μ == 0 ? μ_min : μ * γ
+
+            # increase μ
+            Δ = max(Δ₀, Δ * Δ₀)
+            μ = max(μ_min, μ * Δ)
+
             continue
         end
 
@@ -327,9 +331,11 @@ function iLQR!(
         if !accepted && (d_∞ <= termination_threshold)
             break
         elseif !accepted
-            μ = μ == 0 ? μ_min : μ * γ
+            Δ = max(Δ₀, Δ * Δ₀)
+            μ = max(μ_min, μ * Δ)
         else
-            μ /= γ
+            Δ = min(1 / Δ₀, Δ / Δ₀)
+            μ = μ * Δ
             μ = μ < μ_min ? 0 : μ
         end
     end

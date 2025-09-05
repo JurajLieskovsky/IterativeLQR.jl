@@ -138,7 +138,7 @@ df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
     stacked_derivatives=true, algorithm=algorithm,
     verbose=true, logging=true, plotting_callback=plotting_callback,
-    regularization=regularization, μ=1e2
+    regularization=regularization, μ=0
 )
 
 CSV.write("cartpole/results/cartpole-$algorithm-μ-$regularization.csv", df)
