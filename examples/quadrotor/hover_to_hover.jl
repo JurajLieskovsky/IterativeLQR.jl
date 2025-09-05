@@ -38,7 +38,7 @@ u₀(_) = zRz(x₀[5:7]) * uₜ
 algorithm = :ilqr
 regularization = (:cost,)
 regularization_approach = :eig
-warmstart = false
+warmstart = true
 
 # Dynamics
 function dynamics!(xnew, x, u, _)
@@ -46,6 +46,16 @@ function dynamics!(xnew, x, u, _)
     QuadrotorODE.normalize_state!(xnew)
     return nothing
 end
+
+# """RK4 integration with zero-order hold on u"""
+# function dynamics!(xnew, x, u, _)
+#     f1 = QuadrotorODE.dynamics(quadrotor, x, u)
+#     f2 = QuadrotorODE.dynamics(quadrotor, x + 0.5 * h * f1, u)
+#     f3 = QuadrotorODE.dynamics(quadrotor, x + 0.5 * h * f2, u)
+#     f4 = QuadrotorODE.dynamics(quadrotor, x + h * f3, u)
+#     xnew .= x + (h / 6.0) * (f1 + 2 * f2 + 2 * f3 + f4)
+#     return nothing
+# end
 
 function dynamics_diff!(∇f, x, u, k)
     nx = QuadrotorODE.nx
