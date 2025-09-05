@@ -107,12 +107,12 @@ function cost_regularization!(workset, δ)
     return nothing
 end
 
-function backward_pass!(workset, algorithm, μ)
+function backward_pass!(workset, algorithm, regularization, μ)
     @unpack N, nx, ndx, nu = workset
     @unpack Δv, vx, vxx = workset.value_function
     @unpack d, K = workset.policy_update
     @unpack g, qx, qu, H, qxx, quu, qux = workset.subproblem_objective_derivatives
-    @unpack ∇f, ∇2f = workset.dynamics_derivatives
+    @unpack fx, fu, ∇f, ∇2f = workset.dynamics_derivatives
     @unpack aug_E, E = workset.coordinate_jacobians
 
     # cost derivatives pre-converted into the tangent space if ndx != nx
@@ -142,16 +142,26 @@ function backward_pass!(workset, algorithm, μ)
             H .+= ndx == nx ? tensor_product : aug_E[k]' * tensor_product * aug_E[k]
         end
 
-        view(quu, diagind(quu)) .+= μ
+        q̃ux = if regularization == :cost
+            qux
+        elseif regularization == :value
+            qux + fu[k]' * μ * I(ndx) * fx[k]
+        end
+
+        q̃uu = if regularization == :cost
+            quu + μ * I(nu)
+        elseif regularization == :value
+            quu + fu[k]' * μ * I(ndx) * fu[k]
+        end
 
         # control update
-        F = cholesky(Symmetric(quu))
+        F = cholesky(Symmetric(q̃uu))
         d[k] = -(F \ qu)
-        K[k] = -(F \ qux)
+        K[k] = -(F \ q̃ux)
 
         # cost-to-go model
-        vx[k] .= qx + K[k]' * qu
-        vxx[k] .= qxx + K[k]' * qux
+        vx[k] .= qx + K[k]' * qu + K[k]' * quu * d[k] + qux' * d[k]
+        vxx[k] .= qxx + K[k]' * quu * K[k] + K[k]' * qux + qux' * K[k]
 
         # expected improvement
         Δv[k][1] = d[k]' * qu
@@ -194,34 +204,34 @@ function forward_pass!(workset, dynamics!, difference, running_cost, final_cost,
     return true, sum(l), sum(l) - sum(l_ref)
 end
 
-function print_iteration!(line_count, i, α, J, ΔJ, Δv, d_inf, d_2, accepted, diff, reg, bwd, fwd)
+function print_iteration!(line_count, i, μ, α, J, ΔJ, Δv, d_inf, d_2, accepted, diff, reg, bwd, fwd)
     line_count[] % 10 == 0 && @printf(
-        "%-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s\n",
-        "iter", "α", "J", "ΔJ", "ΔV", "d∞", "d2", "accepted", "diff", "reg", "bwd", "fwd"
+        "%-9s %-9s %-9s %-11s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s\n",
+        "iter", "μ", "α", "J", "ΔJ", "ΔV", "d∞", "d2", "accepted", "diff", "reg", "bwd", "fwd"
     )
     @printf(
-        "%-9i %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9s %-9.3g %-9.3g %-9.3g %-9.3g\n",
-        i, α, J, ΔJ, Δv, d_inf, d_2, accepted, diff, reg, bwd, fwd
+        "%-9i %-9.3g %-9.3g %-11.5g %-9.3g %-9.3g %-9.3g %-9.3g %-9s %-9.3g %-9.3g %-9.3g %-9.3g\n",
+        i, μ, α, J, ΔJ, Δv, d_inf, d_2, accepted, diff, reg, bwd, fwd
     )
     line_count[] += 1
 end
 
 iteration_dataframe() = DataFrame(
-    i=Int[], α=Float64[], J=Float64[], ΔJ=Float64[], ΔV=Float64[], d_inf=Float64[], d_2=Float64[], accepted=Bool[],
+    i=Int[], μ=Float64[], α=Float64[], J=Float64[], ΔJ=Float64[], ΔV=Float64[], d_inf=Float64[], d_2=Float64[], accepted=Bool[],
     diff=Float64[], reg=Float64[], bwd=Float64[], fwd=Float64[]
 )
 
-function log_iteration!(dataframe, i, α, J, ΔJ, Δv, d_inf, d_2, accepted, diff, reg, bwd, fwd)
-    push!(dataframe, (i, α, J, ΔJ, Δv, d_inf, d_2, accepted, diff, reg, bwd, fwd))
+function log_iteration!(dataframe, i, μ, α, J, ΔJ, Δv, d_inf, d_2, accepted, diff, reg, bwd, fwd)
+    push!(dataframe, (i, μ, α, J, ΔJ, Δv, d_inf, d_2, accepted, diff, reg, bwd, fwd))
 end
 
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
     maxiter=200, ρ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16), termination_threshold=1e-4,
-    μ = 0, μ_min = 1e-6, γ=10,
+    μ=0, μ_min=1e-6, γ=2,
     rollout=:full, verbose=true, logging=false, plotting_callback=nothing,
     stacked_derivatives=false, state_difference=-, coordinate_jacobian=nothing,
-    algorithm=:ilqr
+    algorithm=:ilqr, regularization=:cost
 )
     @assert workset.ndx == workset.nx || coordinate_jacobian !== nothing
 
@@ -237,8 +247,8 @@ function iLQR!(
             successful, J = trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
         end
 
-        verbose && print_iteration!(line_count, 0, NaN, J, NaN, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
-        logging && log_iteration!(dataframe, 0, NaN, J, NaN, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
+        verbose && print_iteration!(line_count, 0, NaN, NaN, J, NaN, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
+        logging && log_iteration!(dataframe, 0, NaN, NaN, J, NaN, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
 
         if !successful
             return nothing
@@ -249,8 +259,8 @@ function iLQR!(
                 successful, J, ΔJ = forward_pass!(workset, dynamics!, state_difference, running_cost, final_cost, α)
             end
 
-            verbose && print_iteration!(line_count, 0, NaN, J, ΔJ, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
-            logging && log_iteration!(dataframe, 0, NaN, J, ΔJ, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
+            verbose && print_iteration!(line_count, 0, NaN, NaN, J, ΔJ, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
+            logging && log_iteration!(dataframe, 0, NaN, NaN, J, ΔJ, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
 
             if successful
                 swap_trajectories!(workset)
@@ -278,16 +288,16 @@ function iLQR!(
 
         # backward pass
         Δv1, Δv2, d_∞, d_2 = try
-            backward_pass!(workset, algorithm, μ)
+            backward_pass!(workset, algorithm, regularization, μ)
         catch _
+            verbose && print_iteration!(line_count, i, μ, NaN, NaN, NaN, NaN, NaN, NaN, false, diff * 1e3, NaN, NaN, NaN)
+            logging && log_iteration!(dataframe, i, μ, NaN, NaN, NaN, NaN, NaN, NaN, false, diff * 1e3, NaN, NaN, NaN)
             μ = μ == 0 ? μ_min : μ * γ
-            verbose && print_iteration!(line_count, i, NaN, NaN, NaN, NaN, NaN, NaN, false, diff * 1e3, NaN, NaN, NaN)
-            logging && log_iteration!(dataframe, i, NaN, NaN, NaN, NaN, NaN, NaN, false, diff * 1e3, NaN, NaN, NaN)
             continue
         end
 
-        reg=NaN
-        bwd=NaN
+        reg = NaN
+        bwd = NaN
 
         # forward pass
         accepted = false
@@ -303,8 +313,8 @@ function iLQR!(
             accepted = successful && ΔJ < 0 && ΔJ <= ρ * Δv
 
             # printout
-            verbose && print_iteration!(line_count, i, α, J, ΔJ, Δv, d_∞, d_2, accepted, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
-            logging && log_iteration!(dataframe, i, α, J, ΔJ, Δv, d_∞, d_2, accepted, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
+            verbose && print_iteration!(line_count, i, μ, α, J, ΔJ, Δv, d_∞, d_2, accepted, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
+            logging && log_iteration!(dataframe, i, μ, α, J, ΔJ, Δv, d_∞, d_2, accepted, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)
 
             # solution copying and regularization parameter adjustment
             if accepted
