@@ -158,10 +158,10 @@ if warmstart
 
     IterativeLQR.iLQR!(
         workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-        stacked_derivatives=true,
+        stacked_derivatives=true, algorithm=algorithm,
+        regularization=regularization, regularization_approach=regularization_approach,
         state_difference=QuadrotorODE.state_difference,
         coordinate_jacobian=QuadrotorODE.jacobian,
-        algorithm=algorithm,
         verbose=true, plotting_callback=plotting_callback
     )
 end
@@ -183,7 +183,7 @@ df = IterativeLQR.iLQR!(
 # Save iterations log to csv
 warmstart_string = warmstart ? "-warmstart" : ""
 regularization_string = isempty(regularization) ? "" : mapreduce(a -> "-$a", *, regularization)
-CSV.write("quadrotor/results/quadrotor-$algorithm$warmstart_string$regularization_string-$regularization_approach.csv", df)
+CSV.write("quadrotor/results/quadrotor$warmstart_string-$algorithm$regularization_string-$regularization_approach.csv", df)
 
 # Visualization
 vis = (@isdefined vis) ? vis : Visualizer()
