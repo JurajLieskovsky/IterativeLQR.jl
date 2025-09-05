@@ -31,8 +31,8 @@ x₀ = [0, cos(θ₀ / 2), sin(θ₀ / 2), 0, 0]
 u₀(k) = cos(2 * pi * (k - 1) / N - 1) * ones(UCNCartPoleODE.nu)
 
 # Algorithm and regularization
-algorithm = :ddp
-regularization = (:arg,)
+algorithm = :ilqr
+regularization = (:cost,)
 regularization_approach = :eig
 
 # Dynamics
