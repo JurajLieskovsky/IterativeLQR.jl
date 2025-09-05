@@ -199,11 +199,11 @@ end
 
 function print_iteration!(line_count, i, α, J, ΔJ, Δv, d_inf, d_2, accepted, diff, reg, bwd, fwd)
     line_count[] % 10 == 0 && @printf(
-        "%-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s %-9s\n",
+        "%-9s %-9s %-11s %-9s %-9s %-9s %-9s %-9s %-9s %-8s %-8s %-8s\n",
         "iter", "α", "J", "ΔJ", "ΔV", "d∞", "d2", "accepted", "diff", "reg", "bwd", "fwd"
     )
     @printf(
-        "%-9i %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9.3g %-9s %-9.3g %-9.3g %-9.3g %-9.3g\n",
+        "%-9i %-9.3g %-11.5g %-9.3g %-9.3g %-9.3g %-9.3g %-9s %-9.3g %-8.2g %-8.2g %-8.2g\n",
         i, α, J, ΔJ, Δv, d_inf, d_2, accepted, diff, reg, bwd, fwd
     )
     line_count[] += 1
