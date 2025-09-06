@@ -30,11 +30,20 @@ algorithm = :ilqr
 regularization = :value
 
 # Dynamics
-function dynamics!(xnew, x, u, _)
-    CartPoleODE.f!(cartpole, xnew, x, u)
-    xnew .*= h
-    xnew .+= x
+# function dynamics!(xnew, x, u, _)
+#     CartPoleODE.f!(cartpole, xnew, x, u)
+#     xnew .*= h
+#     xnew .+= x
+#     return nothing
+# end
 
+"""RK4 integration with zero-order hold on u"""
+function dynamics!(xnew, x, u, _)
+    f1 = CartPoleODE.f(cartpole, x, u)
+    f2 = CartPoleODE.f(cartpole, x + 0.5 * h * f1, u)
+    f3 = CartPoleODE.f(cartpole, x + 0.5 * h * f2, u)
+    f4 = CartPoleODE.f(cartpole, x + h * f3, u)
+    xnew .= x + (h / 6.0) * (f1 + 2 * f2 + 2 * f3 + f4)
     return nothing
 end
 

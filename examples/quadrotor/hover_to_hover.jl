@@ -17,8 +17,8 @@ using MatrixEquations
 quadrotor = QuadrotorODE.System(9.81, 0.5, diagm([0.0023, 0.0023, 0.004]), 0.1750, 1.0, 0.0245)
 
 # Horizon and timestep
-T = 3
-N = 600
+T = 2
+N = 200
 h = T / N
 
 # Target state
@@ -39,9 +39,19 @@ algorithm = :ilqr
 warmstart = false
 
 # Dynamics
+# function dynamics!(xnew, x, u, _)
+#     xnew .= x + h * QuadrotorODE.dynamics(quadrotor, x, u)
+#     QuadrotorODE.normalize_state!(xnew)
+#     return nothing
+# end
+
+"""RK4 integration with zero-order hold on u"""
 function dynamics!(xnew, x, u, _)
-    xnew .= x + h * QuadrotorODE.dynamics(quadrotor, x, u)
-    QuadrotorODE.normalize_state!(xnew)
+    f1 = QuadrotorODE.dynamics(quadrotor, x, u)
+    f2 = QuadrotorODE.dynamics(quadrotor, x + 0.5 * h * f1, u)
+    f3 = QuadrotorODE.dynamics(quadrotor, x + 0.5 * h * f2, u)
+    f4 = QuadrotorODE.dynamics(quadrotor, x + h * f3, u)
+    xnew .= x + (h / 6.0) * (f1 + 2 * f2 + 2 * f3 + f4)
     return nothing
 end
 
