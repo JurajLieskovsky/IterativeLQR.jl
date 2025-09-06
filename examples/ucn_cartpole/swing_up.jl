@@ -32,13 +32,24 @@ u₀(k) = cos(2 * pi * (k - 1) / N - 1) * ones(UCNCartPoleODE.nu)
 
 # Algorithm and regularization
 algorithm = :ilqr
-regularization = (:cost,)
-regularization_approach = :eig
+regularization = ()
+regularization_approach = :none
 
 # Dynamics
+# function dynamics!(xnew, x, u, _)
+#     xnew .= x + h * UCNCartPoleODE.f(cartpole, x, u)
+#     UCNCartPoleODE.normalize_state!(xnew)
+#     return nothing
+# end
+
+"""RK4 integration with zero-order hold on u"""
 function dynamics!(xnew, x, u, _)
-    xnew .= x + h * UCNCartPoleODE.f(cartpole, x, u)
-    UCNCartPoleODE.normalize_state!(x)
+    f1 = UCNCartPoleODE.f(cartpole, x, u)
+    f2 = UCNCartPoleODE.f(cartpole, x + 0.5 * h * f1, u)
+    f3 = UCNCartPoleODE.f(cartpole, x + 0.5 * h * f2, u)
+    f4 = UCNCartPoleODE.f(cartpole, x + h * f3, u)
+    xnew .= x + (h / 6.0) * (f1 + 2 * f2 + 2 * f3 + f4)
+    UCNCartPoleODE.normalize_state!(xnew)
     return nothing
 end
 

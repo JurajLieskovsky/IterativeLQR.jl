@@ -18,7 +18,7 @@ quadrotor = QuadrotorODE.System(9.81, 0.5, diagm([0.0023, 0.0023, 0.004]), 0.175
 
 # Horizon and timestep
 T = 2
-N = 400
+N = 200
 h = T / N
 
 # Target state
@@ -41,21 +41,21 @@ regularization_approach = :eig
 warmstart = true
 
 # Dynamics
-function dynamics!(xnew, x, u, _)
-    xnew .= x + h * QuadrotorODE.dynamics(quadrotor, x, u)
-    QuadrotorODE.normalize_state!(xnew)
-    return nothing
-end
-
-# """RK4 integration with zero-order hold on u"""
 # function dynamics!(xnew, x, u, _)
-#     f1 = QuadrotorODE.dynamics(quadrotor, x, u)
-#     f2 = QuadrotorODE.dynamics(quadrotor, x + 0.5 * h * f1, u)
-#     f3 = QuadrotorODE.dynamics(quadrotor, x + 0.5 * h * f2, u)
-#     f4 = QuadrotorODE.dynamics(quadrotor, x + h * f3, u)
-#     xnew .= x + (h / 6.0) * (f1 + 2 * f2 + 2 * f3 + f4)
+#     xnew .= x + h * QuadrotorODE.dynamics(quadrotor, x, u)
+#     QuadrotorODE.normalize_state!(xnew)
 #     return nothing
 # end
+
+"""RK4 integration with zero-order hold on u"""
+function dynamics!(xnew, x, u, _)
+    f1 = QuadrotorODE.dynamics(quadrotor, x, u)
+    f2 = QuadrotorODE.dynamics(quadrotor, x + 0.5 * h * f1, u)
+    f3 = QuadrotorODE.dynamics(quadrotor, x + 0.5 * h * f2, u)
+    f4 = QuadrotorODE.dynamics(quadrotor, x + h * f3, u)
+    xnew .= x + (h / 6.0) * (f1 + 2 * f2 + 2 * f3 + f4)
+    return nothing
+end
 
 function dynamics_diff!(∇f, x, u, k)
     nx = QuadrotorODE.nx
