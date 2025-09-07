@@ -261,6 +261,8 @@ function iLQR!(
         end
     end
 
+    (plotting_callback === nothing) || plotting_callback(workset)
+
     # algorithm
     for i in 1:maxiter
         # nominal trajectory differentiation
