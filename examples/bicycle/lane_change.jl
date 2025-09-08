@@ -184,4 +184,4 @@ df = IterativeLQR.iLQR!(
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
-return nothing
+CSV.write("bicycle/results/bicycle-lane_change-$algorithm-μ-$regularization.csv", df)

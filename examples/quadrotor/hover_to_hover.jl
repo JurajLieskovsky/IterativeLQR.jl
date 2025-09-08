@@ -36,7 +36,8 @@ u₀(_) = zRz(x₀[5:7]) * uₜ
 
 # Algorithm, regularization, and warmstart
 algorithm = :ilqr
-warmstart = false
+regularization = :value
+warmstart = true
 
 # Dynamics
 # function dynamics!(xnew, x, u, _)
@@ -169,7 +170,7 @@ if warmstart
         stacked_derivatives=true,
         state_difference=QuadrotorODE.state_difference,
         coordinate_jacobian=QuadrotorODE.jacobian,
-        algorithm=algorithm,
+        algorithm=algorithm, regularization=regularization,
         verbose=true, plotting_callback=plotting_callback
     )
 end
@@ -183,12 +184,12 @@ df = IterativeLQR.iLQR!(
     stacked_derivatives=true, rollout=warmstart ? :partial : :full,
     state_difference=QuadrotorODE.state_difference,
     coordinate_jacobian=QuadrotorODE.jacobian,
-    algorithm=algorithm,
+    algorithm=algorithm, regularization=regularization,
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
 warmstart_string = (warmstart ? "-warmstart" : "")
-CSV.write("quadrotor/results/quadrotor-$algorithm$warmstart_string-μ.csv", df)
+CSV.write("quadrotor/results/quadrotor$warmstart_string-$algorithm-μ-$regularization.csv", df)
 
 # Visualization
 vis = (@isdefined vis) ? vis : Visualizer()
