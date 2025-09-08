@@ -31,7 +31,8 @@ x₀ = [0, cos(θ₀ / 2), sin(θ₀ / 2), 0, 0]
 u₀(k) = cos(2 * pi * (k - 1) / N - 1) * ones(UCNCartPoleODE.nu)
 
 # Algorithm and regularization
-algorithm = :ilqr
+algorithm = :ddp
+regularization = :cost
 
 # Dynamics
 # function dynamics!(xnew, x, u, _)
@@ -163,7 +164,7 @@ df = IterativeLQR.iLQR!(
     state_difference=UCNCartPoleODE.state_difference
 )
 
-CSV.write("ucn_cartpole/results/ucn_cartpole-$algorithm-μ.csv", df)
+CSV.write("ucn_cartpole/results/ucn_cartpole-$algorithm-μ-$regularization.csv", df)
 
 # Visualization
 (@isdefined vis) || (vis = Visualizer())
