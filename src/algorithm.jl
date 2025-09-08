@@ -228,7 +228,7 @@ end
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
     maxiter=400, ρ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16), termination_threshold=1e-4,
-    μ_min=1e-6, μ=0, Δ₀=2, Δ=0,
+    μ_min=1e-6, μ_max=1e16, μ=0, Δ₀=2, Δ=0,
     rollout=:full, verbose=true, logging=false, plotting_callback=nothing,
     stacked_derivatives=false, state_difference=-, coordinate_jacobian=nothing,
     algorithm=:ilqr, regularization=:cost
@@ -298,6 +298,7 @@ function iLQR!(
             # increase μ
             Δ = max(Δ₀, Δ * Δ₀)
             μ = max(μ_min, μ * Δ)
+            μ >= μ_max && break
 
             continue
         end
@@ -335,6 +336,7 @@ function iLQR!(
         elseif !accepted
             Δ = max(Δ₀, Δ * Δ₀)
             μ = max(μ_min, μ * Δ)
+            μ >= μ_max && break
         else
             Δ = min(1 / Δ₀, Δ / Δ₀)
             μ = μ * Δ
