@@ -185,4 +185,6 @@ df = IterativeLQR.iLQR!(
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
-return nothing
+# Save iterations log to csv
+regularization_string = mapreduce(a -> "-$a", *, regularization)
+CSV.write("bicycle/results/bicycle-lane_change-$algorithm$regularization_string-$regularization_approach.csv", df)
