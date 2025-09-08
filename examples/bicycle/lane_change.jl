@@ -22,17 +22,17 @@ N = 500
 h = T / N
 
 # Target state
-vₜ = 130 / 3.6 # ms^-1 - target velocity
+vₜ = 90 / 3.6 # ms^-1 - target velocity
 xₜ = [3.5, 0, vₜ, 0]
 uₜ = zeros(KinematicBicycleODE.nu)
 
 # Initial state and inputs
-x₀ = [0, 0, vₜ, 0]
+x₀ = [0, 0, 40 / 3.6, 0]
 u₀(_) = zeros(KinematicBicycleODE.nu)
 
 # Algorithm and regularization
-algorithm = :ilqr
-regularization = (:cost,)
+algorithm = :ddp
+regularization = (:arg,)
 regularization_approach = :eig
 
 # Dynamics
