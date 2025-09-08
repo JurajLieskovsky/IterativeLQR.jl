@@ -28,7 +28,7 @@ uₜ = zeros(KinematicBicycleODE.nu)
 
 # Initial state and inputs
 x₀ = [0, 0, 40 / 3.6, 0]
-u₀(_) = zeros(KinematicBicycleODE.nu)
+u₀(_) = [0, 1e-3]
 
 # Algorithm and regularization
 algorithm = :ddp
