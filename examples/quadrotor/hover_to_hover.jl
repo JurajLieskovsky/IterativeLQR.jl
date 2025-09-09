@@ -35,9 +35,9 @@ x₀ = vcat([0, 0, 1.0], [cos(θ₀ / 2), sin(θ₀ / 2), 0, 0], zeros(3), zeros
 u₀(_) = zRz(x₀[5:7]) * uₜ
 
 # Algorithm, regularization, and warmstart
-algorithm = :ilqr
-regularization = (:cost,)
-regularization_approach = :eig
+algorithm = :ddp
+regularization = (:arg,)
+regularization_approach = :gmw
 warmstart = true
 
 # Dynamics
@@ -91,7 +91,7 @@ function running_cost(x, u, _)
     r, q, v, ω = x[1:3], x[4:7], x[8:10], x[11:13]
     q⃗ = q[2:4]
     dr = r - xₜ[1:3]
-    du = u - zRz(q⃗) * uₜ
+    du = u - uₜ
     return h * (dr'dr + q⃗'q⃗ / 4 + 1e-1 * v'v + 1e-1 * ω'ω + 1e-1 * du'du)
 end
 
