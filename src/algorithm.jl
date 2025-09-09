@@ -142,19 +142,37 @@ function backward_pass!(workset, algorithm, regularization, μ)
             H .+= ndx == nx ? tensor_product : aug_E[k]' * tensor_product * aug_E[k]
         end
 
-        q̃ux = if regularization == :cost
-            qux
-        elseif regularization == :value
-            qux + fu[k]' * μ * I(ndx) * fx[k]
-        end
-
+        # fix assymetries in H
+        H .+= H'
+        H .*= 0.5
+        
+        # control update
+        ## q̃uu
         q̃uu = if regularization == :cost
             quu + μ * I(nu)
         elseif regularization == :value
-            quu + fu[k]' * μ * I(ndx) * fu[k]
+            if ndx == nx
+                quu + μ * fu[k]' * fu[k]
+            else
+                quu + μ * fu[k]' * E[k+1] * E[k+1]' * fu[k]
+            end
         end
 
-        # control update
+        q̃uu += q̃uu'
+        q̃uu *= 0.5
+
+        ## q̃ux
+        q̃ux = if regularization == :cost
+            qux
+        elseif regularization == :value
+            if ndx == nx
+                qux + μ * fu[k]' * fx[k]
+            else
+                qux + μ * fu[k]' * E[k+1] * E[k+1]' * fx[k] * E[k]
+            end
+        end
+
+        ## d, K
         F = cholesky(Symmetric(q̃uu))
         d[k] = -(F \ qu)
         K[k] = -(F \ q̃ux)
@@ -291,7 +309,8 @@ function iLQR!(
         # backward pass
         Δv1, Δv2, d_∞, d_2 = try
             backward_pass!(workset, algorithm, regularization, μ)
-        catch _
+        catch e
+            display(e)
             verbose && print_iteration!(line_count, i, μ, NaN, NaN, NaN, NaN, NaN, NaN, false, diff * 1e3, NaN, NaN, NaN)
             logging && log_iteration!(dataframe, i, μ, NaN, NaN, NaN, NaN, NaN, NaN, false, diff * 1e3, NaN, NaN, NaN)
 

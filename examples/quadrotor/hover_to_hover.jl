@@ -35,7 +35,7 @@ x₀ = vcat([0, 0, 1.0], [cos(θ₀ / 2), sin(θ₀ / 2), 0, 0], zeros(3), zeros
 u₀(_) = zRz(x₀[5:7]) * uₜ
 
 # Algorithm, regularization, and warmstart
-algorithm = :ilqr
+algorithm = :ddp
 regularization = :value
 warmstart = true
 
