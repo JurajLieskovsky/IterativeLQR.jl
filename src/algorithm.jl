@@ -146,6 +146,9 @@ function backward_pass!(workset, algorithm, regularization, δ, regularization_a
         # regularization of the entire sub-problem's Hessian
         (:arg in regularization) && regularize!(H, δ, regularization_approach)
 
+        # Liao Shoemaker regularization
+        (:ls in regularization) && ls_regularization!(quu, δ)
+
         # control update
         F = cholesky(Symmetric(quu))
         d[k] = -(F \ qu)

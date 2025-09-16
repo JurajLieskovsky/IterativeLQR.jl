@@ -27,7 +27,7 @@ u₀(k) = cos(2 * pi * (k - 1) / N - 1) * ones(CartPoleODE.nu)
 
 # Algorithm and regularization
 algorithm = :ilqr
-regularization = (:cost,)
+regularization = (:ls,)
 regularization_approach = :eig
 
 # Dynamics

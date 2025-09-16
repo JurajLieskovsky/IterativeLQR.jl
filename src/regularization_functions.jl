@@ -3,6 +3,8 @@ function regularize!(H, δ, approach)
         eigenvalue_regularization!(H, δ)
     elseif approach == :gmw
         gmw_regularization!(H, δ)
+    elseif approach == :ls
+        ls_regularization!(H, δ)
     else
         error("undefined regularization approach")
     end
@@ -35,3 +37,20 @@ function gmw_regularization!(H, δ)
 
     return nothing
 end
+
+""""Active shift" regularization as proposed by Liao and Shoemaker in 1991"""
+function ls_regularization!(H, δ)
+    # remove potential asymetries
+    H .+= H'
+    H ./= 2
+
+    # find minimum eigen value
+    λ_min = minimum(eigvals(H))
+
+    # if the eigenvalue is smaller than delta add correcting term
+    if λ_min < δ
+        view(H, diagind(H)) .+= δ - λ_min
+    end
+end
+
+
