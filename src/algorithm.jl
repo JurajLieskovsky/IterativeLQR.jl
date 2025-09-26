@@ -309,8 +309,7 @@ function iLQR!(
         # backward pass
         Δv1, Δv2, d_∞, d_2 = try
             backward_pass!(workset, algorithm, regularization, μ)
-        catch e
-            display(e)
+        catch _
             verbose && print_iteration!(line_count, i, μ, NaN, NaN, NaN, NaN, NaN, NaN, false, diff * 1e3, NaN, NaN, NaN)
             logging && log_iteration!(dataframe, i, μ, NaN, NaN, NaN, NaN, NaN, NaN, false, diff * 1e3, NaN, NaN, NaN)
 
