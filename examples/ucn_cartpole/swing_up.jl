@@ -166,6 +166,22 @@ df = IterativeLQR.iLQR!(
     state_difference=UCNCartPoleODE.state_difference
 )
 
+## Benchmarking
+benchmark_iter = findfirst(J -> (J-df.J[end]) <= 1e-2 * df.J[end], df.J)
+benchmark_res = @benchmark begin
+    IterativeLQR.set_initial_inputs!(workset, [u₀(k) for k in 1:N])
+    IterativeLQR.iLQR!(
+        workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
+        stacked_derivatives=true, algorithm=algorithm,
+        regularization=regularization, regularization_approach=regularization_approach,
+        verbose=false, logging=false,
+        maxiter=benchmark_iter,
+        coordinate_jacobian=UCNCartPoleODE.jacobian,
+        state_difference=UCNCartPoleODE.state_difference
+    )
+end
+display(benchmark_res)
+
 # Save iterations log to csv
 regularization_string = isempty(regularization) ? "" : mapreduce(a -> "-$a", *, regularization)
 CSV.write("ucn_cartpole/results/ucn_cartpole-$algorithm$regularization_string-$regularization_approach.csv", df)
