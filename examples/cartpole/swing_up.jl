@@ -27,8 +27,7 @@ u₀(k) = cos(2 * pi * (k - 1) / N - 1) * ones(CartPoleODE.nu)
 
 # Algorithm and regularization
 algorithm = :ilqr
-regularization = :value
-μ₀ = 0
+μ₀ = 1e0 
 
 # Dynamics
 # function dynamics!(xnew, x, u, _)
@@ -148,7 +147,7 @@ df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
     stacked_derivatives=true, algorithm=algorithm,
     verbose=true, logging=true, plotting_callback=plotting_callback,
-    regularization=regularization, μ=μ₀
+    # μ=μ₀
 )
 
 ## Benchmarking
@@ -158,14 +157,14 @@ benchmark_res = @benchmark begin
     IterativeLQR.iLQR!(
         workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
         stacked_derivatives=true, algorithm=algorithm,
-        regularization=regularization, μ=μ₀,
         verbose=false, logging=false,
+        # μ=μ₀,
         maxiter=benchmark_iter
     )
 end
 display(benchmark_res)
 
-CSV.write("cartpole/results/cartpole-$algorithm-μ-$regularization.csv", df)
+CSV.write("cartpole/results/cartpole-$algorithm-μ-both.csv", df)
 
 # Visualization
 (@isdefined vis) || (vis = Visualizer())

@@ -107,7 +107,7 @@ function cost_regularization!(workset, δ)
     return nothing
 end
 
-function backward_pass!(workset, algorithm, regularization, μ)
+function backward_pass!(workset, algorithm, μ)
     @unpack N, nx, ndx, nu = workset
     @unpack Δv, vx, vxx = workset.value_function
     @unpack d, K = workset.policy_update
@@ -121,6 +121,8 @@ function backward_pass!(workset, algorithm, regularization, μ)
 
     vx[N+1] .= Φx
     vxx[N+1] .= Φxx
+
+    view(vxx[N+1], diagind(vxx[N+1])) .+= μ
 
     @inbounds for k in N:-1:1
 
@@ -142,44 +144,24 @@ function backward_pass!(workset, algorithm, regularization, μ)
             H .+= ndx == nx ? tensor_product : aug_E[k]' * tensor_product * aug_E[k]
         end
 
+        # regularize quu
+        view(quu, diagind(quu)) .+= μ
+
         # fix assymetries in H
         H .+= H'
         H .*= 0.5
-        
-        # control update
-        ## q̃uu
-        q̃uu = if regularization == :cost
-            quu + μ * I(nu)
-        elseif regularization == :value
-            if ndx == nx
-                quu + μ * fu[k]' * fu[k]
-            else
-                quu + μ * fu[k]' * E[k+1] * E[k+1]' * fu[k]
-            end
-        end
-
-        q̃uu += q̃uu'
-        q̃uu *= 0.5
-
-        ## q̃ux
-        q̃ux = if regularization == :cost
-            qux
-        elseif regularization == :value
-            if ndx == nx
-                qux + μ * fu[k]' * fx[k]
-            else
-                qux + μ * fu[k]' * E[k+1] * E[k+1]' * fx[k] * E[k]
-            end
-        end
 
         ## d, K
-        F = cholesky(Symmetric(q̃uu))
+        F = cholesky(Symmetric(quu))
         d[k] = -(F \ qu)
-        K[k] = -(F \ q̃ux)
+        K[k] = -(F \ qux)
 
         # cost-to-go model
         vx[k] .= qx + K[k]' * qu + K[k]' * quu * d[k] + qux' * d[k]
         vxx[k] .= qxx + K[k]' * quu * K[k] + K[k]' * qux + qux' * K[k]
+
+        # regularize vxx[k]
+        view(vxx[k], diagind(vxx[k])) .+= μ
 
         # expected improvement
         Δv[k][1] = d[k]' * qu
@@ -245,11 +227,11 @@ end
 
 function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
-    maxiter=400, ρ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16), termination_threshold=1e-4,
-    μ_min=1e-6, μ_max=1e16, μ=0, Δ₀=2, Δ=0,
+    maxiter=400, ρ=0.1, δ=sqrt(eps()), α_values=exp2.(0:-1:-16), termination_threshold=1e-4,
+    μ_min=1e-16, μ_max=1e12, μ=1e-9,
     rollout=:full, verbose=true, logging=false, plotting_callback=nothing,
     stacked_derivatives=false, state_difference=-, coordinate_jacobian=nothing,
-    algorithm=:ilqr, regularization=:cost
+    algorithm=:ilqr
 )
     @assert workset.ndx == workset.nx || coordinate_jacobian !== nothing
 
@@ -308,15 +290,14 @@ function iLQR!(
 
         # backward pass
         Δv1, Δv2, d_∞, d_2 = try
-            backward_pass!(workset, algorithm, regularization, μ)
+            backward_pass!(workset, algorithm, μ)
         catch _
             verbose && print_iteration!(line_count, i, μ, NaN, NaN, NaN, NaN, NaN, NaN, false, diff * 1e3, NaN, NaN, NaN)
             logging && log_iteration!(dataframe, i, μ, NaN, NaN, NaN, NaN, NaN, NaN, false, diff * 1e3, NaN, NaN, NaN)
 
             # increase μ
-            Δ = max(Δ₀, Δ * Δ₀)
-            μ = max(μ_min, μ * Δ)
             μ >= μ_max && break
+            μ = min(μ_max, μ * 10)
 
             continue
         end
@@ -345,6 +326,13 @@ function iLQR!(
             if accepted
                 (plotting_callback === nothing) || plotting_callback(workset)
                 swap_trajectories!(workset)
+
+                if α > 0.5
+                    μ = max(μ_min, μ / 10)
+                elseif α < 0.01
+                    μ = min(μ_max, μ * 10)
+                end
+
                 break
             end
         end
@@ -352,13 +340,8 @@ function iLQR!(
         if !accepted && (d_∞ <= termination_threshold)
             break
         elseif !accepted
-            Δ = max(Δ₀, Δ * Δ₀)
-            μ = max(μ_min, μ * Δ)
             μ >= μ_max && break
-        else
-            Δ = min(1 / Δ₀, Δ / Δ₀)
-            μ = μ * Δ
-            μ = μ < μ_min ? 0 : μ
+            μ = min(μ_max, μ * 2)
         end
     end
 
