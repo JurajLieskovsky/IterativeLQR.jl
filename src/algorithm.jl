@@ -3,12 +3,11 @@ function trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
     @unpack x, u, l = nominal_trajectory(workset)
 
     @inbounds for k in 1:N
-        try
-            dynamics!(x[k+1], x[k], u[k], k)
-            l[k] = running_cost(x[k], u[k], k)
-        catch
-            return false, NaN
-        end
+        dynamics!(x[k+1], x[k], u[k], k)
+    end
+
+    @threads for k in 1:N
+        l[k] = running_cost(x[k], u[k], k)
     end
 
     l[N+1] = final_cost(x[N+1], N + 1)
@@ -183,13 +182,11 @@ function forward_pass!(workset, dynamics!, difference, running_cost, final_cost,
 
     @inbounds for k in 1:N
         u[k] .= u_ref[k] + α * d[k] + K[k] * difference(x[k], x_ref[k])
+        dynamics!(x[k+1], x[k], u[k], k)
+    end
 
-        try
-            dynamics!(x[k+1], x[k], u[k], k)
-            l[k] = running_cost(x[k], u[k], k)
-        catch
-            return false, NaN, NaN
-        end
+    @threads for k in 1:N
+        l[k] = running_cost(x[k], u[k], k)
     end
 
     l[N+1] = final_cost(x[N+1], N + 1)
@@ -236,7 +233,11 @@ function iLQR!(
     # initial trajectory rollout
     if rollout == :full
         rlt = @elapsed begin
-            successful, J = trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
+            successful, J = try
+                trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
+            catch
+                false, NaN
+            end
         end
 
         verbose && print_iteration!(line_count, 0, NaN, J, NaN, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
@@ -246,18 +247,21 @@ function iLQR!(
             return nothing
         end
     elseif rollout == :partial
-        for α in α_values
-            rlt = @elapsed begin
-                successful, J, ΔJ = forward_pass!(workset, dynamics!, state_difference, running_cost, final_cost, α)
+        rlt = @elapsed begin
+            successful, J, ΔJ = try
+                forward_pass!(workset, dynamics!, state_difference, running_cost, final_cost, 0)
+            catch
+                false, NaN, NaN
             end
+        end
 
-            verbose && print_iteration!(line_count, 0, NaN, J, ΔJ, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
-            logging && log_iteration!(dataframe, 0, NaN, J, ΔJ, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
+        verbose && print_iteration!(line_count, 0, NaN, J, ΔJ, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
+        logging && log_iteration!(dataframe, 0, NaN, J, ΔJ, NaN, NaN, NaN, successful, NaN, NaN, NaN, rlt * 1e3)
 
-            if successful
-                swap_trajectories!(workset)
-                break
-            end
+        if successful
+            swap_trajectories!(workset)
+        else
+            return nothing
         end
     end
 
@@ -294,7 +298,11 @@ function iLQR!(
         for α in α_values
 
             fwd = @elapsed begin
-                successful, J, ΔJ = forward_pass!(workset, dynamics!, state_difference, running_cost, final_cost, α)
+                successful, J, ΔJ = try
+                    forward_pass!(workset, dynamics!, state_difference, running_cost, final_cost, α)
+                catch
+                    false, NaN, NaN
+                end
             end
 
             # expected improvement and success evaluation
