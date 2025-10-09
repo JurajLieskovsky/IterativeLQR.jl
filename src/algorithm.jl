@@ -156,17 +156,13 @@ function backward_pass!(workset, algorithm, regularization, δ, regularization_a
         vxx[k] .= qxx + K[k]' * qux
 
         # expected improvement
-        Δv[k][1] = d[k]' * qu
-        Δv[k][2] = 0.5 * d[k]' * quu * d[k]
+        Δv[k] = -0.5 * d[k]' * quu * d[k]
     end
-
-    Δ1 = mapreduce(Δ -> Δ[1], +, Δv)
-    Δ2 = mapreduce(Δ -> Δ[2], +, Δv)
 
     d_∞ = mapreduce(d_k -> mapreduce(abs, max, d_k), max, d)
     d_2 = sqrt(mapreduce(d_k -> d_k'd_k, +, d))
 
-    return Δ1, Δ2, d_∞, d_2
+    return sum(Δv), d_∞, d_2
 end
 
 function forward_pass!(workset, dynamics!, difference, running_cost, final_cost, α)
@@ -289,7 +285,7 @@ function iLQR!(
 
         # backward pass
         bwd = @elapsed begin
-            Δv1, Δv2, d_∞, d_2 = backward_pass!(workset, algorithm, regularization, δ, regularization_approach)
+            Δv1, d_∞, d_2 = backward_pass!(workset, algorithm, regularization, δ, regularization_approach)
         end
 
         # forward pass
@@ -306,8 +302,8 @@ function iLQR!(
             end
 
             # expected improvement and success evaluation
-            Δv = α * Δv1 + α^2 * Δv2
-            accepted = successful && ΔJ < 0 && ΔJ <= ρ * Δv
+            Δv = (2 * α - α^2) * Δv1
+            accepted = successful && ΔJ <= ρ * Δv
 
             # printout
             verbose && print_iteration!(line_count, i, α, J, ΔJ, Δv, d_∞, d_2, accepted, diff * 1e3, reg * 1e3, bwd * 1e3, fwd * 1e3)

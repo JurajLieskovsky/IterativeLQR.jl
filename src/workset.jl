@@ -13,12 +13,12 @@ struct Trajectory{T}
 end
 
 struct ValueFunction{T}
-    Δv::Vector{Vector{T}}
+    Δv::Vector{T}
     vx::Vector{Vector{T}}
     vxx::Vector{Matrix{T}}
 
     function ValueFunction{T}(ndx, N) where {T}
-        Δv = [Vector{T}(undef, 2) for _ in 1:N+1]
+        Δv = Vector{T}(undef, N)
         vx = [Vector{T}(undef, ndx) for _ in 1:N+1]
         vxx = [Matrix{T}(undef, ndx, ndx) for _ in 1:N+1]
 
