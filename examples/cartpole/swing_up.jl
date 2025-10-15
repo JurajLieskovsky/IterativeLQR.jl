@@ -152,7 +152,7 @@ df = IterativeLQR.iLQR!(
 )
 
 ## Benchmarking
-benchmark_iter = findfirst(J -> (J-df.J[end]) <= 1e-2 * df.J[end], df.J)
+benchmark_iter = findfirst(J -> (J - df.J[end]) <= 1e-2 * df.J[end], df.J)
 benchmark_res = @benchmark begin
     IterativeLQR.set_initial_inputs!(workset, [u₀(k) for k in 1:N])
     IterativeLQR.iLQR!(
@@ -165,9 +165,25 @@ benchmark_res = @benchmark begin
 end
 display(benchmark_res)
 
+time = Int(round(mean(benchmark_res.times) * 1e-6))
+nthr = Threads.nthreads()
+
 # Save iterations log to csv
 regularization_string = mapreduce(a -> "-$a", *, regularization)
-CSV.write("cartpole/results/cartpole-$algorithm$regularization_string-$regularization_approach.csv", df)
+CSV.write("cartpole/results/cartpole-$algorithm$regularization_string-$regularization_approach-$time-$nthr.csv", df)
+
+# Save final trajectory
+traj = DataFrame(:c => nominal_trajectory(workset).l)
+
+for i in 1:CartPoleODE.nx
+    traj[:, Symbol("x$i")] = map(x -> x[i], nominal_trajectory(workset).x)
+end
+
+for i in 1:CartPoleODE.nu
+    traj[:, Symbol("u$i")] = vcat(map(u -> u[i], nominal_trajectory(workset).u), nominal_trajectory(workset).u[end])
+end
+
+CSV.write("cartpole/results/cartpole-trajectory.csv", traj)
 
 # Visualization
 (@isdefined vis) || (vis = Visualizer())
