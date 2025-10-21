@@ -93,6 +93,20 @@ function cost_derivatives_coordinate_transformation(workset)
     return nothing
 end
 
+function dynamics_derivatives_coordinate_transformation(workset)
+    @unpack N = workset
+    @unpack E, aug_E = workset.coordinate_jacobians
+
+    full = workset.dynamics_derivatives
+    tangent = workset.tangent_dynamics_derivatives
+
+    @threads for k in 1:N
+        tangent.∇f[k] .=  E[k+1]' * full.∇f[k] * aug_E[k]
+    end
+
+    return nothing
+end
+
 function cost_regularization!(workset, δ, regularization_approach)
     @unpack N, nx, ndx = workset
     @unpack ∇2l, Φxx = ndx == nx ? workset.cost_derivatives : workset.tangent_cost_derivatives
@@ -111,10 +125,10 @@ function backward_pass!(workset, algorithm, regularization, δ, regularization_a
     @unpack Δv, vx, vxx = workset.value_function
     @unpack d, K = workset.policy_update
     @unpack g, qx, qu, H, qxx, quu, qux = workset.subproblem_objective_derivatives
-    @unpack ∇f, ∇2f = workset.dynamics_derivatives
     @unpack aug_E, E = workset.coordinate_jacobians
 
     # cost derivatives pre-converted into the tangent space if ndx != nx
+    @unpack ∇f, ∇2f = ndx == nx ? workset.dynamics_derivatives : workset.tangent_dynamics_derivatives
     @unpack ∇l, ∇2l = ndx == nx ? workset.cost_derivatives : workset.tangent_cost_derivatives
     @unpack Φx, Φxx = ndx == nx ? workset.cost_derivatives : workset.tangent_cost_derivatives
 
@@ -124,20 +138,16 @@ function backward_pass!(workset, algorithm, regularization, δ, regularization_a
     @inbounds for k in N:-1:1
 
         # gradient and hessian of the argument
-        if ndx == nx
-            g .= ∇l[k] + ∇f[k]' * vx[k+1]
-            H .= ∇2l[k] + ∇f[k]' * vxx[k+1] * ∇f[k]
-        else
-            g .= ∇l[k] + aug_E[k]' * (∇f[k]' * E[k+1] * vx[k+1])
-            H .= ∇2l[k] + aug_E[k]' * (∇f[k]' * E[k+1] * vxx[k+1] * E[k+1]' * ∇f[k]) * aug_E[k]
-        end
+        g .= ∇l[k] + ∇f[k]' * vx[k+1]
+        H .= ∇2l[k] + ∇f[k]' * vxx[k+1] * ∇f[k]
 
         ## additional tensor-vector multiplication terms of the DDP algorithm
         if algorithm == :ddp
-            tensor_product = mapreduce(
-                (mat, el) -> mat * el, +, eachslice(∇2f[k], dims=1), ndx == nx ? vx[k+1] : E[k+1] * vx[k+1]
-            )
-            H .+= ndx == nx ? tensor_product : aug_E[k]' * tensor_product * aug_E[k]
+            error("not implemented")
+            # tensor_product = mapreduce(
+            #     (mat, el) -> mat * el, +, eachslice(∇2f[k], dims=1), ndx == nx ? vx[k+1] : E[k+1] * vx[k+1]
+            # )
+            # H .+= ndx == nx ? tensor_product : aug_E[k]' * tensor_product * aug_E[k]
         end
 
         # regularization of the entire sub-problem's Hessian
@@ -275,7 +285,10 @@ function iLQR!(
         coordinate_jacobian !== nothing && coordinate_jacobian_calculation(workset, coordinate_jacobian)
 
         # conversion of cost derivatives into tangential plane
-        workset.ndx != workset.nx && cost_derivatives_coordinate_transformation(workset)
+        if workset.ndx != workset.nx
+            cost_derivatives_coordinate_transformation(workset)
+            dynamics_derivatives_coordinate_transformation(workset)
+        end
 
         # regularization
         reg = regularization == :cost ? @elapsed(cost_regularization!(workset, δ, regularization_approach)) : NaN
