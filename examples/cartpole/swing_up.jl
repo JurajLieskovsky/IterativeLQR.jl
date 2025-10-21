@@ -169,7 +169,7 @@ time = Int(round(mean(benchmark_res.times) * 1e-6))
 nthr = Threads.nthreads()
 
 # Save iterations log to csv
-CSV.write("cartpole/results/cartpole-$algorithm-$regularization-$regularization_approach-$time-$nthr.csv", df)
+CSV.write("cartpole/results/cartpole-$algorithm-$regularization-$regularization_approach.csv", df)
 
 # Save final trajectory
 traj = DataFrame(:c => nominal_trajectory(workset).l)
