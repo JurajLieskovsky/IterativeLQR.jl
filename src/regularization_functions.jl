@@ -1,7 +1,7 @@
 function regularize!(H, δ, approach)
     if approach == :eig
         eigenvalue_regularization!(H, δ)
-    elseif approach == :gmw
+    elseif approach == :mchol
         gmw_regularization!(H, δ)
     else
         error("undefined regularization approach")
