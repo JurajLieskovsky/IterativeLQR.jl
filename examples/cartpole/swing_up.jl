@@ -165,8 +165,13 @@ benchmark_res = @benchmark begin
 end
 display(benchmark_res)
 
-time = Int(round(mean(benchmark_res.times) * 1e-6))
-nthr = Threads.nthreads()
+bmk = DataFrame(
+    "algorithm" => "$algorithm",
+    "regularization" => "$regularization-$regularization_approach",
+    "nthreads" => Threads.nthreads(),
+    "ms" => mean(benchmark_res.times) * 1e-6
+)
+CSV.write("cartpole/results/cartpole-comp_times.csv", bmk, append=true)
 
 # Save iterations log to csv
 CSV.write("cartpole/results/cartpole-$algorithm-$regularization-$regularization_approach.csv", df)
