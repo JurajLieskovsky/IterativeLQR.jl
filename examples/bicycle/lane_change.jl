@@ -32,7 +32,7 @@ u₀(_) = [0, 1e-3]
 
 # Algorithm and regularization
 algorithm = :ddp
-regularization = (:arg,)
+regularization = :cost
 regularization_approach = :eig
 
 # Dynamics
@@ -186,5 +186,4 @@ df = IterativeLQR.iLQR!(
 )
 
 # Save iterations log to csv
-regularization_string = mapreduce(a -> "-$a", *, regularization)
-CSV.write("bicycle/results/bicycle-lane_change-$algorithm$regularization_string-$regularization_approach.csv", df)
+CSV.write("bicycle/results/bicycle-lane_change-$algorithm-$regularization-$regularization_approach.csv", df)

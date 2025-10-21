@@ -36,7 +36,7 @@ u₀(_) = zRz(x₀[5:7]) * uₜ
 
 # Algorithm, regularization, and warmstart
 algorithm = :ddp
-regularization = (:arg,)
+regularization = :cost
 regularization_approach = :gmw
 warmstart = true
 
@@ -192,8 +192,7 @@ df = IterativeLQR.iLQR!(
 
 # Save iterations log to csv
 warmstart_string = warmstart ? "-warmstart" : ""
-regularization_string = isempty(regularization) ? "" : mapreduce(a -> "-$a", *, regularization)
-CSV.write("quadrotor/results/quadrotor$warmstart_string-$algorithm$regularization_string-$regularization_approach.csv", df)
+CSV.write("quadrotor/results/quadrotor$warmstart_string-$algorithm-$regularization-$regularization_approach.csv", df)
 
 # Visualization
 vis = (@isdefined vis) ? vis : Visualizer()

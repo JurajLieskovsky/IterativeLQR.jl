@@ -27,7 +27,7 @@ u₀(k) = cos(2 * pi * (k - 1) / N - 1) * ones(CartPoleODE.nu)
 
 # Algorithm and regularization
 algorithm = :ilqr
-regularization = (:cost,)
+regularization = :cost
 regularization_approach = :eig
 
 # Dynamics
@@ -169,8 +169,7 @@ time = Int(round(mean(benchmark_res.times) * 1e-6))
 nthr = Threads.nthreads()
 
 # Save iterations log to csv
-regularization_string = mapreduce(a -> "-$a", *, regularization)
-CSV.write("cartpole/results/cartpole-$algorithm$regularization_string-$regularization_approach-$time-$nthr.csv", df)
+CSV.write("cartpole/results/cartpole-$algorithm-$regularization-$regularization_approach-$time-$nthr.csv", df)
 
 # Save final trajectory
 traj = DataFrame(:c => nominal_trajectory(workset).l)
