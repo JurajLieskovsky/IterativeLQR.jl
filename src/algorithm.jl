@@ -75,34 +75,23 @@ function coordinate_jacobian_calculation(workset, coordinate_jacobian)
     end
 end
 
-function cost_derivatives_coordinate_transformation(workset)
+function derivatives_coordinate_transformation(workset)
     @unpack N = workset
     @unpack E, aug_E = workset.coordinate_jacobians
 
-    full = workset.cost_derivatives
-    tangent = workset.tangent_cost_derivatives
+    dyn = workset.dynamics_derivatives
+    cost = workset.cost_derivatives
+    tan_dyn = workset.tangent_dynamics_derivatives
+    tan_cost = workset.tangent_cost_derivatives
 
     @threads for k in 1:N
-        tangent.∇l[k] .= aug_E[k]' * full.∇l[k]
-        tangent.∇2l[k] .= aug_E[k]' * full.∇2l[k] * aug_E[k]
+        tan_dyn.∇f[k] .= E[k+1]' * dyn.∇f[k] * aug_E[k]
+        tan_cost.∇l[k] .= aug_E[k]' * cost.∇l[k]
+        tan_cost.∇2l[k] .= aug_E[k]' * cost.∇2l[k] * aug_E[k]
     end
 
-    tangent.Φx .= E[N+1]' * full.Φx
-    tangent.Φxx .= E[N+1]' * full.Φxx * E[N+1]
-
-    return nothing
-end
-
-function dynamics_derivatives_coordinate_transformation(workset)
-    @unpack N = workset
-    @unpack E, aug_E = workset.coordinate_jacobians
-
-    full = workset.dynamics_derivatives
-    tangent = workset.tangent_dynamics_derivatives
-
-    @threads for k in 1:N
-        tangent.∇f[k] .=  E[k+1]' * full.∇f[k] * aug_E[k]
-    end
+    tan_cost.Φx .= E[N+1]' * cost.Φx
+    tan_cost.Φxx .= E[N+1]' * cost.Φxx * E[N+1]
 
     return nothing
 end
@@ -286,8 +275,7 @@ function iLQR!(
 
         # conversion of cost derivatives into tangential plane
         if workset.ndx != workset.nx
-            cost_derivatives_coordinate_transformation(workset)
-            dynamics_derivatives_coordinate_transformation(workset)
+            derivatives_coordinate_transformation(workset)
         end
 
         # regularization
