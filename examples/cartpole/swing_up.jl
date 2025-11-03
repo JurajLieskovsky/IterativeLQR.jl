@@ -11,6 +11,7 @@ using DataFrames, CSV
 using Infiltrator
 using BenchmarkTools
 using LinearAlgebra
+using MatrixEquations
 
 # Cartpole model
 cartpole = CartPoleODE.Model(9.81, 1, 0.1, 0.2)
@@ -77,15 +78,26 @@ function dynamics_diff!(∇f, ∇2f, x, u, k)
     return nothing
 end
 
-# Running cost
+# Cost functions
+ξ(x) = [x[1], -cos(x[2] / 2), x[3], x[4]]
+
 Q = h * diagm([1e1, 1e2, 1, 1])
 R = h * Matrix{Float64}(I, 1, 1)
 
-function running_cost(x, u, _)
-    dx = [x[1], cos(x[2] / 2), x[3], x[4]]
-    du = u
-    return dx' * Q * dx + du' * R * du
+S, _ = begin
+    x_eq = [0.0, pi, 0, 0]
+    u_eq = [0.0]
+
+    E = ForwardDiff.jacobian(ξ, x_eq)
+
+    A = E * ForwardDiff.jacobian((xnew, x_) -> dynamics!(xnew, x_, u_eq, 0), zeros(CartPoleODE.nx), x_eq) * inv(E)
+    B = E * ForwardDiff.jacobian((xnew, u_) -> dynamics!(xnew, x_eq, u_, 0), zeros(CartPoleODE.nx), u_eq)
+
+    MatrixEquations.ared(A, B, R, Q)
 end
+
+## Running cost
+running_cost(x, u, _) = ξ(x)' * Q * ξ(x) + u' * R * u
 
 function running_cost_diff!(∇l, ∇2l, x, u, k)
     nx = CartPoleODE.nx
@@ -102,17 +114,8 @@ function running_cost_diff!(∇l, ∇2l, x, u, k)
     return nothing
 end
 
-# Final cost
-function final_cost(x, _)
-    S = [
-        12.0513 -27.9858 6.70145 -1.97378
-        -27.9858 286.677 -29.6374 18.5705
-        6.70145 -29.6374 6.62123 -2.0834
-        -1.97378 18.5705 -2.0834 1.30713
-    ]
-    dx = [x[1], -cos(x[2] / 2), x[3], x[4]]
-    return dx' * S * dx
-end
+## Final cost
+final_cost(x, _) = ξ(x)' * S * ξ(x)
 
 function final_cost_diff!(Φx, Φxx, x, k)
     H = DiffResults.DiffResult(0.0, (Φx, Φxx))
