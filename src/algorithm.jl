@@ -50,19 +50,15 @@ function stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, f
     return nothing
 end
 
-function coordinate_jacobian_calculation(workset, coordinate_jacobian)
+function derivatives_coordinate_transformation(workset, coordinate_jacobian)
     @unpack N = workset
-    @unpack x = nominal_trajectory(workset)
     @unpack E = workset.coordinate_jacobians
+
+    @unpack x = nominal_trajectory(workset)
 
     @threads for k in 1:N+1
         E[k] .= coordinate_jacobian(x[k])
     end
-end
-
-function derivatives_coordinate_transformation(workset)
-    @unpack N = workset
-    @unpack E = workset.coordinate_jacobians
 
     dyn = workset.dynamics_derivatives
     cost = workset.cost_derivatives
@@ -252,12 +248,9 @@ function iLQR!(
             end
         end
 
-        # coordinate jacobian calculation
-        coordinate_jacobian !== nothing && coordinate_jacobian_calculation(workset, coordinate_jacobian)
-
         # conversion of cost derivatives into tangential plane
         if workset.ndx != workset.nx
-            derivatives_coordinate_transformation(workset)
+            derivatives_coordinate_transformation(workset, coordinate_jacobian)
         end
 
         # regularization
