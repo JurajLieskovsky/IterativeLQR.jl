@@ -59,24 +59,12 @@ struct DynamicsDerivatives{T}
     fx::Vector{SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}}
     fu::Vector{SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}}
 
-    ∇2f::Vector{Array{T,3}}
-    fxx::Vector{SubArray{T,3,Array{T,3},Tuple{UnitRange{Int64},UnitRange{Int64},UnitRange{Int64}},false}}
-    fuu::Vector{SubArray{T,3,Array{T,3},Tuple{UnitRange{Int64},UnitRange{Int64},UnitRange{Int64}},false}}
-    fux::Vector{SubArray{T,3,Array{T,3},Tuple{UnitRange{Int64},UnitRange{Int64},UnitRange{Int64}},false}}
-    fxu::Vector{SubArray{T,3,Array{T,3},Tuple{UnitRange{Int64},UnitRange{Int64},UnitRange{Int64}},false}}
-
     function DynamicsDerivatives{T}(nx, nu, N) where {T}
         ∇f = [Matrix{T}(undef, nx, nx + nu) for _ in 1:N]
         fx = [view(∇f[k], 1:nx, 1:nx) for k in 1:N]
         fu = [view(∇f[k], 1:nx, nx+1:nx+nu) for k in 1:N]
 
-        ∇2f = [Array{T,3}(undef, nx, nx + nu, nx + nu) for _ in 1:N]
-        fxx = [view(∇2f[k], 1:nx, 1:nx, 1:nx) for k in 1:N]
-        fuu = [view(∇2f[k], 1:nx, nx+1:nx+nu, nx+1:nx+nu) for k in 1:N]
-        fux = [view(∇2f[k], 1:nx, nx+1:nx+nu, 1:nx) for k in 1:N]
-        fxu = [view(∇2f[k], 1:nx, 1:nx, nx+1:nx+nu) for k in 1:N]
-
-        return new(∇f, fx, fu, ∇2f, fxx, fuu, fux, fxu)
+        return new(∇f, fx, fu)
     end
 end
 

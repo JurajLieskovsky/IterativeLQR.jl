@@ -36,7 +36,7 @@ end
 function stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
     @unpack N = workset
     @unpack x, u = nominal_trajectory(workset)
-    @unpack ∇f, ∇2f = workset.dynamics_derivatives
+    @unpack ∇f = workset.dynamics_derivatives
     @unpack ∇l, ∇2l = workset.cost_derivatives
     @unpack vx, vxx = workset.value_function
     @unpack Φx, Φxx = workset.cost_derivatives
@@ -103,7 +103,7 @@ function backward_pass!(workset)
     @unpack aug_E, E = workset.coordinate_jacobians
 
     # cost derivatives pre-converted into the tangent space if ndx != nx
-    @unpack ∇f, ∇2f = ndx == nx ? workset.dynamics_derivatives : workset.tangent_dynamics_derivatives
+    @unpack ∇f = ndx == nx ? workset.dynamics_derivatives : workset.tangent_dynamics_derivatives
     @unpack ∇l, ∇2l = ndx == nx ? workset.cost_derivatives : workset.tangent_cost_derivatives
     @unpack Φx, Φxx = ndx == nx ? workset.cost_derivatives : workset.tangent_cost_derivatives
 
