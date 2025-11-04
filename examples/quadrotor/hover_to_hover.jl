@@ -83,7 +83,6 @@ function running_cost_diff!(∇l, ∇2l, x, u, k)
 end
 
 # Final cost
-## infinite horizion LQR value function's matrix
 S, _ = begin
     nx = QuadrotorODE.nx
     nu = QuadrotorODE.nu
@@ -102,7 +101,6 @@ S, _ = begin
     MatrixEquations.ared(A, B, R, Q)
 end
 
-## resulting final cost and its partial derivatives
 function final_cost(x, _)
     dx = QuadrotorODE.state_difference(x, xₜ)
     return dx' * S * dx
