@@ -55,7 +55,7 @@ function dynamics_diff!(∇f, x, u, k)
 end
 
 # Cost functions
-ξ(x) = [x[1], -cos(x[2] / 2), x[3], x[4]]
+ξ(x) = [x[1], cos(x[2] / 2), x[3], x[4]]
 
 Q = h * diagm([1e1, 1e2, 1, 1])
 R = h * Matrix{Float64}(I, 1, 1)
@@ -64,10 +64,15 @@ S, _ = begin
     x_eq = [0.0, pi, 0, 0]
     u_eq = [0.0]
 
-    E = ForwardDiff.jacobian(ξ, x_eq)
+    nx = CartPoleODE.nx
+    nu = CartPoleODE.nu
 
-    A = E * ForwardDiff.jacobian((xnew, x_) -> dynamics!(xnew, x_, u_eq, 0), zeros(CartPoleODE.nx), x_eq) * inv(E)
-    B = E * ForwardDiff.jacobian((xnew, u_) -> dynamics!(xnew, x_eq, u_, 0), zeros(CartPoleODE.nx), u_eq)
+    ∇f = zeros(nx, nx + nu)
+    dynamics_diff!(∇f, x_eq, u_eq, 0)
+
+    E = ForwardDiff.jacobian(ξ, x_eq)
+    A = E' * ∇f[:, 1:nx] * inv(E)
+    B = E' * ∇f[:, nx+1:nx+nu]
 
     MatrixEquations.ared(A, B, R, Q)
 end
