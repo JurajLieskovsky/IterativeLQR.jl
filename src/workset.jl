@@ -12,20 +12,6 @@ struct Trajectory{T}
     end
 end
 
-struct ValueFunction{T}
-    Δv::Vector{T}
-    vx::Vector{Vector{T}}
-    vxx::Vector{Matrix{T}}
-
-    function ValueFunction{T}(ndx, N) where {T}
-        Δv = Vector{T}(undef, N)
-        vx = [Vector{T}(undef, ndx) for _ in 1:N+1]
-        vxx = [Matrix{T}(undef, ndx, ndx) for _ in 1:N+1]
-
-        return new(Δv, vx, vxx)
-    end
-end
-
 struct PolicyUpdate{T}
     d::Vector{Vector{T}}
     K::Vector{Matrix{T}}
@@ -128,7 +114,6 @@ struct Workset{T}
     nominal::Ref{Int}
     active::Ref{Int}
     trajectory::Tuple{Trajectory{T},Trajectory{T}}
-    value_function::ValueFunction{T}
     policy_update::PolicyUpdate{T}
     coordinate_jacobians::CoordinateJacobians{T}
     dynamics_derivatives::DynamicsDerivatives{T}
@@ -141,7 +126,6 @@ struct Workset{T}
         ndx = ndx !== nothing ? ndx : nx
 
         trajectory = (Trajectory{T}(nx, nu, N), Trajectory{T}(nx, nu, N))
-        value_function = ValueFunction{T}(ndx, N)
         policy_update = PolicyUpdate{T}(ndx, nu, N)
         coordinate_jacobians = CoordinateJacobians{T}(nx, ndx, N)
         dynamics_derivatives = DynamicsDerivatives{T}(nx, nu, N)
@@ -151,7 +135,7 @@ struct Workset{T}
 
         subproblem_objective_derivatives = SubproblemObjectiveDerivatives{T}(ndx, nu)
 
-        return new(N, nx, ndx, nu, 1, 2, trajectory, value_function, policy_update, coordinate_jacobians, dynamics_derivatives, cost_derivatives, tangent_dynamics_derivatives, tangent_cost_derivatives, subproblem_objective_derivatives)
+        return new(N, nx, ndx, nu, 1, 2, trajectory, policy_update, coordinate_jacobians, dynamics_derivatives, cost_derivatives, tangent_dynamics_derivatives, tangent_cost_derivatives, subproblem_objective_derivatives)
     end
 end
 

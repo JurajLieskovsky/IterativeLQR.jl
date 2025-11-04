@@ -38,7 +38,6 @@ function stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, f
     @unpack x, u = nominal_trajectory(workset)
     @unpack ∇f = workset.dynamics_derivatives
     @unpack ∇l, ∇2l = workset.cost_derivatives
-    @unpack vx, vxx = workset.value_function
     @unpack Φx, Φxx = workset.cost_derivatives
 
     @threads for k in 1:N
@@ -107,7 +106,6 @@ end
 
 function backward_pass!(workset)
     @unpack N, nx, ndx, nu = workset
-    @unpack Δv, vx, vxx = workset.value_function
     @unpack d, K = workset.policy_update
     @unpack g, qx, qu, H, qxx, quu, qux = workset.subproblem_objective_derivatives
 
@@ -116,14 +114,14 @@ function backward_pass!(workset)
     @unpack ∇l, ∇2l = ndx == nx ? workset.cost_derivatives : workset.tangent_cost_derivatives
     @unpack Φx, Φxx = ndx == nx ? workset.cost_derivatives : workset.tangent_cost_derivatives
 
-    vx[N+1] .= Φx
-    vxx[N+1] .= Φxx
+    Δv = 0
+    vx = Φx
+    vxx = Φxx
 
     @inbounds for k in N:-1:1
-
         # gradient and hessian of the argument
-        g .= ∇l[k] + ∇f[k]' * vx[k+1]
-        H .= ∇2l[k] + ∇f[k]' * vxx[k+1] * ∇f[k]
+        g .= ∇l[k] + ∇f[k]' * vx
+        H .= ∇2l[k] + ∇f[k]' * vxx * ∇f[k]
 
         # control update
         F = cholesky(Symmetric(quu))
@@ -131,17 +129,17 @@ function backward_pass!(workset)
         K[k] = -(F \ qux)
 
         # cost-to-go model
-        vx[k] .= qx + K[k]' * qu
-        vxx[k] .= qxx + K[k]' * qux
+        vx .= qx + K[k]' * qu
+        vxx .= qxx + K[k]' * qux
 
         # expected improvement
-        Δv[k] = -0.5 * d[k]' * quu * d[k]
+        Δv -= 0.5 * d[k]' * quu * d[k]
     end
 
     d_∞ = mapreduce(d_k -> mapreduce(abs, max, d_k), max, d)
     d_2 = sqrt(mapreduce(d_k -> d_k'd_k, +, d))
 
-    return sum(Δv), d_∞, d_2
+    return Δv, d_∞, d_2
 end
 
 function forward_pass!(workset, dynamics!, difference, running_cost, final_cost, α)
