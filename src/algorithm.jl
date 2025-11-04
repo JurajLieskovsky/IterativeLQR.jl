@@ -263,7 +263,6 @@ function iLQR!(
         accepted = false
 
         for α in α_values
-
             fwd = @elapsed begin
                 successful, J, ΔJ = try
                     forward_pass!(workset, dynamics!, state_difference, running_cost, final_cost, α)
