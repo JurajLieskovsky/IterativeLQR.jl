@@ -31,7 +31,7 @@ x₀ = [0, cos(θ₀ / 2), sin(θ₀ / 2), 0, 0]
 u₀(k) = cos(2 * pi * (k - 1) / N - 1) * ones(UCNCartPoleODE.nu)
 
 # Regularization
-regularization_approach = :none
+regularization = :none
 
 # Dynamics
 """RK4 integration with zero-order hold on u"""
@@ -151,10 +151,9 @@ IterativeLQR.set_initial_state!(workset, x₀)
 IterativeLQR.set_initial_inputs!(workset, [u₀(k) for k in 1:N])
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    stacked_derivatives=true, regularization_approach=regularization_approach,
+    stacked_derivatives=true, regularization=regularization,
+    coordinate_jacobian=UCNCartPoleODE.jacobian, state_difference=UCNCartPoleODE.state_difference,
     verbose=true, logging=true, plotting_callback=plotting_callback,
-    coordinate_jacobian=UCNCartPoleODE.jacobian,
-    state_difference=UCNCartPoleODE.state_difference
 )
 
 ## Benchmarking
@@ -163,11 +162,10 @@ benchmark_res = @benchmark begin
     IterativeLQR.set_initial_inputs!(workset, [u₀(k) for k in 1:N])
     IterativeLQR.iLQR!(
         workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-        stacked_derivatives=true, regularization_approach=regularization_approach,
+        stacked_derivatives=true, regularization=regularization,
+        coordinate_jacobian=UCNCartPoleODE.jacobian, state_difference=UCNCartPoleODE.state_difference,
         verbose=false, logging=false,
-        maxiter=benchmark_iter,
-        coordinate_jacobian=UCNCartPoleODE.jacobian,
-        state_difference=UCNCartPoleODE.state_difference
+        maxiter=benchmark_iter
     )
 end
 display(benchmark_res)
@@ -181,7 +179,7 @@ bmk = DataFrame(
 CSV.write("cartpole/results/cartpole-comp_times.csv", bmk, append=true)
 
 # Save iterations log to csv
-CSV.write("ucn_cartpole/results/ucn_cartpole-ilqr-$regularization_approach.csv", df)
+CSV.write("ucn_cartpole/results/ucn_cartpole-ilqr-$regularization.csv", df)
 CSV.write("cartpole/results/cartpole-ilqr-ucn.csv", df)
 
 # Visualization

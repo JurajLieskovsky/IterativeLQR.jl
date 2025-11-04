@@ -27,7 +27,7 @@ x₀ = [0, θ₀, 0, 0]
 u₀(k) = cos(2 * pi * (k - 1) / N - 1) * ones(CartPoleODE.nu)
 
 # Regularization
-regularization_approach = :mchol
+regularization = :mchol
 
 # Dynamics
 """RK4 integration with zero-order hold on u"""
@@ -140,7 +140,7 @@ IterativeLQR.set_initial_state!(workset, x₀)
 IterativeLQR.set_initial_inputs!(workset, [u₀(k) for k in 1:N])
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    stacked_derivatives=true, regularization_approach=regularization_approach,
+    stacked_derivatives=true, regularization=regularization,
     verbose=true, logging=true, plotting_callback=plotting_callback
 )
 
@@ -150,7 +150,7 @@ benchmark_res = @benchmark begin
     IterativeLQR.set_initial_inputs!(workset, [u₀(k) for k in 1:N])
     IterativeLQR.iLQR!(
         workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-        stacked_derivatives=true, regularization_approach=regularization_approach,
+        stacked_derivatives=true, regularization=regularization,
         verbose=false, logging=false,
         maxiter=benchmark_iter
     )
@@ -159,14 +159,14 @@ display(benchmark_res)
 
 bmk = DataFrame(
     "algorithm" => "ilqr",
-    "regularization" => "$regularization_approach",
+    "regularization" => "$regularization",
     "nthreads" => Threads.nthreads(),
     "ms" => mean(benchmark_res.times) * 1e-6
 )
 CSV.write("cartpole/results/cartpole-comp_times.csv", bmk, append=true)
 
 # Save iterations log to csv
-CSV.write("cartpole/results/cartpole-ilqr-$regularization_approach.csv", df)
+CSV.write("cartpole/results/cartpole-ilqr-$regularization.csv", df)
 
 # Save final trajectory
 traj = DataFrame(:c => nominal_trajectory(workset).l)

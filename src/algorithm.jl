@@ -185,7 +185,7 @@ function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
     maxiter=250, ρ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16), termination_threshold=1e-4,
     rollout=:full, verbose=true, logging=false, plotting_callback=nothing,
-    stacked_derivatives=false, state_difference=-, coordinate_jacobian=nothing, regularization_approach=:eig
+    stacked_derivatives=false, state_difference=-, coordinate_jacobian=nothing, regularization=:mchol
 )
     @assert workset.ndx == workset.nx || coordinate_jacobian !== nothing
 
@@ -252,7 +252,7 @@ function iLQR!(
         end
 
         # regularization
-        reg = regularization_approach != :none ? @elapsed(cost_regularization!(workset, δ, regularization_approach)) : NaN
+        reg = regularization != :none ? @elapsed(cost_regularization!(workset, δ, regularization)) : NaN
 
         # backward pass
         bwd = @elapsed begin
