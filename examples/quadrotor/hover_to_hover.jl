@@ -35,9 +35,8 @@ x₀ = vcat([0, 0, 1.0], [cos(θ₀ / 2), sin(θ₀ / 2), 0, 0], zeros(3), zeros
 u₀(_) = zRz(x₀[5:7]) * uₜ
 
 # Algorithm, regularization, and warmstart
-algorithm = :ddp
 regularization = :cost
-regularization_approach = :gmw
+regularization_approach = :mchol
 warmstart = true
 
 # Dynamics
@@ -168,7 +167,7 @@ if warmstart
 
     IterativeLQR.iLQR!(
         workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-        stacked_derivatives=true, algorithm=algorithm,
+        stacked_derivatives=true,
         regularization=regularization, regularization_approach=regularization_approach,
         state_difference=QuadrotorODE.state_difference,
         coordinate_jacobian=QuadrotorODE.jacobian,
@@ -182,7 +181,7 @@ warmstart || IterativeLQR.set_initial_inputs!(workset, [u₀(k) for k in 1:N])
 
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    stacked_derivatives=true, algorithm=algorithm, rollout=warmstart ? :partial : :full,
+    stacked_derivatives=true, rollout=warmstart ? :partial : :full,
     regularization=regularization, regularization_approach=regularization_approach,
     state_difference=QuadrotorODE.state_difference,
     coordinate_jacobian=QuadrotorODE.jacobian,
@@ -192,7 +191,7 @@ df = IterativeLQR.iLQR!(
 
 # Save iterations log to csv
 warmstart_string = warmstart ? "-warmstart" : ""
-CSV.write("quadrotor/results/quadrotor$warmstart_string-$algorithm-$regularization-$regularization_approach.csv", df)
+CSV.write("quadrotor/results/quadrotor$warmstart_string-ilqr-$regularization-$regularization_approach.csv", df)
 
 # Visualization
 vis = (@isdefined vis) ? vis : Visualizer()

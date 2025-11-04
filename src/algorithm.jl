@@ -15,7 +15,7 @@ function trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
     return true, sum(l)
 end
 
-function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!, algorithm)
+function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
     @unpack N, ndx = workset
     @unpack x, u = nominal_trajectory(workset)
     @unpack fx, fu, fxx, fux, fxu, fuu = workset.dynamics_derivatives
@@ -23,16 +23,7 @@ function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cos
     @unpack Φx, Φxx = workset.cost_derivatives
 
     @threads for k in 1:N
-        if algorithm == :ilqr
-            dynamics_diff!(fx[k], fu[k], x[k], u[k], k)
-        elseif algorithm == :ddp
-            # has not been tested
-            dynamics_diff!(fx[k], fu[k], fxx[k], fxu[k], fuu[k], x[k], u[k], k)
-            for i in 1:ndx
-                fux[k][i, :, :] .= fxu[k][i, :, :]'
-            end
-        end
-
+        dynamics_diff!(fx[k], fu[k], x[k], u[k], k)
         running_cost_diff!(lx[k], lu[k], lxx[k], lxu[k], luu[k], x[k], u[k], k)
         lux[k] .= lxu[k]'
     end
@@ -42,7 +33,7 @@ function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cos
     return nothing
 end
 
-function stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!, algorithm)
+function stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
     @unpack N = workset
     @unpack x, u = nominal_trajectory(workset)
     @unpack ∇f, ∇2f = workset.dynamics_derivatives
@@ -51,12 +42,7 @@ function stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, f
     @unpack Φx, Φxx = workset.cost_derivatives
 
     @threads for k in 1:N
-        if algorithm == :ilqr
-            dynamics_diff!(∇f[k], x[k], u[k], k)
-        elseif algorithm == :ddp
-            dynamics_diff!(∇f[k], ∇2f[k], x[k], u[k], k)
-        end
-
+        dynamics_diff!(∇f[k], x[k], u[k], k)
         running_cost_diff!(∇l[k], ∇2l[k], x[k], u[k], k)
     end
 
@@ -109,7 +95,7 @@ function cost_regularization!(workset, δ, regularization_approach)
     return nothing
 end
 
-function backward_pass!(workset, algorithm, regularization, δ, regularization_approach)
+function backward_pass!(workset, regularization, δ, regularization_approach)
     @unpack N, nx, ndx, nu = workset
     @unpack Δv, vx, vxx = workset.value_function
     @unpack d, K = workset.policy_update
@@ -129,15 +115,6 @@ function backward_pass!(workset, algorithm, regularization, δ, regularization_a
         # gradient and hessian of the argument
         g .= ∇l[k] + ∇f[k]' * vx[k+1]
         H .= ∇2l[k] + ∇f[k]' * vxx[k+1] * ∇f[k]
-
-        ## additional tensor-vector multiplication terms of the DDP algorithm
-        if algorithm == :ddp
-            error("not implemented")
-            # tensor_product = mapreduce(
-            #     (mat, el) -> mat * el, +, eachslice(∇2f[k], dims=1), ndx == nx ? vx[k+1] : E[k+1] * vx[k+1]
-            # )
-            # H .+= ndx == nx ? tensor_product : aug_E[k]' * tensor_product * aug_E[k]
-        end
 
         # regularization of the entire sub-problem's Hessian
         (regularization == :arg) && regularize!(H, δ, regularization_approach)
@@ -212,7 +189,7 @@ function iLQR!(
     maxiter=250, ρ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16), termination_threshold=1e-4,
     rollout=:full, verbose=true, logging=false, plotting_callback=nothing,
     stacked_derivatives=false, state_difference=-, coordinate_jacobian=nothing,
-    algorithm=:ilqr, regularization=:cost, regularization_approach=:eig
+    regularization=:cost, regularization_approach=:eig
 )
     @assert workset.ndx == workset.nx || coordinate_jacobian !== nothing
 
@@ -264,9 +241,9 @@ function iLQR!(
         # nominal trajectory differentiation
         diff = @elapsed begin
             if stacked_derivatives
-                stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!, algorithm)
+                stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
             else
-                differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!, algorithm)
+                differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
             end
         end
 
@@ -283,7 +260,7 @@ function iLQR!(
 
         # backward pass
         bwd = @elapsed begin
-            Δv1, d_∞, d_2 = backward_pass!(workset, algorithm, regularization, δ, regularization_approach)
+            Δv1, d_∞, d_2 = backward_pass!(workset, regularization, δ, regularization_approach)
         end
 
         # forward pass

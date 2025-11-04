@@ -31,7 +31,6 @@ x₀ = [0, cos(θ₀ / 2), sin(θ₀ / 2), 0, 0]
 u₀(k) = cos(2 * pi * (k - 1) / N - 1) * ones(UCNCartPoleODE.nu)
 
 # Algorithm and regularization
-algorithm = :ilqr
 regularization = :none
 regularization_approach = :none
 
@@ -159,7 +158,7 @@ IterativeLQR.set_initial_state!(workset, x₀)
 IterativeLQR.set_initial_inputs!(workset, [u₀(k) for k in 1:N])
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    stacked_derivatives=true, algorithm=algorithm,
+    stacked_derivatives=true,
     regularization=regularization, regularization_approach=regularization_approach,
     verbose=true, logging=true, plotting_callback=plotting_callback,
     coordinate_jacobian=UCNCartPoleODE.jacobian,
@@ -172,7 +171,7 @@ benchmark_res = @benchmark begin
     IterativeLQR.set_initial_inputs!(workset, [u₀(k) for k in 1:N])
     IterativeLQR.iLQR!(
         workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-        stacked_derivatives=true, algorithm=algorithm,
+        stacked_derivatives=true, 
         regularization=regularization, regularization_approach=regularization_approach,
         verbose=false, logging=false,
         maxiter=benchmark_iter,
@@ -183,7 +182,7 @@ end
 display(benchmark_res)
 
 bmk = DataFrame(
-    "algorithm" => "$algorithm",
+    "algorithm" => "ilqr",
     "regularization" => "ucn",
     "nthreads" => Threads.nthreads(),
     "ms" => mean(benchmark_res.times) * 1e-6
@@ -191,8 +190,8 @@ bmk = DataFrame(
 CSV.write("cartpole/results/cartpole-comp_times.csv", bmk, append=true)
 
 # Save iterations log to csv
-CSV.write("ucn_cartpole/results/ucn_cartpole-$algorithm-$regularization-$regularization_approach.csv", df)
-CSV.write("cartpole/results/cartpole-$algorithm-ucn.csv", df)
+CSV.write("ucn_cartpole/results/ucn_cartpole-ilqr-$regularization-$regularization_approach.csv", df)
+CSV.write("cartpole/results/cartpole-ilqr-ucn.csv", df)
 
 # Visualization
 (@isdefined vis) || (vis = Visualizer())
