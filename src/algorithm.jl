@@ -63,7 +63,7 @@ end
 
 function derivatives_coordinate_transformation(workset)
     @unpack N = workset
-    @unpack E, aug_E = workset.coordinate_jacobians
+    @unpack E = workset.coordinate_jacobians
 
     dyn = workset.dynamics_derivatives
     cost = workset.cost_derivatives
@@ -71,11 +71,21 @@ function derivatives_coordinate_transformation(workset)
     tan_cost = workset.tangent_cost_derivatives
 
     @threads for k in 1:N
-        tan_dyn.∇f[k] .= E[k+1]' * dyn.∇f[k] * aug_E[k]
-        tan_cost.∇l[k] .= aug_E[k]' * cost.∇l[k]
-        tan_cost.∇2l[k] .= aug_E[k]' * cost.∇2l[k] * aug_E[k]
+        # dynamics
+        tan_dyn.fx[k] .= E[k+1]' * dyn.fx[k] * E[k]
+        tan_dyn.fu[k] .= E[k+1]' * dyn.fu[k]
+
+        # running cost
+        tan_cost.lx[k] .= E[k]' * cost.lx[k]
+        tan_cost.lu[k] .= cost.lu[k]
+
+        tan_cost.lxx[k] .= E[k]' * cost.lxx[k] * E[k]
+        tan_cost.lxu[k] .= E[k]' * cost.lxu[k]
+        tan_cost.lux[k] .= cost.lux[k] * E[k]
+        tan_cost.luu[k] .= cost.luu[k]
     end
 
+    # final cost
     tan_cost.Φx .= E[N+1]' * cost.Φx
     tan_cost.Φxx .= E[N+1]' * cost.Φxx * E[N+1]
 
@@ -100,7 +110,6 @@ function backward_pass!(workset)
     @unpack Δv, vx, vxx = workset.value_function
     @unpack d, K = workset.policy_update
     @unpack g, qx, qu, H, qxx, quu, qux = workset.subproblem_objective_derivatives
-    @unpack aug_E, E = workset.coordinate_jacobians
 
     # cost derivatives pre-converted into the tangent space if ndx != nx
     @unpack ∇f = ndx == nx ? workset.dynamics_derivatives : workset.tangent_dynamics_derivatives

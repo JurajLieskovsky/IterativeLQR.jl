@@ -39,18 +39,12 @@ struct PolicyUpdate{T}
 end
 
 struct CoordinateJacobians{T}
-    aug_E::Vector{Matrix{T}}
-    E # TBD
+    E::Vector{Matrix{T}}
 
-    function CoordinateJacobians{T}(nx, ndx, nu, N) where {T}
-        aug_E = [zeros(T, nx + nu, ndx + nu) for _ in 1:N]
-        E = [k <= N ? view(aug_E[k], 1:nx, 1:ndx) : zeros(T, nx, ndx) for k in 1:N+1]
+    function CoordinateJacobians{T}(nx, ndx, N) where {T}
+        E = [zeros(T, nx, ndx) for _ in 1:N+1]
 
-        for i in 1:N
-            aug_E[i][nx+1:nx+nu, ndx+1:ndx+nu] .= Matrix{T}(I, nu, nu)
-        end
-        
-        return new(aug_E, E)
+        return new(E)
     end
 end
 
@@ -149,7 +143,7 @@ struct Workset{T}
         trajectory = (Trajectory{T}(nx, nu, N), Trajectory{T}(nx, nu, N))
         value_function = ValueFunction{T}(ndx, N)
         policy_update = PolicyUpdate{T}(ndx, nu, N)
-        coordinate_jacobians = CoordinateJacobians{T}(nx, ndx, nu, N)
+        coordinate_jacobians = CoordinateJacobians{T}(nx, ndx, N)
         dynamics_derivatives = DynamicsDerivatives{T}(nx, nu, N)
         cost_derivatives = CostDerivatives{T}(nx, nu, N)
         tangent_dynamics_derivatives = DynamicsDerivatives{T}(ndx, nu, N)
