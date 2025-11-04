@@ -122,31 +122,32 @@ struct Workset{T}
 
     trajectory::Tuple{Trajectory{T},Trajectory{T}}
     policy_update::PolicyUpdate{T}
-    coordinate_jacobians::CoordinateJacobians{T}
     dynamics_derivatives::DynamicsDerivatives{T}
     cost_derivatives::CostDerivatives{T}
-    tangent_dynamics_derivatives::DynamicsDerivatives{T}
-    tangent_cost_derivatives::CostDerivatives{T}
     backward_pass_workset::BackwardPassWorkset{T}
+
+    coordinate_jacobians::Union{CoordinateJacobians{T}, Nothing}
+    tangent_dynamics_derivatives::Union{DynamicsDerivatives{T}, Nothing}
+    tangent_cost_derivatives::Union{CostDerivatives{T}, Nothing}
 
     function Workset{T}(nx, nu, N, ndx=nothing) where {T}
         ndx = ndx !== nothing ? ndx : nx
 
         trajectory = (Trajectory{T}(nx, nu, N), Trajectory{T}(nx, nu, N))
         policy_update = PolicyUpdate{T}(ndx, nu, N)
-        coordinate_jacobians = CoordinateJacobians{T}(nx, ndx, N)
         dynamics_derivatives = DynamicsDerivatives{T}(nx, nu, N)
         cost_derivatives = CostDerivatives{T}(nx, nu, N)
-        tangent_dynamics_derivatives = DynamicsDerivatives{T}(ndx, nu, N)
-        tangent_cost_derivatives = CostDerivatives{T}(ndx, nu, N)
         backward_pass_workset = BackwardPassWorkset{T}(ndx, nu)
+
+        coordinate_jacobians = ndx != nx ? CoordinateJacobians{T}(nx, ndx, N) : nothing
+        tangent_dynamics_derivatives = ndx != nx ? DynamicsDerivatives{T}(ndx, nu, N) : nothing
+        tangent_cost_derivatives = ndx != nx ? CostDerivatives{T}(ndx, nu, N) : nothing
 
         return new(
             N, nx, ndx, nu, 1, 2,
-            trajectory, policy_update, coordinate_jacobians,
-            dynamics_derivatives, cost_derivatives,
-            tangent_dynamics_derivatives, tangent_cost_derivatives,
-            backward_pass_workset
+            trajectory, policy_update,
+            dynamics_derivatives, cost_derivatives, backward_pass_workset,
+            coordinate_jacobians, tangent_dynamics_derivatives, tangent_cost_derivatives,
         )
     end
 end
