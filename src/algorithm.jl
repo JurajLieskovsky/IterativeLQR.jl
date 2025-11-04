@@ -82,15 +82,15 @@ function derivatives_coordinate_transformation(workset)
     return nothing
 end
 
-function cost_regularization!(workset, δ, regularization_approach)
+function cost_regularization!(workset, δ, regularization)
     @unpack N, nx, ndx = workset
     @unpack ∇2l, Φxx = ndx == nx ? workset.cost_derivatives : workset.tangent_cost_derivatives
 
     @threads for k in 1:N
-        regularize!(∇2l[k], δ, regularization_approach)
+        regularize!(∇2l[k], δ, regularization)
     end
 
-    regularize!(Φxx, δ, regularization_approach)
+    regularize!(Φxx, δ, regularization)
 
     return nothing
 end
