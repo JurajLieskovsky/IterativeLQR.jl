@@ -95,7 +95,7 @@ function cost_regularization!(workset, δ, regularization_approach)
     return nothing
 end
 
-function backward_pass!(workset, regularization, δ, regularization_approach)
+function backward_pass!(workset)
     @unpack N, nx, ndx, nu = workset
     @unpack Δv, vx, vxx = workset.value_function
     @unpack d, K = workset.policy_update
@@ -115,9 +115,6 @@ function backward_pass!(workset, regularization, δ, regularization_approach)
         # gradient and hessian of the argument
         g .= ∇l[k] + ∇f[k]' * vx[k+1]
         H .= ∇2l[k] + ∇f[k]' * vxx[k+1] * ∇f[k]
-
-        # regularization of the entire sub-problem's Hessian
-        (regularization == :arg) && regularize!(H, δ, regularization_approach)
 
         # control update
         F = cholesky(Symmetric(quu))
@@ -188,8 +185,7 @@ function iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
     maxiter=250, ρ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16), termination_threshold=1e-4,
     rollout=:full, verbose=true, logging=false, plotting_callback=nothing,
-    stacked_derivatives=false, state_difference=-, coordinate_jacobian=nothing,
-    regularization=:cost, regularization_approach=:eig
+    stacked_derivatives=false, state_difference=-, coordinate_jacobian=nothing, regularization_approach=:eig
 )
     @assert workset.ndx == workset.nx || coordinate_jacobian !== nothing
 
@@ -256,11 +252,11 @@ function iLQR!(
         end
 
         # regularization
-        reg = regularization == :cost ? @elapsed(cost_regularization!(workset, δ, regularization_approach)) : NaN
+        reg = regularization_approach != :none ? @elapsed(cost_regularization!(workset, δ, regularization_approach)) : NaN
 
         # backward pass
         bwd = @elapsed begin
-            Δv1, d_∞, d_2 = backward_pass!(workset, regularization, δ, regularization_approach)
+            Δv1, d_∞, d_2 = backward_pass!(workset)
         end
 
         # forward pass
