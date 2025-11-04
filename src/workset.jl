@@ -81,6 +81,10 @@ struct CostDerivatives{T}
 end
 
 struct SubproblemObjectiveDerivatives{T}
+    Δv::Ref{T}
+    vx::Vector{T}
+    vxx::Matrix{T}
+
     g::Vector{T}
     qx::SubArray{T,1,Vector{T},Tuple{UnitRange{Int64}},true}
     qu::SubArray{T,1,Vector{T},Tuple{UnitRange{Int64}},true}
@@ -92,17 +96,21 @@ struct SubproblemObjectiveDerivatives{T}
     qxu::SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}
 
     function SubproblemObjectiveDerivatives{T}(ndx, nu) where {T}
-        g = zeros(ndx + nu)
+        Δv = zero(T)
+        vx = zeros(T, ndx)
+        vxx = zeros(T, ndx, ndx)
+
+        g = zeros(T, ndx + nu)
         qx = view(g, 1:ndx)
         qu = view(g, ndx+1:ndx+nu)
 
-        H = zeros(ndx + nu, ndx + nu)
+        H = zeros(T, ndx + nu, ndx + nu)
         qxx = view(H, 1:ndx, 1:ndx)
         quu = view(H, ndx+1:ndx+nu, ndx+1:ndx+nu)
         qux = view(H, ndx+1:ndx+nu, 1:ndx)
         qxu = view(H, 1:ndx, ndx+1:ndx+nu)
 
-        return new(g, qx, qu, H, qxx, quu, qux, qxu)
+        return new(Δv, vx, vxx, g, qx, qu, H, qxx, quu, qux, qxu)
     end
 end
 

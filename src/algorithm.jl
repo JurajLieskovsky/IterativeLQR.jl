@@ -107,6 +107,7 @@ end
 function backward_pass!(workset)
     @unpack N, nx, ndx, nu = workset
     @unpack d, K = workset.policy_update
+    @unpack Δv, vx, vxx = workset.subproblem_objective_derivatives
     @unpack g, qx, qu, H, qxx, quu, qux = workset.subproblem_objective_derivatives
 
     # cost derivatives pre-converted into the tangent space if ndx != nx
@@ -114,9 +115,9 @@ function backward_pass!(workset)
     @unpack ∇l, ∇2l = ndx == nx ? workset.cost_derivatives : workset.tangent_cost_derivatives
     @unpack Φx, Φxx = ndx == nx ? workset.cost_derivatives : workset.tangent_cost_derivatives
 
-    Δv = 0
-    vx = Φx
-    vxx = Φxx
+    Δv[] = 0
+    vx .= Φx
+    vxx .= Φxx
 
     @inbounds for k in N:-1:1
         # gradient and hessian of the argument
@@ -133,13 +134,13 @@ function backward_pass!(workset)
         vxx .= qxx + K[k]' * qux
 
         # expected improvement
-        Δv -= 0.5 * d[k]' * quu * d[k]
+        Δv[] -= 0.5 * d[k]' * quu * d[k]
     end
 
     d_∞ = mapreduce(d_k -> mapreduce(abs, max, d_k), max, d)
     d_2 = sqrt(mapreduce(d_k -> d_k'd_k, +, d))
 
-    return Δv, d_∞, d_2
+    return Δv[], d_∞, d_2
 end
 
 function forward_pass!(workset, dynamics!, difference, running_cost, final_cost, α)
