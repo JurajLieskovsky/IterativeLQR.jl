@@ -63,21 +63,6 @@ function dynamics_diff!(∇f, x, u, k)
     return nothing
 end
 
-function dynamics_diff!(∇f, ∇2f, x, u, k)
-    nx = QuadrotorODE.nx
-    nu = QuadrotorODE.nu
-
-    function stacked_dynamics(arg)
-        xnew = zeros(eltype(arg), nx)
-        dynamics!(xnew, view(arg, 1:nx), view(arg, nx+1:nx+nu), k)
-        return xnew
-    end
-
-    ForwardDiff.jacobian!(∇2f, (jac, arg) -> ForwardDiff.jacobian!(jac, stacked_dynamics, arg), ∇f, vcat(x, u))
-
-    return nothing
-end
-
 # Running cost
 function running_cost(x, u, _)
     r, q, v, ω = x[1:3], x[4:7], x[8:10], x[11:13]

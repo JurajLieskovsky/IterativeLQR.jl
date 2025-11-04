@@ -59,21 +59,6 @@ function dynamics_diff!(∇f, x, u, k)
     return nothing
 end
 
-function dynamics_diff!(∇f, ∇2f, x, u, k)
-    nx = UCNCartPoleODE.nx
-    nu = UCNCartPoleODE.nu
-
-    function stacked_dynamics(arg)
-        xnew = zeros(eltype(arg), nx)
-        dynamics!(xnew, view(arg, 1:nx), view(arg, nx+1:nx+nu), k)
-        return xnew
-    end
-
-    ForwardDiff.jacobian!(∇2f, (jac, arg) -> ForwardDiff.jacobian!(jac, stacked_dynamics, arg), ∇f, vcat(x, u))
-
-    return nothing
-end
-
 # Running cost
 Q = h * diagm([1e1, 1e2, 1, 1])
 R = h * Matrix{Float64}(I, 1, 1)

@@ -54,21 +54,6 @@ function dynamics_diff!(∇f, x, u, k)
     return nothing
 end
 
-function dynamics_diff!(∇f, ∇2f, x, u, k)
-    nx = CartPoleODE.nx
-    nu = CartPoleODE.nu
-
-    function stacked_dynamics(arg)
-        xnew = zeros(eltype(arg), nx)
-        dynamics!(xnew, view(arg, 1:nx), view(arg, nx+1:nx+nu), k)
-        return xnew
-    end
-
-    ForwardDiff.jacobian!(∇2f, (jac, arg) -> ForwardDiff.jacobian!(jac, stacked_dynamics, arg), ∇f, vcat(x, u))
-
-    return nothing
-end
-
 # Cost functions
 ξ(x) = [x[1], -cos(x[2] / 2), x[3], x[4]]
 
