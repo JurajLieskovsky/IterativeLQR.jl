@@ -121,6 +121,7 @@ struct Workset{T}
     nu::Int64
     nominal::Ref{Int}
     active::Ref{Int}
+
     trajectory::Tuple{Trajectory{T},Trajectory{T}}
     policy_update::PolicyUpdate{T}
     coordinate_jacobians::CoordinateJacobians{T}
@@ -143,7 +144,13 @@ struct Workset{T}
 
         backward_pass_workset = BackwardPassWorkset{T}(ndx, nu)
 
-        return new(N, nx, ndx, nu, 1, 2, trajectory, policy_update, coordinate_jacobians, dynamics_derivatives, cost_derivatives, tangent_dynamics_derivatives, tangent_cost_derivatives, backward_pass_workset)
+        return new(
+            N, nx, ndx, nu, 1, 2,
+            trajectory, policy_update, coordinate_jacobians,
+            dynamics_derivatives, cost_derivatives,
+            tangent_dynamics_derivatives, tangent_cost_derivatives,
+            backward_pass_workset
+        )
     end
 end
 
