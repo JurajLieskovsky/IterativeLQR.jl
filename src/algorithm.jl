@@ -107,8 +107,8 @@ end
 function backward_pass!(workset)
     @unpack N, nx, ndx, nu = workset
     @unpack d, K = workset.policy_update
-    @unpack Δv, vx, vxx = workset.subproblem_objective_derivatives
-    @unpack g, qx, qu, H, qxx, quu, qux = workset.subproblem_objective_derivatives
+    @unpack Δv, vx, vxx = workset.backward_pass_workset
+    @unpack g, qx, qu, H, qxx, quu, qux = workset.backward_pass_workset
 
     # cost derivatives pre-converted into the tangent space if ndx != nx
     @unpack ∇f = ndx == nx ? workset.dynamics_derivatives : workset.tangent_dynamics_derivatives

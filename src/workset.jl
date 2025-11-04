@@ -80,7 +80,7 @@ struct CostDerivatives{T}
     end
 end
 
-struct SubproblemObjectiveDerivatives{T}
+struct BackwardPassWorkset{T}
     Δv::Ref{T}
     vx::Vector{T}
     vxx::Matrix{T}
@@ -95,7 +95,7 @@ struct SubproblemObjectiveDerivatives{T}
     qux::SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}
     qxu::SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}
 
-    function SubproblemObjectiveDerivatives{T}(ndx, nu) where {T}
+    function BackwardPassWorkset{T}(ndx, nu) where {T}
         Δv = zero(T)
         vx = zeros(T, ndx)
         vxx = zeros(T, ndx, ndx)
@@ -128,7 +128,7 @@ struct Workset{T}
     cost_derivatives::CostDerivatives{T}
     tangent_dynamics_derivatives::DynamicsDerivatives{T}
     tangent_cost_derivatives::CostDerivatives{T}
-    subproblem_objective_derivatives::SubproblemObjectiveDerivatives{T}
+    backward_pass_workset::BackwardPassWorkset{T}
 
     function Workset{T}(nx, nu, N, ndx=nothing) where {T}
         ndx = ndx !== nothing ? ndx : nx
@@ -141,9 +141,9 @@ struct Workset{T}
         tangent_dynamics_derivatives = DynamicsDerivatives{T}(ndx, nu, N)
         tangent_cost_derivatives = CostDerivatives{T}(ndx, nu, N)
 
-        subproblem_objective_derivatives = SubproblemObjectiveDerivatives{T}(ndx, nu)
+        backward_pass_workset = BackwardPassWorkset{T}(ndx, nu)
 
-        return new(N, nx, ndx, nu, 1, 2, trajectory, policy_update, coordinate_jacobians, dynamics_derivatives, cost_derivatives, tangent_dynamics_derivatives, tangent_cost_derivatives, subproblem_objective_derivatives)
+        return new(N, nx, ndx, nu, 1, 2, trajectory, policy_update, coordinate_jacobians, dynamics_derivatives, cost_derivatives, tangent_dynamics_derivatives, tangent_cost_derivatives, backward_pass_workset)
     end
 end
 
