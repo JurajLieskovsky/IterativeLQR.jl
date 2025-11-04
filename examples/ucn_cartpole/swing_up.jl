@@ -30,9 +30,6 @@ uₜ = zeros(UCNCartPoleODE.nu)
 x₀ = [0, cos(θ₀ / 2), sin(θ₀ / 2), 0, 0]
 u₀(k) = cos(2 * pi * (k - 1) / N - 1) * ones(UCNCartPoleODE.nu)
 
-# Regularization
-regularization = :none
-
 # Dynamics
 """RK4 integration with zero-order hold on u"""
 function dynamics!(xnew, x, u, _)
@@ -136,7 +133,7 @@ IterativeLQR.set_initial_state!(workset, x₀)
 IterativeLQR.set_initial_inputs!(workset, [u₀(k) for k in 1:N])
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    stacked_derivatives=true, regularization=regularization,
+    stacked_derivatives=true, regularization=:none,
     coordinate_jacobian=UCNCartPoleODE.jacobian, state_difference=UCNCartPoleODE.state_difference,
     verbose=true, logging=true, plotting_callback=plotting_callback,
 )
@@ -147,7 +144,7 @@ benchmark_res = @benchmark begin
     IterativeLQR.set_initial_inputs!(workset, [u₀(k) for k in 1:N])
     IterativeLQR.iLQR!(
         workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-        stacked_derivatives=true, regularization=regularization,
+        stacked_derivatives=true, regularization=:none,
         coordinate_jacobian=UCNCartPoleODE.jacobian, state_difference=UCNCartPoleODE.state_difference,
         verbose=false, logging=false,
         maxiter=benchmark_iter
@@ -164,7 +161,7 @@ bmk = DataFrame(
 CSV.write("cartpole/results/cartpole-comp_times.csv", bmk, append=true)
 
 # Save iterations log to csv
-CSV.write("ucn_cartpole/results/ucn_cartpole-ilqr-$regularization.csv", df)
+CSV.write("ucn_cartpole/results/ucn_cartpole-ilqr.csv", df)
 CSV.write("cartpole/results/cartpole-ilqr-ucn.csv", df)
 
 # Visualization
