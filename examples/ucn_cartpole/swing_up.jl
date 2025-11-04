@@ -138,31 +138,8 @@ df = IterativeLQR.iLQR!(
     verbose=true, logging=true, plotting_callback=plotting_callback,
 )
 
-## Benchmarking
-benchmark_iter = findfirst(J -> (J-df.J[end]) <= 1e-2 * df.J[end], df.J)
-benchmark_res = @benchmark begin
-    IterativeLQR.set_initial_inputs!(workset, [u₀(k) for k in 1:N])
-    IterativeLQR.iLQR!(
-        workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-        stacked_derivatives=true, regularization=:none,
-        coordinate_jacobian=UCNCartPoleODE.jacobian, state_difference=UCNCartPoleODE.state_difference,
-        verbose=false, logging=false,
-        maxiter=benchmark_iter
-    )
-end
-display(benchmark_res)
-
-bmk = DataFrame(
-    "algorithm" => "ilqr",
-    "regularization" => "ucn",
-    "nthreads" => Threads.nthreads(),
-    "ms" => mean(benchmark_res.times) * 1e-6
-)
-CSV.write("cartpole/results/cartpole-comp_times.csv", bmk, append=true)
-
 # Save iterations log to csv
 CSV.write("ucn_cartpole/results/ucn_cartpole-ilqr.csv", df)
-CSV.write("cartpole/results/cartpole-ilqr-ucn.csv", df)
 
 # Visualization
 (@isdefined vis) || (vis = Visualizer())
