@@ -135,7 +135,7 @@ df = IterativeLQR.iLQR!(
 )
 
 # Save iterations log to csv
-CSV.write("cartpole/results/iterations-$regularization.csv", df)
+# CSV.write("cartpole/results/iterations-$regularization.csv", df)
 
 # Visualization
 (@isdefined vis) || (vis = Visualizer())

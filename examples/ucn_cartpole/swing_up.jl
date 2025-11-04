@@ -139,7 +139,7 @@ df = IterativeLQR.iLQR!(
 )
 
 # Save iterations log to csv
-CSV.write("ucn_cartpole/results/iterations.csv", df)
+# CSV.write("ucn_cartpole/results/iterations.csv", df)
 
 # Visualization
 (@isdefined vis) || (vis = Visualizer())
