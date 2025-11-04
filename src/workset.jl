@@ -81,7 +81,6 @@ struct CostDerivatives{T}
 end
 
 struct BackwardPassWorkset{T}
-    Δv::Ref{T}
     vx::Vector{T}
     vxx::Matrix{T}
 
@@ -96,7 +95,6 @@ struct BackwardPassWorkset{T}
     qxu::SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}
 
     function BackwardPassWorkset{T}(ndx, nu) where {T}
-        Δv = zero(T)
         vx = zeros(T, ndx)
         vxx = zeros(T, ndx, ndx)
 
@@ -110,7 +108,7 @@ struct BackwardPassWorkset{T}
         qux = view(H, ndx+1:ndx+nu, 1:ndx)
         qxu = view(H, 1:ndx, ndx+1:ndx+nu)
 
-        return new(Δv, vx, vxx, g, qx, qu, H, qxx, quu, qux, qxu)
+        return new(vx, vxx, g, qx, qu, H, qxx, quu, qux, qxu)
     end
 end
 
