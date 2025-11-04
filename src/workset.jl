@@ -141,7 +141,6 @@ struct Workset{T}
         cost_derivatives = CostDerivatives{T}(nx, nu, N)
         tangent_dynamics_derivatives = DynamicsDerivatives{T}(ndx, nu, N)
         tangent_cost_derivatives = CostDerivatives{T}(ndx, nu, N)
-
         backward_pass_workset = BackwardPassWorkset{T}(ndx, nu)
 
         return new(
