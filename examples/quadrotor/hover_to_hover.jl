@@ -162,7 +162,7 @@ df = IterativeLQR.iLQR!(
 
 # Save iterations log to csv
 warmstart_string = warmstart ? "-warmstart" : ""
-CSV.write("quadrotor/results/quadrotor-ilqr$warmstart_string.csv", df)
+CSV.write("quadrotor/results/iterations$warmstart_string.csv", df)
 
 # Visualization
 vis = (@isdefined vis) ? vis : Visualizer()

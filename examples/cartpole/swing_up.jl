@@ -135,20 +135,7 @@ df = IterativeLQR.iLQR!(
 )
 
 # Save iterations log to csv
-CSV.write("cartpole/results/cartpole-ilqr-$regularization.csv", df)
-
-# Save final trajectory
-traj = DataFrame(:c => nominal_trajectory(workset).l)
-
-for i in 1:CartPoleODE.nx
-    traj[:, Symbol("x$i")] = map(x -> x[i], nominal_trajectory(workset).x)
-end
-
-for i in 1:CartPoleODE.nu
-    traj[:, Symbol("u$i")] = vcat(map(u -> u[i], nominal_trajectory(workset).u), nominal_trajectory(workset).u[end])
-end
-
-CSV.write("cartpole/results/cartpole-trajectory.csv", traj)
+CSV.write("cartpole/results/iterations-$regularization.csv", df)
 
 # Visualization
 (@isdefined vis) || (vis = Visualizer())
