@@ -26,18 +26,10 @@ h = T / N
 x₀ = [0, θ₀, 0, 0]
 u₀(k) = cos(2 * pi * (k - 1) / N - 1) * ones(CartPoleODE.nu)
 
-# Algorithm and regularization
-regularization = :cost
+# Regularization
 regularization_approach = :mchol
 
 # Dynamics
-# function dynamics!(xnew, x, u, _)
-#     CartPoleODE.f!(cartpole, xnew, x, u)
-#     xnew .*= h
-#     xnew .+= x
-#     return nothing
-# end
-
 """RK4 integration with zero-order hold on u"""
 function dynamics!(xnew, x, u, _)
     f1 = CartPoleODE.f(cartpole, x, u)

@@ -30,16 +30,10 @@ uₜ = zeros(UCNCartPoleODE.nu)
 x₀ = [0, cos(θ₀ / 2), sin(θ₀ / 2), 0, 0]
 u₀(k) = cos(2 * pi * (k - 1) / N - 1) * ones(UCNCartPoleODE.nu)
 
-# Algorithm and regularization
+# Regularization
 regularization_approach = :none
 
 # Dynamics
-# function dynamics!(xnew, x, u, _)
-#     xnew .= x + h * UCNCartPoleODE.f(cartpole, x, u)
-#     UCNCartPoleODE.normalize_state!(xnew)
-#     return nothing
-# end
-
 """RK4 integration with zero-order hold on u"""
 function dynamics!(xnew, x, u, _)
     f1 = UCNCartPoleODE.f(cartpole, x, u)

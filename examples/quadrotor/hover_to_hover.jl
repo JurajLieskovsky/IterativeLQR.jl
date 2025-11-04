@@ -34,17 +34,11 @@ zRz(q⃗) = 1 - 2 * (q⃗[1]^2 + q⃗[2]^2)
 x₀ = vcat([0, 0, 1.0], [cos(θ₀ / 2), sin(θ₀ / 2), 0, 0], zeros(3), zeros(3))
 u₀(_) = zRz(x₀[5:7]) * uₜ
 
-# Algorithm, regularization, and warmstart
+# Regularization and warmstart
 regularization_approach = :none
 warmstart = true
 
 # Dynamics
-# function dynamics!(xnew, x, u, _)
-#     xnew .= x + h * QuadrotorODE.dynamics(quadrotor, x, u)
-#     QuadrotorODE.normalize_state!(xnew)
-#     return nothing
-# end
-
 """RK4 integration with zero-order hold on u"""
 function dynamics!(xnew, x, u, _)
     f1 = QuadrotorODE.dynamics(quadrotor, x, u)
