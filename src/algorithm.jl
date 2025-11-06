@@ -15,17 +15,22 @@ function trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
     return true, sum(l)
 end
 
-function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
-    @unpack N, ndx = workset
+function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!, stacked)
+    @unpack N = workset
     @unpack x, u = nominal_trajectory(workset)
-    @unpack fx, fu, fxx, fux, fxu, fuu = workset.dynamics_derivatives
-    @unpack lx, lu, lxx, lux, lxu, luu = workset.cost_derivatives
+    @unpack ∇f, fx, fu = workset.dynamics_derivatives
+    @unpack ∇l, lx, lu, ∇2l, lxx, lux, lxu, luu = workset.cost_derivatives
     @unpack Φx, Φxx = workset.cost_derivatives
 
     @threads for k in 1:N
-        dynamics_diff!(fx[k], fu[k], x[k], u[k], k)
-        running_cost_diff!(lx[k], lu[k], lxx[k], lxu[k], luu[k], x[k], u[k], k)
-        lux[k] .= lxu[k]'
+        if stacked
+            dynamics_diff!(∇f[k], x[k], u[k], k)
+            running_cost_diff!(∇l[k], ∇2l[k], x[k], u[k], k)
+        else
+            dynamics_diff!(fx[k], fu[k], x[k], u[k], k)
+            running_cost_diff!(lx[k], lu[k], lxx[k], lxu[k], luu[k], x[k], u[k], k)
+            lux[k] .= lxu[k]'
+        end
     end
 
     final_cost_diff!(Φx, Φxx, x[N+1], N + 1)
@@ -33,69 +38,7 @@ function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cos
     return nothing
 end
 
-function reduced_coordinate_differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!, coordinate_jacobian)
-    @unpack N = workset
-    @unpack x, u = nominal_trajectory(workset)
-    @unpack E = workset.coordinate_jacobians
-    @unpack fx, fu, fxx, fux, fxu, fuu = workset.dynamics_derivatives
-    @unpack lx, lu, lxx, lux, lxu, luu = workset.cost_derivatives
-    @unpack Φx, Φxx = workset.cost_derivatives
-
-    dfwork = workset.dynamics_derivatives_workset
-    dlwork = workset.cost_derivatives_workset
-
-    # Coordinate jacobians (precalculated as E[k] and E[k+1] are required for dynamics derivs)
-    @threads for k in 1:N+1
-        E[k] .= coordinate_jacobian(x[k])
-    end
-
-    # Dynamics and running cost
-    @threads for k in 1:N
-        i = threadid()
-
-        # differentiation
-        dynamics_diff!(dfwork.fx[i], dfwork.fu[i], x[k], u[k], k)
-        running_cost_diff!(dlwork.lx[i], lu[k], dlwork.lxx[i], dlwork.lxu[i], luu[k], x[k], u[k], k)
-
-        # dynamics coordinate transformation
-        fx[k] .= E[k+1]' * dfwork.fx[i] * E[k]
-        fu[k] .= E[k+1]' * dfwork.fu[i]
-
-        # running cost coordinate transformation
-        lx[k] .= E[k]' * dlwork.lx[i]
-
-        lxx[k] .= E[k]' * dlwork.lxx[i] * E[k]
-        lxu[k] .= E[k]' * dlwork.lxu[i]
-        lux[k] .= lxu[k]'
-    end
-
-    # Final cost
-    final_cost_diff!(dlwork.Φx, dlwork.Φxx, x[N+1], N + 1)
-
-    Φx .= E[N+1]' * dlwork.Φx
-    Φxx .= E[N+1]' * dlwork.Φxx * E[N+1]
-
-    return nothing
-end
-
-function stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
-    @unpack N = workset
-    @unpack x, u = nominal_trajectory(workset)
-    @unpack ∇f = workset.dynamics_derivatives
-    @unpack ∇l, ∇2l = workset.cost_derivatives
-    @unpack Φx, Φxx = workset.cost_derivatives
-
-    @threads for k in 1:N
-        dynamics_diff!(∇f[k], x[k], u[k], k)
-        running_cost_diff!(∇l[k], ∇2l[k], x[k], u[k], k)
-    end
-
-    final_cost_diff!(Φx, Φxx, x[N+1], N + 1)
-
-    return nothing
-end
-
-function reduced_coordinate_stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!, coordinate_jacobian)
+function reduced_coordinate_differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!, coordinate_jacobian, stacked)
     @unpack N = workset
     @unpack x, u = nominal_trajectory(workset)
     @unpack E = workset.coordinate_jacobians
@@ -116,8 +59,13 @@ function reduced_coordinate_stacked_differentiation!(workset, dynamics_diff!, ru
         i = threadid()
 
         # differentiation
-        dynamics_diff!(dfwork.∇f[i], x[k], u[k], k)
-        running_cost_diff!(dlwork.∇l[i], dlwork.∇2l[i], x[k], u[k], k)
+        if stacked
+            dynamics_diff!(dfwork.∇f[i], x[k], u[k], k)
+            running_cost_diff!(dlwork.∇l[i], dlwork.∇2l[i], x[k], u[k], k)
+        else
+            dynamics_diff!(dfwork.fx[i], dfwork.fu[i], x[k], u[k], k)
+            running_cost_diff!(dlwork.lx[i], dlwork.lu[i], dlwork.lxx[i], dlwork.lxu[i], dlwork.luu[i], x[k], u[k], k)
+        end
 
         # dynamics coordinate transformation
         fx[k] .= E[k+1]' * dfwork.fx[i] * E[k]
@@ -137,43 +85,6 @@ function reduced_coordinate_stacked_differentiation!(workset, dynamics_diff!, ru
 
     Φx .= E[N+1]' * dlwork.Φx
     Φxx .= E[N+1]' * dlwork.Φxx * E[N+1]
-
-    return nothing
-end
-
-function derivatives_coordinate_transformation(workset, coordinate_jacobian)
-    @unpack N = workset
-    @unpack E = workset.coordinate_jacobians
-
-    @unpack x = nominal_trajectory(workset)
-
-    @threads for k in 1:N+1
-        E[k] .= coordinate_jacobian(x[k])
-    end
-
-    dyn = workset.dynamics_derivatives
-    cost = workset.cost_derivatives
-    tan_dyn = workset.tangent_dynamics_derivatives
-    tan_cost = workset.tangent_cost_derivatives
-
-    @threads for k in 1:N
-        # dynamics
-        tan_dyn.fx[k] .= E[k+1]' * dyn.fx[k] * E[k]
-        tan_dyn.fu[k] .= E[k+1]' * dyn.fu[k]
-
-        # running cost
-        tan_cost.lx[k] .= E[k]' * cost.lx[k]
-        tan_cost.lu[k] .= cost.lu[k]
-
-        tan_cost.lxx[k] .= E[k]' * cost.lxx[k] * E[k]
-        tan_cost.lxu[k] .= E[k]' * cost.lxu[k]
-        tan_cost.lux[k] .= cost.lux[k] * E[k]
-        tan_cost.luu[k] .= cost.luu[k]
-    end
-
-    # final cost
-    tan_cost.Φx .= E[N+1]' * cost.Φx
-    tan_cost.Φxx .= E[N+1]' * cost.Φxx * E[N+1]
 
     return nothing
 end
@@ -331,16 +242,12 @@ function iLQR!(
     for i in 1:maxiter
         # nominal trajectory differentiation
         diff = @elapsed begin
-            if stacked_derivatives
-                if workset.ndx == workset.nx
-                    stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
-                else
-                    reduced_coordinate_stacked_differentiation!(
-                        workset, dynamics_diff!, running_cost_diff!, final_cost_diff!, coordinate_jacobian
-                    )
-                end
+            if workset.ndx == workset.nx
+                differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!, stacked_derivatives)
             else
-                differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
+                reduced_coordinate_differentiation!(
+                    workset, dynamics_diff!, running_cost_diff!, final_cost_diff!, coordinate_jacobian, stacked_derivatives
+                )
             end
         end
 
