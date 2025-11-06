@@ -127,27 +127,27 @@ struct Workset{T}
     backward_pass_workset::BackwardPassWorkset{T}
 
     coordinate_jacobians::Union{CoordinateJacobians{T}, Nothing}
-    tangent_dynamics_derivatives::Union{DynamicsDerivatives{T}, Nothing}
-    tangent_cost_derivatives::Union{CostDerivatives{T}, Nothing}
+    dynamics_derivatives_workset::Union{DynamicsDerivatives{T}, Nothing}
+    cost_derivatives_workset::Union{CostDerivatives{T}, Nothing}
 
     function Workset{T}(nx, nu, N, ndx=nothing) where {T}
         ndx = ndx !== nothing ? ndx : nx
 
         trajectory = (Trajectory{T}(nx, nu, N), Trajectory{T}(nx, nu, N))
         policy_update = PolicyUpdate{T}(ndx, nu, N)
-        dynamics_derivatives = DynamicsDerivatives{T}(nx, nu, N)
-        cost_derivatives = CostDerivatives{T}(nx, nu, N)
+        dynamics_derivatives = DynamicsDerivatives{T}(ndx, nu, N)
+        cost_derivatives = CostDerivatives{T}(ndx, nu, N)
         backward_pass_workset = BackwardPassWorkset{T}(ndx, nu)
 
         coordinate_jacobians = ndx != nx ? CoordinateJacobians{T}(nx, ndx, N) : nothing
-        tangent_dynamics_derivatives = ndx != nx ? DynamicsDerivatives{T}(ndx, nu, N) : nothing
-        tangent_cost_derivatives = ndx != nx ? CostDerivatives{T}(ndx, nu, N) : nothing
+        dynamics_derivatives_workset = ndx != nx ? DynamicsDerivatives{T}(nx, nu, nthreads()) : nothing
+        cost_derivatives_workset = ndx != nx ? CostDerivatives{T}(nx, nu, nthreads()) : nothing
 
         return new(
             N, nx, ndx, nu, 1, 2,
             trajectory, policy_update,
             dynamics_derivatives, cost_derivatives, backward_pass_workset,
-            coordinate_jacobians, tangent_dynamics_derivatives, tangent_cost_derivatives,
+            coordinate_jacobians, dynamics_derivatives_workset, cost_derivatives_workset,
         )
     end
 end

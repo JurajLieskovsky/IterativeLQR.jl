@@ -33,6 +33,51 @@ function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cos
     return nothing
 end
 
+function reduced_coordinate_differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!, coordinate_jacobian)
+    @unpack N = workset
+    @unpack x, u = nominal_trajectory(workset)
+    @unpack E = workset.coordinate_jacobians
+    @unpack fx, fu, fxx, fux, fxu, fuu = workset.dynamics_derivatives
+    @unpack lx, lu, lxx, lux, lxu, luu = workset.cost_derivatives
+    @unpack Φx, Φxx = workset.cost_derivatives
+
+    dfwork = workset.dynamics_derivatives_workset
+    dlwork = workset.cost_derivatives_workset
+
+    # Coordinate jacobians (precalculated as E[k] and E[k+1] are required for dynamics derivs)
+    @threads for k in 1:N+1
+        E[k] .= coordinate_jacobian(x[k])
+    end
+
+    # Dynamics and running cost
+    @threads for k in 1:N
+        i = threadid()
+
+        # differentiation
+        dynamics_diff!(dfwork.fx[i], dfwork.fu[i], x[k], u[k], k)
+        running_cost_diff!(dlwork.lx[i], lu[k], dlwork.lxx[i], dlwork.lxu[i], luu[k], x[k], u[k], k)
+
+        # dynamics coordinate transformation
+        fx[k] .= E[k+1]' * dfwork.fx[i] * E[k]
+        fu[k] .= E[k+1]' * dfwork.fu[i]
+
+        # running cost coordinate transformation
+        lx[k] .= E[k]' * dlwork.lx[i]
+
+        lxx[k] .= E[k]' * dlwork.lxx[i] * E[k]
+        lxu[k] .= E[k]' * dlwork.lxu[i]
+        lux[k] .= lxu[k]'
+    end
+
+    # Final cost
+    final_cost_diff!(dlwork.Φx, dlwork.Φxx, x[N+1], N + 1)
+
+    Φx .= E[N+1]' * dlwork.Φx
+    Φxx .= E[N+1]' * dlwork.Φxx * E[N+1]
+
+    return nothing
+end
+
 function stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
     @unpack N = workset
     @unpack x, u = nominal_trajectory(workset)
@@ -46,6 +91,52 @@ function stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, f
     end
 
     final_cost_diff!(Φx, Φxx, x[N+1], N + 1)
+
+    return nothing
+end
+
+function reduced_coordinate_stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!, coordinate_jacobian)
+    @unpack N = workset
+    @unpack x, u = nominal_trajectory(workset)
+    @unpack E = workset.coordinate_jacobians
+    @unpack ∇f, fx, fu = workset.dynamics_derivatives
+    @unpack ∇l, lx, lu, ∇2l, lxx, lux, lxu, luu = workset.cost_derivatives
+    @unpack Φx, Φxx = workset.cost_derivatives
+
+    dfwork = workset.dynamics_derivatives_workset
+    dlwork = workset.cost_derivatives_workset
+
+    # Coordinate jacobians (precalculated as E[k] and E[k+1] are required for dynamics derivs)
+    @threads for k in 1:N+1
+        E[k] .= coordinate_jacobian(x[k])
+    end
+
+    # Dynamics and running cost
+    @threads for k in 1:N
+        i = threadid()
+
+        # differentiation
+        dynamics_diff!(dfwork.∇f[i], x[k], u[k], k)
+        running_cost_diff!(dlwork.∇l[i], dlwork.∇2l[i], x[k], u[k], k)
+
+        # dynamics coordinate transformation
+        fx[k] .= E[k+1]' * dfwork.fx[i] * E[k]
+        fu[k] .= E[k+1]' * dfwork.fu[i]
+
+        # running cost coordinate transformation
+        lx[k] .= E[k]' * dlwork.lx[i]
+        lu[k] .= dlwork.lu[i]
+
+        lxx[k] .= E[k]' * dlwork.lxx[i] * E[k]
+        lxu[k] .= E[k]' * dlwork.lxu[i]
+        luu[k] .= dlwork.luu[i]
+        lux[k] .= lxu[k]'
+    end
+
+    final_cost_diff!(dlwork.Φx, dlwork.Φxx, x[N+1], N + 1)
+
+    Φx .= E[N+1]' * dlwork.Φx
+    Φxx .= E[N+1]' * dlwork.Φxx * E[N+1]
 
     return nothing
 end
@@ -107,10 +198,9 @@ function backward_pass!(workset)
     @unpack g, qx, qu = workset.backward_pass_workset
     @unpack H, qxx, quu, qux = workset.backward_pass_workset
 
-    # cost derivatives pre-converted into the tangent space if ndx != nx
-    @unpack ∇f = ndx == nx ? workset.dynamics_derivatives : workset.tangent_dynamics_derivatives
-    @unpack ∇l, ∇2l = ndx == nx ? workset.cost_derivatives : workset.tangent_cost_derivatives
-    @unpack Φx, Φxx = ndx == nx ? workset.cost_derivatives : workset.tangent_cost_derivatives
+    @unpack ∇f = workset.dynamics_derivatives
+    @unpack ∇l, ∇2l = workset.cost_derivatives
+    @unpack Φx, Φxx = workset.cost_derivatives
 
     Δv = 0
     vx .= Φx
@@ -242,15 +332,16 @@ function iLQR!(
         # nominal trajectory differentiation
         diff = @elapsed begin
             if stacked_derivatives
-                stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
+                if workset.ndx == workset.nx
+                    stacked_differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
+                else
+                    reduced_coordinate_stacked_differentiation!(
+                        workset, dynamics_diff!, running_cost_diff!, final_cost_diff!, coordinate_jacobian
+                    )
+                end
             else
                 differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!)
             end
-        end
-
-        # conversion of cost derivatives into tangential plane
-        if workset.ndx != workset.nx
-            derivatives_coordinate_transformation(workset, coordinate_jacobian)
         end
 
         # regularization
