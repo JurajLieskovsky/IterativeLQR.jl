@@ -1,9 +1,13 @@
+"""
+Stores a trajectory xₖ, uₖ of the controlled system (including costs).
+
+"""
 struct Trajectory{T}
     x::Vector{Vector{T}}
     u::Vector{Vector{T}}
     l::Vector{T}
 
-    function Trajectory{T}(nx, nu, N) where {T}
+    function Trajectory{T}(nx::Int, nu::Int, N::Int) where {T}
         x = [zeros(T, nx) for _ in 1:N+1]
         u = [zeros(T, nu) for _ in 1:N]
         l = zeros(T, N + 1)
@@ -12,11 +16,15 @@ struct Trajectory{T}
     end
 end
 
+"""
+Stores terms dₖ and Kₖ of the policy update δuₖ(δxₖ) = dₖ + Kₖδxₖ.
+
+"""
 struct PolicyUpdate{T}
     d::Vector{Vector{T}}
     K::Vector{Matrix{T}}
 
-    function PolicyUpdate{T}(ndx, nu, N) where {T}
+    function PolicyUpdate{T}(ndx::Int, nu::Int, N::Int) where {T}
         d = [Vector{T}(undef, nu) for _ in 1:N]
         K = [Matrix{T}(undef, nu, ndx) for _ in 1:N]
 
@@ -24,22 +32,30 @@ struct PolicyUpdate{T}
     end
 end
 
+"""
+Stores coordinate jacobians Eₖ.
+
+"""
 struct CoordinateJacobians{T}
     E::Vector{Matrix{T}}
 
-    function CoordinateJacobians{T}(nx, ndx, N) where {T}
+    function CoordinateJacobians{T}(nx::Int, ndx::Int, N::Int) where {T}
         E = [zeros(T, nx, ndx) for _ in 1:N+1]
 
         return new(E)
     end
 end
 
+"""
+Stores partial derivatives of the system's dyanamics f.
+
+"""
 struct DynamicsDerivatives{T}
     ∇f::Vector{Matrix{T}}
     fx::Vector{SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}}
     fu::Vector{SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}}
 
-    function DynamicsDerivatives{T}(nx, nu, N) where {T}
+    function DynamicsDerivatives{T}(nx::Int, nu::Int, N::Int) where {T}
         ∇f = [Matrix{T}(undef, nx, nx + nu) for _ in 1:N]
         fx = [view(∇f[k], 1:nx, 1:nx) for k in 1:N]
         fu = [view(∇f[k], 1:nx, nx+1:nx+nu) for k in 1:N]
@@ -48,6 +64,10 @@ struct DynamicsDerivatives{T}
     end
 end
 
+"""
+Stores partial derivatives of the running cost l and the final cost Φ.
+
+"""
 struct CostDerivatives{T}
     ∇l::Vector{Vector{T}}
     lx::Vector{SubArray{T,1,Vector{T},Tuple{UnitRange{Int64}},true}}
@@ -80,6 +100,10 @@ struct CostDerivatives{T}
     end
 end
 
+"""
+Stores quantities used exclusively in the backward pass of the algorithm.
+
+"""
 struct BackwardPassWorkset{T}
     vx::Vector{T}
     vxx::Matrix{T}
@@ -94,7 +118,7 @@ struct BackwardPassWorkset{T}
     qux::SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}
     qxu::SubArray{T,2,Matrix{T},Tuple{UnitRange{Int64},UnitRange{Int64}},false}
 
-    function BackwardPassWorkset{T}(ndx, nu) where {T}
+    function BackwardPassWorkset{T}(ndx::Int, nu::Int) where {T}
         vx = zeros(T, ndx)
         vxx = zeros(T, ndx, ndx)
 
@@ -112,6 +136,10 @@ struct BackwardPassWorkset{T}
     end
 end
 
+"""
+Stores the nominal trajectory (current the most optimal) as well as all internal quantities of the algorithm.
+
+"""
 struct Workset{T}
     N::Int64
     nx::Int64
@@ -130,8 +158,19 @@ struct Workset{T}
     dynamics_derivatives_workset::Union{DynamicsDerivatives{T}, Nothing}
     cost_derivatives_workset::Union{CostDerivatives{T}, Nothing}
 
-    function Workset{T}(nx, nu, N, ndx=nothing) where {T}
-        ndx = ndx !== nothing ? ndx : nx
+    """
+    Initializes the workset for the iLQR algorithm.
+
+    # Arguments
+    - `nx`: number of states
+    - `nu`: number of inputs
+    - `N`: length of the optimizations horizon 
+    - `ndx`: number of independent states (defaults to `nx`)
+
+    # Returns
+
+    """
+    function Workset{T}(nx::Int, nu::Int, N::Int, ndx::Int=nx) where {T}
 
         trajectory = (Trajectory{T}(nx, nu, N), Trajectory{T}(nx, nu, N))
         policy_update = PolicyUpdate{T}(ndx, nu, N)
@@ -151,4 +190,5 @@ struct Workset{T}
         )
     end
 end
+
 

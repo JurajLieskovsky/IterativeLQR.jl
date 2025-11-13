@@ -7,6 +7,7 @@ using DataFrames, CSV
 using Infiltrator
 using PositiveFactorizations
 using Base.Threads
+using DocStringExtensions
 
 using GMW
 

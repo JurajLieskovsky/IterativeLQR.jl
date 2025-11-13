@@ -14,26 +14,48 @@ function Base.copy!(dst::Trajectory, src::Trajectory)
     dst.l .= src.l
 end
 
-## nominal/active utilities
+## nominal/active trajectory utilities
 
-function nominal_trajectory(workset)
+"""
+Accesses the nominal trajectory
+
+"""
+function nominal_trajectory(workset::Workset)
     workset.trajectory[workset.nominal[]]
 end
 
-function active_trajectory(workset)
+"""
+Accesses the active trajectory
+
+"""
+function active_trajectory(workset::Workset)
     workset.trajectory[workset.active[]]
 end
 
-function swap_trajectories!(workset)
+"""
+Swaps the nominal and active trajectory (without copying any data).
+
+"""
+function swap_trajectories!(workset::Workset)
     workset.nominal[], workset.active[] = workset.active[], workset.nominal[]
     return nothing
 end
 
 ## set functions
 
-function set_initial_state!(workset, x0)
+"""
+Sets the initial state x̃₀.
+
+"""
+function set_initial_state!(workset::Workset, x0::Vector)
     nominal_trajectory(workset).x[1] .= x0
 end
+
+"""
+Sets the nominal inputs ũₖ, k = 1:N.
+
+"""
+function set_initial_inputs! end
 
 function set_initial_inputs!(workset, u::Vector{Vector{T}}) where {T}
     @assert length(u) == workset.N

@@ -1,4 +1,8 @@
-function regularize!(H, δ, approach)
+"""
+Regularizes the symmetric matrix `H` so that it is positive definite.
+
+"""
+function regularize!(H::AbstractMatrix, δ::Real, approach::Symbol)
     if approach == :eig
         eigenvalue_regularization!(H, δ)
     elseif approach == :mchol
@@ -8,14 +12,18 @@ function regularize!(H, δ, approach)
     end
 end
 
-function eigenvalue_regularization!(H, δ)
+"""
+Regularizes `H` using the eigenvalue approach, so that all of its eigen values are >=`δ`.
+
+"""
+function eigenvalue_regularization!(H, δ::Real)
+    @assert δ > 0
+
     # remove potential asymetries
     H .+= H'
     H ./= 2
 
     # calculate eigenvalues and eigenvectors
-    #  imaginary components of eigenvalues can be ignored
-    #  as the matrix is symmetric
     λ, _, _, V = LinearAlgebra.LAPACK.geev!('N', 'V', H)
 
     # minimally perturb eigenvalues and reconstruct matrix

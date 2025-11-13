@@ -1,4 +1,11 @@
-function trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
+"""
+Rolls-out the states x of the nominal trajectory from the initial state x̃ and nominal inputs u.
+It also evaluates the running costs l in multiple threads and the final cost Φ. 
+
+"""
+function trajectory_rollout!(
+    workset::Workset, dynamics!::Function, running_cost::Function, final_cost::Function
+)
     @unpack N = workset
     @unpack x, u, l = nominal_trajectory(workset)
 
@@ -15,7 +22,16 @@ function trajectory_rollout!(workset, dynamics!, running_cost, final_cost)
     return true, sum(l)
 end
 
-function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!, stacked)
+"""
+Produces partial derivatives of the system's dynamics f and costs l and Φ
+that are required for the backward pass of the algorithm. (multithreaded)
+
+"""
+function differentiation!(
+    workset::Workset,
+    dynamics_diff!::Function, running_cost_diff!::Function, final_cost_diff!::Function,
+    stacked::Bool
+)
     @unpack N = workset
     @unpack x, u = nominal_trajectory(workset)
     @unpack ∇f, fx, fu = workset.dynamics_derivatives
@@ -38,7 +54,18 @@ function differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cos
     return nothing
 end
 
-function reduced_coordinate_differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!, coordinate_jacobian, stacked)
+"""
+Produces partial derivatives of the system's dynamics f and costs l and Φ  
+that are required for the backward pass of the algorithm. It also transforms them  
+to the surface of the state manifold using coordinate jacobians. (multithreaded)
+
+"""
+function differentiation!(
+    workset::Workset,
+    dynamics_diff!::Function, running_cost_diff!::Function, final_cost_diff!::Function,
+    coordinate_jacobian::Function,
+    stacked::Bool
+)
     @unpack N = workset
     @unpack x, u = nominal_trajectory(workset)
     @unpack E = workset.coordinate_jacobians
@@ -64,7 +91,9 @@ function reduced_coordinate_differentiation!(workset, dynamics_diff!, running_co
             running_cost_diff!(dlwork.∇l[i], dlwork.∇2l[i], x[k], u[k], k)
         else
             dynamics_diff!(dfwork.fx[i], dfwork.fu[i], x[k], u[k], k)
-            running_cost_diff!(dlwork.lx[i], dlwork.lu[i], dlwork.lxx[i], dlwork.lxu[i], dlwork.luu[i], x[k], u[k], k)
+            running_cost_diff!(
+                dlwork.lx[i], dlwork.lu[i], dlwork.lxx[i], dlwork.lxu[i], dlwork.luu[i], x[k], u[k], k
+            )
         end
 
         # dynamics coordinate transformation
@@ -89,9 +118,13 @@ function reduced_coordinate_differentiation!(workset, dynamics_diff!, running_co
     return nothing
 end
 
-function cost_regularization!(workset, δ, regularization)
+"""
+Regularizes the hessians of the running cost l and final cost Φ. (multithreaded)
+
+"""
+function cost_regularization!(workset::Workset, δ::Real, regularization::Symbol)
     @unpack N, nx, ndx = workset
-    @unpack ∇2l, Φxx = ndx == nx ? workset.cost_derivatives : workset.tangent_cost_derivatives
+    @unpack ∇2l, Φxx = workset.cost_derivatives
 
     @threads for k in 1:N
         regularize!(∇2l[k], δ, regularization)
@@ -102,7 +135,12 @@ function cost_regularization!(workset, δ, regularization)
     return nothing
 end
 
-function backward_pass!(workset)
+"""
+Performs the backward pass of the algorithm. This produces the the terms d and K
+of the policy update as well as the expected improvement Δv.
+
+"""
+function backward_pass!(workset::Workset)
     @unpack N, nx, ndx, nu = workset
     @unpack d, K = workset.policy_update
     @unpack vx, vxx = workset.backward_pass_workset
@@ -141,7 +179,15 @@ function backward_pass!(workset)
     return Δv, d_∞, d_2
 end
 
-function forward_pass!(workset, dynamics!, difference, running_cost, final_cost, α)
+"""
+Performs the forward pass of the algorithm. This produces a candidate trajectory x, u.
+
+"""
+function forward_pass!(
+    workset::Workset,
+    dynamics!::Function, difference::Function, running_cost::Function, final_cost::Function,
+    α::Real
+)
     @unpack N = workset
     @unpack x, u, l = active_trajectory(workset)
     @unpack d, K = workset.policy_update
@@ -166,6 +212,10 @@ function forward_pass!(workset, dynamics!, difference, running_cost, final_cost,
     return true, sum(l), sum(l) - sum(l_ref)
 end
 
+"""
+Prints information about the current iteration.
+
+"""
 function print_iteration!(line_count, i, α, J, ΔJ, Δv, d_inf, d_2, accepted, diff, reg, bwd, fwd)
     line_count[] % 10 == 0 && @printf(
         "%-9s %-9s %-11s %-9s %-9s %-9s %-9s %-9s %-9s %-8s %-8s %-8s\n",
@@ -178,20 +228,36 @@ function print_iteration!(line_count, i, α, J, ΔJ, Δv, d_inf, d_2, accepted, 
     line_count[] += 1
 end
 
+"""
+Creates a data frame for logging information about the iterations of the algorithm.
+
+"""
 iteration_dataframe() = DataFrame(
     i=Int[], α=Float64[], J=Float64[], ΔJ=Float64[], ΔV=Float64[], d_inf=Float64[], d_2=Float64[], accepted=Bool[],
     diff=Float64[], reg=Float64[], bwd=Float64[], fwd=Float64[]
 )
 
+"""
+Logs information into the data frame about the iterations of the algorithm.
+
+"""
 function log_iteration!(dataframe, i, α, J, ΔJ, Δv, d_inf, d_2, accepted, diff, reg, bwd, fwd)
     push!(dataframe, (i, α, J, ΔJ, Δv, d_inf, d_2, accepted, diff, reg, bwd, fwd))
 end
 
+"""
+Optimizes the trajectory of the controlled system.
+
+"""
 function iLQR!(
-    workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!;
-    maxiter=250, ρ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16), termination_threshold=1e-4,
-    rollout=:full, verbose=true, logging=false, plotting_callback=nothing,
-    stacked_derivatives=false, state_difference=-, coordinate_jacobian=nothing, regularization=:mchol
+    workset::Workset,
+    dynamics!::Function, dynamics_diff!::Function,
+    running_cost::Function, running_cost_diff!::Function,
+    final_cost::Function, final_cost_diff!::Function;
+    maxiter::Int=250, ρ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16), termination_threshold=1e-4,
+    rollout::Symbol=:full, verbose::Bool=true, logging::Bool=false, plotting_callback::Union{Function,Nothing}=nothing,
+    stacked_derivatives::Bool=false, state_difference::Function=-, coordinate_jacobian::Union{Function,Nothing}=nothing,
+    regularization::Symbol=:mchol
 )
     @assert workset.ndx == workset.nx || coordinate_jacobian !== nothing
 
@@ -245,7 +311,7 @@ function iLQR!(
             if workset.ndx == workset.nx
                 differentiation!(workset, dynamics_diff!, running_cost_diff!, final_cost_diff!, stacked_derivatives)
             else
-                reduced_coordinate_differentiation!(
+                differentiation!(
                     workset, dynamics_diff!, running_cost_diff!, final_cost_diff!, coordinate_jacobian, stacked_derivatives
                 )
             end
