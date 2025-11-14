@@ -1,5 +1,5 @@
 """
-Stores a trajectory xₖ, uₖ of the controlled system (including costs).
+Struct containing a trajectory xₖ, uₖ of the controlled system (including costs).
 
 """
 struct Trajectory{T}
@@ -17,7 +17,7 @@ struct Trajectory{T}
 end
 
 """
-Stores terms dₖ and Kₖ of the policy update δuₖ(δxₖ) = dₖ + Kₖδxₖ.
+Struct containing terms dₖ and Kₖ of the policy update δuₖ(δxₖ) = dₖ + Kₖδxₖ.
 
 """
 struct PolicyUpdate{T}
@@ -33,7 +33,7 @@ struct PolicyUpdate{T}
 end
 
 """
-Stores coordinate jacobians Eₖ.
+Struct containing coordinate jacobians Eₖ.
 
 """
 struct CoordinateJacobians{T}
@@ -47,7 +47,7 @@ struct CoordinateJacobians{T}
 end
 
 """
-Stores partial derivatives of the system's dyanamics f.
+Struct containing partial derivatives of the system's dyanamics f.
 
 """
 struct DynamicsDerivatives{T}
@@ -65,7 +65,7 @@ struct DynamicsDerivatives{T}
 end
 
 """
-Stores partial derivatives of the running cost l and the final cost Φ.
+Struct containing partial derivatives of the running cost l and the final cost Φ.
 
 """
 struct CostDerivatives{T}
@@ -101,7 +101,7 @@ struct CostDerivatives{T}
 end
 
 """
-Stores quantities used exclusively in the backward pass of the algorithm.
+Struct containing quantities used exclusively in the backward pass of the algorithm.
 
 """
 struct BackwardPassWorkset{T}
@@ -137,7 +137,7 @@ struct BackwardPassWorkset{T}
 end
 
 """
-Stores the nominal trajectory (current the most optimal) as well as all internal quantities of the algorithm.
+Struct containing the nominal trajectory (current the most optimal) as well as all internal quantities of the algorithm.
 
 """
 struct Workset{T}
@@ -158,8 +158,8 @@ struct Workset{T}
     dynamics_derivatives_workset::Union{DynamicsDerivatives{T}, Nothing}
     cost_derivatives_workset::Union{CostDerivatives{T}, Nothing}
 
-    """
-    Initializes the workset for the iLQR algorithm.
+    @doc """
+    Create a `Workset` for the trajectory optimization problem.
 
     # Arguments
     - `nx`: number of states

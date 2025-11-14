@@ -17,7 +17,7 @@ end
 ## nominal/active trajectory utilities
 
 """
-Accesses the nominal trajectory
+Access the nominal trajectory
 
 """
 function nominal_trajectory(workset::Workset)
@@ -25,7 +25,7 @@ function nominal_trajectory(workset::Workset)
 end
 
 """
-Accesses the active trajectory
+Access the active trajectory
 
 """
 function active_trajectory(workset::Workset)
@@ -33,7 +33,7 @@ function active_trajectory(workset::Workset)
 end
 
 """
-Swaps the nominal and active trajectory (without copying any data).
+Swap the nominal and active trajectory (without copying any data).
 
 """
 function swap_trajectories!(workset::Workset)
@@ -44,20 +44,20 @@ end
 ## set functions
 
 """
-Sets the initial state x̃₀.
+Set the initial state x̃₁.
 
 """
-function set_initial_state!(workset::Workset, x0::Vector)
-    nominal_trajectory(workset).x[1] .= x0
+function set_initial_state!(workset::Workset, x1::Vector)
+    nominal_trajectory(workset).x[1] .= x1
 end
 
 """
-Sets the nominal inputs ũₖ, k = 1:N.
+Set the nominal inputs ūₖ.
 
 """
-function set_initial_inputs! end
+function set_nominal_inputs! end
 
-function set_initial_inputs!(workset, u::Vector{Vector{T}}) where {T}
+function set_nominal_inputs!(workset, u::Vector{Vector{T}}) where {T}
     @assert length(u) == workset.N
 
     for k in 1:workset.N
@@ -65,7 +65,7 @@ function set_initial_inputs!(workset, u::Vector{Vector{T}}) where {T}
     end
 end
 
-function set_initial_inputs!(workset, u::Matrix{T}) where {T}
+function set_nominal_inputs!(workset, u::Matrix{T}) where {T}
     @unpack N, nu = workset
 
     (p, q) = size(u)

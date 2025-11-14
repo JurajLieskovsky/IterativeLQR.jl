@@ -1,6 +1,6 @@
 """
-Rolls-out the states x of the nominal trajectory from the initial state x̃ and nominal inputs u.
-It also evaluates the running costs l in multiple threads and the final cost Φ. 
+Roll-out the states x̄ₖ of the nominal trajectory from the initial state x̃₁ and nominal inputs ūₖ.
+Also evaluate the running costs lₖ in multiple threads and the final cost Φ. 
 
 """
 function trajectory_rollout!(
@@ -23,7 +23,7 @@ function trajectory_rollout!(
 end
 
 """
-Produces partial derivatives of the system's dynamics f and costs l and Φ
+Produce partial derivatives of the system's dynamics f and costs l and Φ
 that are required for the backward pass of the algorithm. (multithreaded)
 
 """
@@ -55,8 +55,8 @@ function differentiation!(
 end
 
 """
-Produces partial derivatives of the system's dynamics f and costs l and Φ  
-that are required for the backward pass of the algorithm. It also transforms them  
+Produce partial derivatives of the system's dynamics f and costs l and Φ  
+that are required for the backward pass of the algorithm. Also transform them  
 to the surface of the state manifold using coordinate jacobians. (multithreaded)
 
 """
@@ -119,7 +119,7 @@ function differentiation!(
 end
 
 """
-Regularizes the hessians of the running cost l and final cost Φ. (multithreaded)
+Regularize the hessians of the running cost l and final cost Φ. (multithreaded)
 
 """
 function cost_regularization!(workset::Workset, δ::Real, regularization::Symbol)
@@ -136,7 +136,7 @@ function cost_regularization!(workset::Workset, δ::Real, regularization::Symbol
 end
 
 """
-Performs the backward pass of the algorithm. This produces the the terms d and K
+Perform the backward pass of the algorithm. Mainly, produce the the terms d and K
 of the policy update as well as the expected improvement Δv.
 
 """
@@ -180,7 +180,7 @@ function backward_pass!(workset::Workset)
 end
 
 """
-Performs the forward pass of the algorithm. This produces a candidate trajectory x, u.
+Perform the forward pass of the algorithm, i.e. produce a candidate trajectory x, u.
 
 """
 function forward_pass!(
@@ -213,7 +213,7 @@ function forward_pass!(
 end
 
 """
-Prints information about the current iteration.
+Print information about the current iteration.
 
 """
 function print_iteration!(line_count, i, α, J, ΔJ, Δv, d_inf, d_2, accepted, diff, reg, bwd, fwd)
@@ -229,7 +229,7 @@ function print_iteration!(line_count, i, α, J, ΔJ, Δv, d_inf, d_2, accepted, 
 end
 
 """
-Creates a data frame for logging information about the iterations of the algorithm.
+Create a data frame for logging information about the iterations of the algorithm.
 
 """
 iteration_dataframe() = DataFrame(
@@ -238,7 +238,7 @@ iteration_dataframe() = DataFrame(
 )
 
 """
-Logs information into the data frame about the iterations of the algorithm.
+Log information into the data frame about the iterations of the algorithm.
 
 """
 function log_iteration!(dataframe, i, α, J, ΔJ, Δv, d_inf, d_2, accepted, diff, reg, bwd, fwd)
@@ -246,7 +246,29 @@ function log_iteration!(dataframe, i, α, J, ΔJ, Δv, d_inf, d_2, accepted, dif
 end
 
 """
-Optimizes the trajectory of the controlled system.
+Optimize the trajectory of a system with in-place `dynamics!` for the `running_cost` and `final_cost`
+on a horizon of length `N`. The number of the system's states `nx` and inputs `nu` as well as the horizon's
+length `N` must be compatible with the `workset` which is constructed using these quantities.
+
+Functions `dynamics_diff!`, `running_cost_diff!`, and `final_cost_diff!` are used to calculate partial derivatives.
+They can either calculate each partial derivatives with respect to `x` and `u` separately:
+- `dynamics_diff!(fx, fu, x, u, k)`,
+- `running_cost_diff!(lx, lu, lxx, lxu, luu, x, u, k)`,
+- `final_cost_diff!(Φx, Φxx, x, k)`
+or in a stacked form:
+- `dynamics_diff!(∇f, x, u, k)`,
+- `running_cost_diff!(∇l, ∇2l, x, u, k)`,
+- `final_cost_diff!(Φx, Φxx, x, k)`.
+If the stacked form is used, set the keyword argument `stacked_derivatives` to `True`.
+
+If the state of the system lies on a manifold, the keyword arguments `state_difference` and `coordinate_jacobian` must be supplied.
+Also `ndx!=nx` must have been used in the construction of `workset`.
+
+To re-use the nominal control policy from a previous solve (for example in MPC applications) set `rollout=:partial`. The default `rollout=:full` uses the nominal inputs in feedforward manner to produce the states of the nominal trajectory.
+
+During the optimization, printout into the console can be switched of using by setting `verbose=false`. Instead of printing (or in addition to) information about each iteration can be stored in a `dataframe::DataFrames.DataFrame` by setting `logging=true`. If set true the `dataframe` is the only output of the function.
+
+Quantities in the workset can be plotted live using the `plotting_callback` keyword argument which expects a function with the signature `plotting_callback(workset)`. It is called once after the intial rollout and then after every succesful iteration.
 
 """
 function iLQR!(
@@ -254,9 +276,9 @@ function iLQR!(
     dynamics!::Function, dynamics_diff!::Function,
     running_cost::Function, running_cost_diff!::Function,
     final_cost::Function, final_cost_diff!::Function;
-    maxiter::Int=250, ρ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16), termination_threshold=1e-4,
-    rollout::Symbol=:full, verbose::Bool=true, logging::Bool=false, plotting_callback::Union{Function,Nothing}=nothing,
     stacked_derivatives::Bool=false, state_difference::Function=-, coordinate_jacobian::Union{Function,Nothing}=nothing,
+    rollout::Symbol=:full, verbose::Bool=true, logging::Bool=false, plotting_callback::Union{Function,Nothing}=nothing,
+    maxiter::Int=250, ρ=1e-4, δ=sqrt(eps()), α_values=exp2.(0:-1:-16), termination_threshold=1e-4,
     regularization::Symbol=:mchol
 )
     @assert workset.ndx == workset.nx || coordinate_jacobian !== nothing

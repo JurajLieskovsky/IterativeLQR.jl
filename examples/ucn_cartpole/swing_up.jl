@@ -130,7 +130,7 @@ end
 workset = IterativeLQR.Workset{Float64}(UCNCartPoleODE.nx, UCNCartPoleODE.nu, N, UCNCartPoleODE.nd)
 IterativeLQR.set_initial_state!(workset, x₀)
 
-IterativeLQR.set_initial_inputs!(workset, [u₀(k) for k in 1:N])
+IterativeLQR.set_nominal_inputs!(workset, [u₀(k) for k in 1:N])
 df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
     stacked_derivatives=true, regularization=:none,

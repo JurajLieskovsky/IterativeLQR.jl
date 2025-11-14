@@ -138,7 +138,7 @@ workset = IterativeLQR.Workset{Float64}(QuadrotorODE.nx, QuadrotorODE.nu, N, Qua
 ## warmstart by first creating a stabilizing controller at equilibrium
 if warmstart
     IterativeLQR.set_initial_state!(workset, xₜ)
-    IterativeLQR.set_initial_inputs!(workset, [uₜ for _ in 1:N])
+    IterativeLQR.set_nominal_inputs!(workset, [uₜ for _ in 1:N])
 
     IterativeLQR.iLQR!(
         workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,

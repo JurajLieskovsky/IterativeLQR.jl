@@ -4,10 +4,7 @@ makedocs(
     sitename="IterativeLQR.jl",
     pages=[
         "Home" => "index.md",
-        "Manual" => [
-            "Getting started" => "guide.md",
-            "Examples" => "examples.md"
-        ],
+        "Getting started" => "guide.md",
         "reference.md"
     ],
     remotes=nothing

@@ -1,5 +1,7 @@
 """
-Regularizes the symmetric matrix `H` so that it is positive definite.
+Regularizes the symmetric matrix `H` so that it is positive definite. The argument `approach`
+determines if an eigenvalue approach is taken [`eigenvalue_regularization!`](@ref) or the GMW
+modified Cholesky decomposition algorithm is used [`gmw_regularization!`](@ref).
 
 """
 function regularize!(H::AbstractMatrix, δ::Real, approach::Symbol)
