@@ -4,12 +4,8 @@ using Parameters
 using LinearAlgebra
 using Printf
 using DataFrames, CSV
-using Infiltrator
-using PositiveFactorizations
 using Base.Threads
-using DocStringExtensions
-
-using GMW
+using GMW81
 
 include("workset.jl")
 include("trajectory_utils.jl")

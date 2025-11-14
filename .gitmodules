@@ -10,6 +10,3 @@
 [submodule "examples/deps/UCNCartPoleODE"]
 	path = examples/deps/UCNCartPoleODE
 	url = git@github.com:JurajLieskovsky/UCNCartPoleODE.jl.git
-[submodule "deps/GMW"]
-	path = deps/GMW
-	url = git@github.com:JurajLieskovsky/GMW.jl.git
