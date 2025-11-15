@@ -35,6 +35,10 @@ function eigenvalue_regularization!(H, δ::Real)
     return nothing
 end
 
+"""
+Regularized `H` using the Gill-Murray-Wright modified Cholesky factorization.
+
+"""
 function gmw_regularization!(H, δ)
     p, L = GMW81.factorize(H, δ)
     GMW81.reconstruct!(H, p, L)
