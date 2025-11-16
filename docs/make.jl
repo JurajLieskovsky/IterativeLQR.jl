@@ -7,5 +7,8 @@ makedocs(
         "Getting started" => "guide.md",
         "reference.md"
     ],
-    remotes=nothing
+)
+
+deploydocs(
+    repo = "github.com/JurajLieskovsky/IterativeLQR.jl.git",
 )
