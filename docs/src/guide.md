@@ -1,7 +1,9 @@
 # Getting started
 
-To get started clone the repository into the `deps` folder of your project. Navigate 
+## Installation
 
+
+To get started we recommend taking a look at one of the **examples**. (figure out how to link this)  
 
 ## Examples
 
