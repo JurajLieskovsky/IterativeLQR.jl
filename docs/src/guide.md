@@ -3,7 +3,7 @@
 ## Installation
 
 
-To get started we recommend taking a look at one of the examples
+For usage, we recommend taking a look at one of the examples.
 
 ## Examples
 
