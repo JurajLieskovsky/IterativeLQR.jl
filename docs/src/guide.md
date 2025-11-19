@@ -1,9 +1,11 @@
 # Getting started
 
 ## Installation
-
-
-For usage, we recommend taking a look at one of the examples.
+The package can be added to your project using the command
+```
+] add https://github.com/JurajLieskovsky/IterativeLQR.jl.git
+```
+in your REPL. For usage, we recommend taking a look at one of the [@repo blob "examples/cartpole/swing_up"].
 
 ## Examples
 
