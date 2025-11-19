@@ -40,7 +40,7 @@ Regularized `H` using the Gill-Murray-Wright modified Cholesky factorization.
 
 """
 function gmw_regularization!(H, δ)
-    p, L = GMW81.factorize(H, δ)
-    GMW81.reconstruct!(H, p, L)
+    p, L = GillMurrayWright81.factorize(H, δ)
+    GillMurrayWright81.reconstruct!(H, p, L)
     return nothing
 end

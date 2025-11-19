@@ -5,7 +5,7 @@ using LinearAlgebra
 using Printf
 using DataFrames, CSV
 using Base.Threads
-using GMW81
+using GillMurrayWright81
 
 include("workset.jl")
 include("trajectory_utils.jl")
