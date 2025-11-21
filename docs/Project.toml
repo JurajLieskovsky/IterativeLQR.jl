@@ -1,6 +1,7 @@
 [deps]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 IterativeLQR = "cc6f6f65-08c7-49b2-9c9b-e23214e815ad"
+Literate = "98b081ad-f1c9-55d3-8b20-4c87d4299306"
 
 [sources]
 IterativeLQR = {path = ".."}
