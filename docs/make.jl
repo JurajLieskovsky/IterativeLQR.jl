@@ -5,7 +5,7 @@ SOURCE = joinpath(@__DIR__, "..", "examples", "cartpole", "swing_up.jl")
 OUTPUT = joinpath(@__DIR__, "src", "generated")
 
 Literate.markdown(SOURCE, OUTPUT, codefence="```julia" => "```")
-Literate.script(SOURCE, OUTPUT)
+# Literate.script(SOURCE, OUTPUT)
 
 makedocs(
     sitename="IterativeLQR.jl",

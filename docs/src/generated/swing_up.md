@@ -1,3 +1,8 @@
+```@meta
+EditURL = "../../../examples/cartpole/swing_up.jl"
+```
+
+```julia
 using Revise
 
 using IterativeLQR
@@ -12,24 +17,39 @@ using Infiltrator
 using BenchmarkTools
 using LinearAlgebra
 using MatrixEquations
+```
 
-# Cartpole model
+Cartpole model
+
+```julia
 cartpole = CartPoleODE.Model(9.81, 1, 0.1, 0.2)
+```
 
-# Horizon and timestep
+Horizon and timestep
+
+```julia
 T = 2
 N = 200
 h = T / N
+```
 
-# Initial state and inputs
+Initial state and inputs
+
+```julia
 θ₀ = 0 * pi
 x₀ = [0, θ₀, 0, 0]
 u₀(k) = cos(2 * pi * (k - 1) / N - 1) * ones(CartPoleODE.nu)
+```
 
-# Regularization
+Regularization
+
+```julia
 regularization = :mchol
+```
 
-# Dynamics
+Dynamics
+
+```julia
 """RK4 integration with zero-order hold on u"""
 function dynamics!(xnew, x, u, _)
     f1 = CartPoleODE.f(cartpole, x, u)
@@ -53,8 +73,11 @@ function dynamics_diff!(∇f, x, u, k)
 
     return nothing
 end
+```
 
-# Cost functions
+Cost functions
+
+```julia
 ξ(x) = [x[1], cos(x[2] / 2), x[3], x[4]]
 
 Q = h * diagm([1e1, 1e2, 1, 1])
@@ -77,7 +100,7 @@ S, _ = begin
     MatrixEquations.ared(A, B, R, Q)
 end
 
-## Running cost
+# Running cost
 running_cost(x, u, _) = ξ(x)' * Q * ξ(x) + u' * R * u
 
 function running_cost_diff!(∇l, ∇2l, x, u, k)
@@ -95,7 +118,7 @@ function running_cost_diff!(∇l, ∇2l, x, u, k)
     return nothing
 end
 
-## Final cost
+# Final cost
 final_cost(x, _) = ξ(x)' * S * ξ(x)
 
 function final_cost_diff!(Φx, Φxx, x, k)
@@ -103,8 +126,11 @@ function final_cost_diff!(Φx, Φxx, x, k)
     ForwardDiff.hessian!(H, x -> final_cost(x, k), x)
     return nothing
 end
+```
 
-# Plotting callback
+Plotting callback
+
+```julia
 function plotting_callback(workset)
     range = 0:workset.N
 
@@ -122,29 +148,38 @@ function plotting_callback(workset)
 
     return plt
 end
+```
 
-# Trajectory optimization
+Trajectory optimization
+
+```julia
 workset = IterativeLQR.Workset{Float64}(CartPoleODE.nx, CartPoleODE.nu, N)
 IterativeLQR.set_initial_state!(workset, x₀)
 
 IterativeLQR.set_nominal_inputs!(workset, [u₀(k) for k in 1:N])
-IterativeLQR.iLQR!(
+df = IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
     stacked_derivatives=true, regularization=regularization,
-    verbose=true, plotting_callback=plotting_callback
+    verbose=true, logging=true, plotting_callback=plotting_callback
 )
+```
 
-# Visualization
+Save iterations log to csv
+CSV.write("cartpole/results/iterations-$regularization.csv", df)
+
+Visualization
+
+```julia
 (@isdefined vis) || (vis = Visualizer())
 render(vis)
 
-## cart-pole
+# cart-pole
 MeshCatBenchmarkMechanisms.set_cartpole!(vis, 0.1, 0.05, 0.05, cartpole.l, 0.02)
 
-## initial configuration
+# initial configuration
 MeshCatBenchmarkMechanisms.set_cartpole_state!(vis, nominal_trajectory(workset).x[1])
 
-## animation
+# animation
 anim = MeshCatBenchmarkMechanisms.Animation(vis, fps=1 / h)
 for (i, x) in enumerate(nominal_trajectory(workset).x)
     atframe(anim, i) do
@@ -152,3 +187,9 @@ for (i, x) in enumerate(nominal_trajectory(workset).x)
     end
 end
 setanimation!(vis, anim, play=false)
+```
+
+---
+
+*This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
+
