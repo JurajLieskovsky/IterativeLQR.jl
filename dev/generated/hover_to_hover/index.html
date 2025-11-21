@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Quadrotor recovery · IterativeLQR.jl</title><meta name="title" content="Quadrotor recovery · IterativeLQR.jl"/><meta property="og:title" content="Quadrotor recovery · IterativeLQR.jl"/><meta property="twitter:title" content="Quadrotor recovery · IterativeLQR.jl"/><meta name="description" content="Documentation for IterativeLQR.jl."/><meta property="og:description" content="Documentation for IterativeLQR.jl."/><meta property="twitter:description" content="Documentation for IterativeLQR.jl."/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">IterativeLQR.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><a class="tocitem" href="../../guide/">Getting started</a></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../swing_up/">Cart-pole swing-up</a></li><li class="is-active"><a class="tocitem" href>Quadrotor recovery</a><ul class="internal"><li><a class="tocitem" href="#Dependencies"><span>Dependencies</span></a></li><li><a class="tocitem" href="#Quadrotor-model"><span>Quadrotor model</span></a></li><li><a class="tocitem" href="#Horizon-and-timestep"><span>Horizon and timestep</span></a></li><li><a class="tocitem" href="#Target"><span>Target</span></a></li><li><a class="tocitem" href="#Initial-state-and-inputs"><span>Initial state and inputs</span></a></li><li><a class="tocitem" href="#Dynamics"><span>Dynamics</span></a></li><li><a class="tocitem" href="#Plotting-callback"><span>Plotting callback</span></a></li><li><a class="tocitem" href="#Optimization"><span>Optimization</span></a></li><li><a class="tocitem" href="#Visualization"><span>Visualization</span></a></li></ul></li></ul></li><li><a class="tocitem" href="../../reference/">Reference</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Quadrotor recovery</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Quadrotor recovery</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="github.com/JurajLieskovsky/IterativeLQR.jl.git" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Quadrotor-Recovery-Problem"><a class="docs-heading-anchor" href="#Quadrotor-Recovery-Problem">Quadrotor Recovery Problem</a><a id="Quadrotor-Recovery-Problem-1"></a><a class="docs-heading-anchor-permalink" href="#Quadrotor-Recovery-Problem" title="Permalink"></a></h1><p>In this example we show how to optimize the recovery of a quadrotor in an MPC context. We use quaternions for the quadrotor&#39;s orientation which lie on a manifold in the state space. Therefore, in this example we show how to use the solver&#39;s capabilities to optimize directly on the manifold.</p><h2 id="Dependencies"><a class="docs-heading-anchor" href="#Dependencies">Dependencies</a><a id="Dependencies-1"></a><a class="docs-heading-anchor-permalink" href="#Dependencies" title="Permalink"></a></h2><p>Two of the dependencies are not registered, namely <a href="https://github.com/JurajLieskovsky/QuadrotorODE.jl"><code>QuadrotorODE.jl</code></a> and <a href="https://github.com/JurajLieskovsky/MeshCatBenchmarkMechanisms.jl"><code>MeshCatBenchmarkMechanisms.jl</code></a>. However, if you if run the examples from a clone of the repository according to the <a href="../../guide/#Running-Examples">instructions</a> in the docs, they load automatically.</p><pre><code class="language-julia hljs">using Revise
+
+using IterativeLQR
+using IterativeLQR: nominal_trajectory, active_trajectory
+using QuadrotorODE
+using MeshCatBenchmarkMechanisms
+
+using LinearAlgebra
+using ForwardDiff
+using Plots
+using DataFrames, CSV
+using BenchmarkTools
+using Infiltrator
+using MatrixEquations</code></pre><h2 id="Quadrotor-model"><a class="docs-heading-anchor" href="#Quadrotor-model">Quadrotor model</a><a id="Quadrotor-model-1"></a><a class="docs-heading-anchor-permalink" href="#Quadrotor-model" title="Permalink"></a></h2><p>We start by initializing a model of the quadrotor which stores its parameters. Although the code is unit-less, in practical terms we are using SI units throughout this example.</p><pre><code class="language-julia hljs">quadrotor = QuadrotorODE.System(9.81, 0.5, diagm([0.0023, 0.0023, 0.004]), 0.1750, 1.0, 0.0245)</code></pre><h2 id="Horizon-and-timestep"><a class="docs-heading-anchor" href="#Horizon-and-timestep">Horizon and timestep</a><a id="Horizon-and-timestep-1"></a><a class="docs-heading-anchor-permalink" href="#Horizon-and-timestep" title="Permalink"></a></h2><p>We will be optimizing the trajectory on a horizon of T=2s which we discretize into 200 steps.</p><pre><code class="language-julia hljs">T = 2
+N = 200
+h = T / N</code></pre><h2 id="Target"><a class="docs-heading-anchor" href="#Target">Target</a><a id="Target-1"></a><a class="docs-heading-anchor-permalink" href="#Target" title="Permalink"></a></h2><p>we set the target state and input as the equilibrium</p><pre><code class="language-julia hljs">xₜ = vcat([0, 0, 1.0], [1, 0, 0, 0], zeros(3), zeros(3))
+uₜ = quadrotor.m * quadrotor.g / 4 * ones(4)</code></pre><h2 id="Initial-state-and-inputs"><a class="docs-heading-anchor" href="#Initial-state-and-inputs">Initial state and inputs</a><a id="Initial-state-and-inputs-1"></a><a class="docs-heading-anchor-permalink" href="#Initial-state-and-inputs" title="Permalink"></a></h2><p>As the initial state we will use a significant rotation around the x-axis</p><pre><code class="language-julia hljs">θ₀ = 3 * pi / 4
+x₀ = vcat([0, 0, 1.0], [cos(θ₀ / 2), sin(θ₀ / 2), 0, 0], zeros(3), zeros(3))</code></pre><p>And for the inital input use a small utility function that calculates the dot product between the z-axes of a global and local frame of the quadrotor</p><pre><code class="language-julia hljs">zRz(q⃗) = 1 - 2 * (q⃗[1]^2 + q⃗[2]^2)</code></pre><p>to produce an input that somewhat minimizes movement of the quadrotor in space</p><pre><code class="language-julia hljs">u₀(_) = zRz(x₀[5:7]) * uₜ</code></pre><h2 id="Dynamics"><a class="docs-heading-anchor" href="#Dynamics">Dynamics</a><a id="Dynamics-1"></a><a class="docs-heading-anchor-permalink" href="#Dynamics" title="Permalink"></a></h2><p>To discretize the continuous-time dynamics of the system, we use a fourth order Runge-Kutta method</p><pre><code class="language-julia hljs">&quot;&quot;&quot;RK4 integration with zero-order hold on u&quot;&quot;&quot;
+function dynamics!(xnew, x, u, _)
+    f1 = QuadrotorODE.dynamics(quadrotor, x, u)
+    f2 = QuadrotorODE.dynamics(quadrotor, x + 0.5 * h * f1, u)
+    f3 = QuadrotorODE.dynamics(quadrotor, x + 0.5 * h * f2, u)
+    f4 = QuadrotorODE.dynamics(quadrotor, x + h * f3, u)
+    xnew .= x + (h / 6.0) * (f1 + 2 * f2 + 2 * f3 + f4)
+    return nothing
+end</code></pre><p>and <code>ForwardDiff.jl</code> to obtain its Jacobians</p><pre><code class="language-julia hljs">function dynamics_diff!(∇f, x, u, k)
+    nx = QuadrotorODE.nx
+    nu = QuadrotorODE.nu
+
+    @views ForwardDiff.jacobian!(
+        ∇f,
+        (xnew, arg) -&gt; dynamics!(xnew, view(arg, 1:nx), view(arg, nx+1:nx+nu), k),
+        zeros(nx),
+        vcat(x, u)
+    )
+
+    return nothing
+end</code></pre><p>Cost function As the running cost we can use a function that is quadratic in <code>x</code> and <code>u</code></p><pre><code class="language-julia hljs">function running_cost(x, u, _)
+    r, q, v, ω = x[1:3], x[4:7], x[8:10], x[11:13]
+    q⃗ = q[2:4]
+    dr = r - xₜ[1:3]
+    du = u - uₜ
+    return h * (dr&#39;dr + q⃗&#39;q⃗ / 4 + 1e-1 * v&#39;v + 1e-1 * ω&#39;ω + 1e-1 * du&#39;du)
+end
+
+function running_cost_diff!(∇l, ∇2l, x, u, k)
+    nx = QuadrotorODE.nx
+    nu = QuadrotorODE.nu
+
+    result = DiffResults.DiffResult(0.0, (∇l, ∇2l))
+    @views ForwardDiff.hessian!(result, arg -&gt; running_cost(view(arg, 1:nx), view(arg, nx+1:nx+nu), k), vcat(x, u))
+
+    return nothing
+end</code></pre><p>this means that the final cost can be derived as the inifinite-horizon LQR value function. To calculate it, we use the the coordinate jacobian, which allows us to linearize the system&#39;s dynamics, as well as the running cost, on the state-space manifold</p><pre><code class="language-julia hljs">S, _ = begin
+    nx = QuadrotorODE.nx
+    nu = QuadrotorODE.nu
+
+    ∇f, ∇l, ∇2l = zeros(nx, nx + nu), zeros(nx + nu), zeros(nx + nu, nx + nu)
+    dynamics_diff!(∇f, xₜ, uₜ, 0)
+    running_cost_diff!(∇l, ∇2l, xₜ, uₜ, 0)
+
+    E = QuadrotorODE.jacobian(xₜ)
+
+    A = E&#39; * ∇f[:, 1:nx] * E
+    B = E&#39; * ∇f[:, nx+1:nx+nu]
+    Q = 2 * E&#39; * ∇2l[1:nx, 1:nx] * E
+    R = 2 * ∇2l[nx+1:nx+nu, nx+1:nx+nu]
+
+    MatrixEquations.ared(A, B, R, Q)
+end
+
+function final_cost(x, _)
+    dx = QuadrotorODE.state_difference(x, xₜ)
+    return dx&#39; * S * dx
+end
+
+function final_cost_diff!(Φx, Φxx, x, k)
+    H = DiffResults.DiffResult(0.0, (Φx, Φxx))
+    ForwardDiff.hessian!(H, x_ -&gt; final_cost(x_, k), x)
+
+    return nothing
+end</code></pre><h2 id="Plotting-callback"><a class="docs-heading-anchor" href="#Plotting-callback">Plotting callback</a><a id="Plotting-callback-1"></a><a class="docs-heading-anchor-permalink" href="#Plotting-callback" title="Permalink"></a></h2><p>During the optimization process we will plot the position and orientation of the quadrotor in space, as well as the inputs and cumulative cost.</p><pre><code class="language-julia hljs">function plotting_callback(workset)
+    range = 0:workset.N
+
+    states = mapreduce(x -&gt; x&#39;, vcat, nominal_trajectory(workset).x)
+    state_labels = [&quot;x&quot; &quot;y&quot; &quot;z&quot; &quot;q₀&quot; &quot;q₁&quot; &quot;q₂&quot; &quot;q₃&quot; &quot;vx&quot; &quot;vy&quot; &quot;vz&quot; &quot;ωx&quot; &quot;ωy&quot; &quot;ωz&quot;]
+    position_plot = plot(range, states[:, 1:7], label=state_labels[1:1, 1:7])
+
+    inputs = mapreduce(u -&gt; u&#39;, vcat, nominal_trajectory(workset).u)
+    input_labels = [&quot;u₀&quot; &quot;u₁&quot; &quot;u₂&quot; &quot;u₃&quot;]
+    input_plot = plot(range, vcat(inputs, inputs[end, :]&#39;), label=input_labels, seriestype=:steppost)
+
+    cost_plot = plot(range, cumsum(nominal_trajectory(workset).l), label=&quot;c&quot;, seriestype=:steppost)
+
+    plt = plot(position_plot, input_plot, cost_plot, layout=(3, 1))
+    display(plt)
+
+    return plt
+end</code></pre><h2 id="Optimization"><a class="docs-heading-anchor" href="#Optimization">Optimization</a><a id="Optimization-1"></a><a class="docs-heading-anchor-permalink" href="#Optimization" title="Permalink"></a></h2><p>First we initialize the workset based on the length of the horizon and dimensions of the systems state and input vector</p><pre><code class="language-julia hljs">workset = IterativeLQR.Workset{Float64}(QuadrotorODE.nx, QuadrotorODE.nu, N, QuadrotorODE.nz)</code></pre><h3 id="Warmstart"><a class="docs-heading-anchor" href="#Warmstart">Warmstart</a><a id="Warmstart-1"></a><a class="docs-heading-anchor-permalink" href="#Warmstart" title="Permalink"></a></h3><p>We first run and optimization that stabilizes the quadrotor at the target equilibrium. This will essentially computes the gains of an infinite-horizon LQR which will drastically improve the convergence rate of the second optimization from the perturbed state</p><pre><code class="language-julia hljs">IterativeLQR.set_initial_state!(workset, xₜ)
+IterativeLQR.set_nominal_inputs!(workset, [uₜ for _ in 1:N])
+
+IterativeLQR.iLQR!(
+    workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
+    stacked_derivatives=true, regularization=:none,
+    state_difference=QuadrotorODE.state_difference, coordinate_jacobian=QuadrotorODE.jacobian,
+    verbose=true, plotting_callback=plotting_callback
+)</code></pre><p>Note that as the system&#39;s state lies on a manifold we supply <code>state_difference</code> and <code>coordinate_jacobian</code> to optimize directly on the manifold.</p><h3 id="Recovery"><a class="docs-heading-anchor" href="#Recovery">Recovery</a><a id="Recovery-1"></a><a class="docs-heading-anchor-permalink" href="#Recovery" title="Permalink"></a></h3><p>The second optimization is now run with <code>rollout = :partial</code> to re-use the gains from the previous optimization</p><pre><code class="language-julia hljs">IterativeLQR.set_initial_state!(workset, x₀)
+warmstart || IterativeLQR.set_initial_inputs!(workset, [u₀(k) for k in 1:N])
+
+IterativeLQR.iLQR!(
+    workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
+    stacked_derivatives=true, regularization=:none, rollout=:partial,
+    state_difference=QuadrotorODE.state_difference, coordinate_jacobian=QuadrotorODE.jacobian,
+    verbose=true, plotting_callback=plotting_callback,
+)</code></pre><h2 id="Visualization"><a class="docs-heading-anchor" href="#Visualization">Visualization</a><a id="Visualization-1"></a><a class="docs-heading-anchor-permalink" href="#Visualization" title="Permalink"></a></h2><p>We can visualize the execution of the trajectory using <code>MeshCat.jl</code> for which we wrote a wrapper.</p><pre><code class="language-julia hljs">vis = (@isdefined vis) ? vis : Visualizer()
+render(vis)</code></pre><p>First we initialize the quadrotor and target</p><pre><code class="language-julia hljs">MeshCatBenchmarkMechanisms.set_quadrotor!(vis, 2 * quadrotor.a, 0.07, 0.12)
+MeshCatBenchmarkMechanisms.set_target!(vis, 0.07)</code></pre><p>and their initial configurations</p><pre><code class="language-julia hljs">MeshCatBenchmarkMechanisms.set_quadrotor_state!(vis, nominal_trajectory(workset).x[1])
+MeshCatBenchmarkMechanisms.set_target_position!(vis, xₜ[1:3])</code></pre><p>Then we animate the recovery</p><pre><code class="language-julia hljs">anim = MeshCatBenchmarkMechanisms.Animation(vis, fps=1 / h)
+for (i, x) in enumerate(nominal_trajectory(workset).x)
+    atframe(anim, i) do
+        MeshCatBenchmarkMechanisms.set_quadrotor_state!(vis, x)
+    end
+end
+setanimation!(vis, anim, play=false);
+nothing #hide</code></pre><p>You can view the animation in your browser at the address given by running <code>&gt; vis</code> in your REPL.</p><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../swing_up/">« Cart-pole swing-up</a><a class="docs-footer-nextpage" href="../../reference/">Reference »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.16.0 on <span class="colophon-date" title="Friday 21 November 2025 13:49">Friday 21 November 2025</span>. Using Julia version 1.12.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

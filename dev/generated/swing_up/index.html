@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Cart-pole swing-up · IterativeLQR.jl</title><meta name="title" content="Cart-pole swing-up · IterativeLQR.jl"/><meta property="og:title" content="Cart-pole swing-up · IterativeLQR.jl"/><meta property="twitter:title" content="Cart-pole swing-up · IterativeLQR.jl"/><meta name="description" content="Documentation for IterativeLQR.jl."/><meta property="og:description" content="Documentation for IterativeLQR.jl."/><meta property="twitter:description" content="Documentation for IterativeLQR.jl."/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">IterativeLQR.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><a class="tocitem" href="../../guide/">Getting started</a></li><li><span class="tocitem">Examples</span><ul><li class="is-active"><a class="tocitem" href>Cart-pole swing-up</a><ul class="internal"><li><a class="tocitem" href="#Dependencies"><span>Dependencies</span></a></li><li><a class="tocitem" href="#Cart-pole-model"><span>Cart-pole model</span></a></li><li><a class="tocitem" href="#Horizon-and-timestep"><span>Horizon and timestep</span></a></li><li><a class="tocitem" href="#Initial-state-and-inputs"><span>Initial state and inputs</span></a></li><li><a class="tocitem" href="#Regularization"><span>Regularization</span></a></li><li><a class="tocitem" href="#Dynamics"><span>Dynamics</span></a></li><li><a class="tocitem" href="#Cost-functions"><span>Cost functions</span></a></li><li><a class="tocitem" href="#Plotting-callback"><span>Plotting callback</span></a></li><li><a class="tocitem" href="#Trajectory-optimization"><span>Trajectory optimization</span></a></li><li><a class="tocitem" href="#Visualization"><span>Visualization</span></a></li></ul></li><li><a class="tocitem" href="../hover_to_hover/">Quadrotor recovery</a></li></ul></li><li><a class="tocitem" href="../../reference/">Reference</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Cart-pole swing-up</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Cart-pole swing-up</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="github.com/JurajLieskovsky/IterativeLQR.jl.git" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Cart-Pole-Swing-Up-Problem"><a class="docs-heading-anchor" href="#Cart-Pole-Swing-Up-Problem">Cart-Pole Swing-Up Problem</a><a id="Cart-Pole-Swing-Up-Problem-1"></a><a class="docs-heading-anchor-permalink" href="#Cart-Pole-Swing-Up-Problem" title="Permalink"></a></h1><p>In this example we show how to optimize a cart-pole swing-up with an MPC-like cost function. The problem is highly non-convex, which means that it is a good showcase of the novel regularization approach.</p><h2 id="Dependencies"><a class="docs-heading-anchor" href="#Dependencies">Dependencies</a><a id="Dependencies-1"></a><a class="docs-heading-anchor-permalink" href="#Dependencies" title="Permalink"></a></h2><p>Two of the dependencies are not registered, namely <a href="https://github.com/JurajLieskovsky/CartPoleODE.jl"><code>CartPoleODE.jl</code></a> and <a href="https://github.com/JurajLieskovsky/MeshCatBenchmarkMechanisms.jl"><code>MeshCatBenchmarkMechanisms.jl</code></a>. However, if you if run the examples from a clone of the repository according to the <a href="../../guide/#Running-Examples">instructions</a> in the docs, they load automatically.</p><pre><code class="language-julia hljs">using Revise
+
+using CartPoleODE
+using MeshCatBenchmarkMechanisms
+
+using IterativeLQR
+using IterativeLQR: nominal_trajectory
+
+using ForwardDiff, DiffResults
+using Plots
+using DataFrames, CSV
+using Infiltrator
+using BenchmarkTools
+using LinearAlgebra
+using MatrixEquations</code></pre><h2 id="Cart-pole-model"><a class="docs-heading-anchor" href="#Cart-pole-model">Cart-pole model</a><a id="Cart-pole-model-1"></a><a class="docs-heading-anchor-permalink" href="#Cart-pole-model" title="Permalink"></a></h2><p>We start by initializing a model of the cart-pole which stores its parameters. Although the code is unit-less, in practical terms we are using SI units throughout this example.</p><pre><code class="language-julia hljs">cartpole = CartPoleODE.Model(9.81, 1, 0.1, 0.2)</code></pre><h2 id="Horizon-and-timestep"><a class="docs-heading-anchor" href="#Horizon-and-timestep">Horizon and timestep</a><a id="Horizon-and-timestep-1"></a><a class="docs-heading-anchor-permalink" href="#Horizon-and-timestep" title="Permalink"></a></h2><p>We will be optimizing the trajectory on a horizon of T=2s which we discretize into 200 steps.</p><pre><code class="language-julia hljs">T = 2
+N = 200
+h = T / N</code></pre><h2 id="Initial-state-and-inputs"><a class="docs-heading-anchor" href="#Initial-state-and-inputs">Initial state and inputs</a><a id="Initial-state-and-inputs-1"></a><a class="docs-heading-anchor-permalink" href="#Initial-state-and-inputs" title="Permalink"></a></h2><p>For the intial state and nominal control policy we use the stable equilibrium</p><pre><code class="language-julia hljs">x₀ = [0.0, 0, 0, 0]</code></pre><p>and a simple harmonic input signal</p><pre><code class="language-julia hljs">u₀(k) = cos(2 * pi * (k - 1) / N - 1) * ones(CartPoleODE.nu)</code></pre><p>which perturbs the initial trajectory from stable equilibrium, where the gradient is zero.</p><h2 id="Regularization"><a class="docs-heading-anchor" href="#Regularization">Regularization</a><a id="Regularization-1"></a><a class="docs-heading-anchor-permalink" href="#Regularization" title="Permalink"></a></h2><p>As the overall problem is highly non-convex, we use the eigen value regularization approach.</p><pre><code class="language-julia hljs">regularization = :eig</code></pre><h2 id="Dynamics"><a class="docs-heading-anchor" href="#Dynamics">Dynamics</a><a id="Dynamics-1"></a><a class="docs-heading-anchor-permalink" href="#Dynamics" title="Permalink"></a></h2><p>To discretize the continuous-time dynamics of the system, we use a fourth order Runge-Kutta method</p><pre><code class="language-julia hljs">&quot;&quot;&quot;RK4 integration with zero-order hold on u&quot;&quot;&quot;
+function dynamics!(xnew, x, u, _)
+    f1 = CartPoleODE.f(cartpole, x, u)
+    f2 = CartPoleODE.f(cartpole, x + 0.5 * h * f1, u)
+    f3 = CartPoleODE.f(cartpole, x + 0.5 * h * f2, u)
+    f4 = CartPoleODE.f(cartpole, x + h * f3, u)
+    xnew .= x + (h / 6.0) * (f1 + 2 * f2 + 2 * f3 + f4)
+    return nothing
+end</code></pre><p>and <code>ForwardDiff.jl</code> to obtain its Jacobians</p><pre><code class="language-julia hljs">function dynamics_diff!(∇f, x, u, k)
+    nx = CartPoleODE.nx
+    nu = CartPoleODE.nu
+
+    @views ForwardDiff.jacobian!(
+        ∇f,
+        (xnew, arg) -&gt; dynamics!(xnew, view(arg, 1:nx), view(arg, nx+1:nx+nu), k),
+        zeros(nx),
+        vcat(x, u)
+    )
+
+    return nothing
+end</code></pre><h2 id="Cost-functions"><a class="docs-heading-anchor" href="#Cost-functions">Cost functions</a><a id="Cost-functions-1"></a><a class="docs-heading-anchor-permalink" href="#Cost-functions" title="Permalink"></a></h2><p>We base the running and final cost on a distance function from the equlibrium</p><pre><code class="language-julia hljs">ξ(x) = [x[1], cos(x[2] / 2), x[3], x[4]]</code></pre><p>As <code>ξ</code> can also be regard as an alternative state (although the underlying representation has a singularity at the stable equilibrium) we may model the cost function after infinite-horizon LQR with weights</p><pre><code class="language-julia hljs">Q = h * diagm([1e1, 1e2, 1, 1])
+R = h * Matrix{Float64}(I, 1, 1)</code></pre><p>The final cost can be formed from the solution of the DARE for the alternative state-space representation</p><pre><code class="language-julia hljs">S, _ = begin
+    x_eq = [0.0, pi, 0, 0]
+    u_eq = [0.0]
+
+    nx = CartPoleODE.nx
+    nu = CartPoleODE.nu
+
+    ∇f = zeros(nx, nx + nu)
+    dynamics_diff!(∇f, x_eq, u_eq, 0)
+
+    E = ForwardDiff.jacobian(ξ, x_eq)
+    A = E&#39; * ∇f[:, 1:nx] * inv(E)
+    B = E&#39; * ∇f[:, nx+1:nx+nu]
+
+    MatrixEquations.ared(A, B, R, Q)
+end</code></pre><p>The running cost is then simply the quadratic form in <code>ξ</code> and <code>u</code></p><pre><code class="language-julia hljs">running_cost(x, u, _) = ξ(x)&#39; * Q * ξ(x) + u&#39; * R * u
+
+function running_cost_diff!(∇l, ∇2l, x, u, k)
+    nx = CartPoleODE.nx
+    nu = CartPoleODE.nu
+
+    H = DiffResults.DiffResult(0.0, (∇l, ∇2l))
+
+    @views ForwardDiff.hessian!(
+        H,
+        arg -&gt; running_cost(view(arg, 1:nx), view(arg, nx+1:nx+nu), k),
+        vcat(x, u)
+    )
+
+    return nothing
+end</code></pre><p>And the final cost essentially a quadratic value function</p><pre><code class="language-julia hljs">final_cost(x, _) = ξ(x)&#39; * S * ξ(x)
+
+function final_cost_diff!(Φx, Φxx, x, k)
+    H = DiffResults.DiffResult(0.0, (Φx, Φxx))
+    ForwardDiff.hessian!(H, x -&gt; final_cost(x, k), x)
+    return nothing
+end</code></pre><h2 id="Plotting-callback"><a class="docs-heading-anchor" href="#Plotting-callback">Plotting callback</a><a id="Plotting-callback-1"></a><a class="docs-heading-anchor-permalink" href="#Plotting-callback" title="Permalink"></a></h2><p>During the optimization process we will plot the position of the cart and angle of the pendulum as well as the input and cumulative cost.</p><pre><code class="language-julia hljs">function plotting_callback(workset)
+    range = 0:workset.N
+
+    states = mapreduce(x -&gt; x&#39;, vcat, nominal_trajectory(workset).x)
+    state_labels = [&quot;x₁&quot; &quot;x₂&quot; &quot;x₃&quot; &quot;x₄&quot;]
+    position_plot = plot(range, states[:, 1:2], label=state_labels[1:1, 1:2])
+
+    inputs = mapreduce(u -&gt; u&#39;, vcat, nominal_trajectory(workset).u)
+    input_plot = plot(range, vcat(inputs, inputs[end, :]&#39;), label=&quot;u&quot;, seriestype=:steppost)
+
+    cost_plot = plot(range, cumsum(nominal_trajectory(workset).l), label=&quot;c&quot;, seriestype=:steppost)
+
+    plt = plot(position_plot, input_plot, cost_plot, layout=(3, 1))
+    display(plt)
+
+    return plt
+end</code></pre><h2 id="Trajectory-optimization"><a class="docs-heading-anchor" href="#Trajectory-optimization">Trajectory optimization</a><a id="Trajectory-optimization-1"></a><a class="docs-heading-anchor-permalink" href="#Trajectory-optimization" title="Permalink"></a></h2><p>First we initialize the workset based on the length of the horizon and dimensions of the systems state and input vector</p><pre><code class="language-julia hljs">workset = IterativeLQR.Workset{Float64}(CartPoleODE.nx, CartPoleODE.nu, N)</code></pre><p>Then we set the initial state and nominal control policy</p><pre><code class="language-julia hljs">IterativeLQR.set_initial_state!(workset, x₀)
+IterativeLQR.set_nominal_inputs!(workset, [u₀(k) for k in 1:N])</code></pre><p>Having done so, we run the optimization</p><pre><code class="language-julia hljs">IterativeLQR.iLQR!(
+    workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
+    stacked_derivatives=true, regularization=regularization,
+    verbose=true, plotting_callback=plotting_callback
+)</code></pre><h2 id="Visualization"><a class="docs-heading-anchor" href="#Visualization">Visualization</a><a id="Visualization-1"></a><a class="docs-heading-anchor-permalink" href="#Visualization" title="Permalink"></a></h2><p>We can visualize the execution of the trajectory using <code>MeshCat.jl</code> for which we wrote a wrapper.</p><pre><code class="language-julia hljs">(@isdefined vis) || (vis = Visualizer())
+render(vis)</code></pre><p>First we initialize the cart-pole</p><pre><code class="language-julia hljs">MeshCatBenchmarkMechanisms.set_cartpole!(vis, 0.1, 0.05, 0.05, cartpole.l, 0.02)</code></pre><p>then set the initial configuration</p><pre><code class="language-julia hljs">MeshCatBenchmarkMechanisms.set_cartpole_state!(vis, nominal_trajectory(workset).x[1])</code></pre><p>and finally animate the swing-up</p><pre><code class="language-julia hljs">anim = MeshCatBenchmarkMechanisms.Animation(vis, fps=1 / h)
+for (i, x) in enumerate(nominal_trajectory(workset).x)
+    atframe(anim, i) do
+        MeshCatBenchmarkMechanisms.set_cartpole_state!(vis, x)
+    end
+end
+setanimation!(vis, anim, play=false)</code></pre><p>You can view the animation in your browser at the address given by running <code>&gt; vis</code> in your REPL.</p><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../guide/">« Getting started</a><a class="docs-footer-nextpage" href="../hover_to_hover/">Quadrotor recovery »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.16.0 on <span class="colophon-date" title="Friday 21 November 2025 13:49">Friday 21 November 2025</span>. Using Julia version 1.12.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
