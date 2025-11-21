@@ -15,6 +15,3 @@ Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 CSV = "0.10.15"
 DataFrames = "1.7.0"
 GillMurrayWright81 = "0.1.0"
-
-[sources]
-GillMurrayWright81 = {url = "https://github.com/JurajLieskovsky/GillMurrayWright81.jl.git"}
