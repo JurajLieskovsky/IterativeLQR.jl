@@ -1,5 +1,7 @@
 # # Cart-Pole Swing-Up Problem
-# In this example we show how to optimize a cart-pole swing-up with an MPC-like cost function.
+# In this example we show how to optimize a cart-pole swing-up with an MPC-like cost function. The
+# problem is highly non-convex, which means that it is a good showcase of the novel regularization
+# approach.
 
 # ## Dependencies
 # Two of the dependencies are not registered, namely
