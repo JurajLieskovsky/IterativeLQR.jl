@@ -18,9 +18,9 @@ makedocs(
         ],
         "reference.md"
     ],
-    repo = Remotes.GitHub("JurajLieskovsky", "IterativeLQR.jl")
+    repo = "github.com/JurajLieskovsky/IterativeLQR.jl.git"
 )
 
 deploydocs(
-    repo = Remotes.GitHub("JurajLieskovsky", "IterativeLQR.jl")
+    repo = "github.com/JurajLieskovsky/IterativeLQR.jl.git"
 )
