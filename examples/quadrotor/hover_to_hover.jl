@@ -1,3 +1,16 @@
+# # Quadrotor Recovery Problem
+# In this example we show how to optimize the recovery of a quadrotor in an MPC context. We use
+# quaternions for the quadrotor's orientation which lie on a manifold in the state space. Therefore,
+# in this example we show how to use the solver's capabilities to optimize directly on the manifold.
+
+# ## Dependencies
+# Two of the dependencies are not registered, namely
+# [`QuadrotorODE.jl`](https://github.com/JurajLieskovsky/QuadrotorODE.jl) and 
+# [`MeshCatBenchmarkMechanisms.jl`]
+# (https://github.com/JurajLieskovsky/MeshCatBenchmarkMechanisms.jl).
+# However, if you if run the examples from a clone of the repository according to the
+# [instructions](@ref "Running Examples") in the docs, they load automatically.
+
 using Revise
 
 using IterativeLQR
@@ -13,31 +26,43 @@ using BenchmarkTools
 using Infiltrator
 using MatrixEquations
 
-# Quadrotor model
+# ## Quadrotor model
+# We start by initializing a model of the quadrotor which stores its parameters.
+# Although the code is unit-less, in practical terms we are using SI units throughout this example. 
+
 quadrotor = QuadrotorODE.System(9.81, 0.5, diagm([0.0023, 0.0023, 0.004]), 0.1750, 1.0, 0.0245)
 
-# Horizon and timestep
+# ## Horizon and timestep
+# We will be optimizing the trajectory on a horizon of T=2s which we discretize into 200 steps.
+
 T = 2
 N = 200
 h = T / N
 
-# Target state
+# ## Target
+# we set the target state and input as the equilibrium
+
 xₜ = vcat([0, 0, 1.0], [1, 0, 0, 0], zeros(3), zeros(3))
 uₜ = quadrotor.m * quadrotor.g / 4 * ones(4)
 
-# Directional utility for thrust gravity compensation
-# Calculates the dot product between the z-axes of a global and local frame
-zRz(q⃗) = 1 - 2 * (q⃗[1]^2 + q⃗[2]^2)
+# ## Initial state and inputs
+# As the initial state we will use a significant rotation around the x-axis
 
-# Initial state and inputs
 θ₀ = 3 * pi / 4
 x₀ = vcat([0, 0, 1.0], [cos(θ₀ / 2), sin(θ₀ / 2), 0, 0], zeros(3), zeros(3))
+
+# And for the inital input use a small utility function that calculates the dot product between
+# the z-axes of a global and local frame of the quadrotor
+
+zRz(q⃗) = 1 - 2 * (q⃗[1]^2 + q⃗[2]^2)
+
+# to produce an input that somewhat minimizes movement of the quadrotor in space
+
 u₀(_) = zRz(x₀[5:7]) * uₜ
 
-# Warmstart
-warmstart = true
+# ## Dynamics
+# To discretize the continuous-time dynamics of the system, we use a fourth order Runge-Kutta method
 
-# Dynamics
 """RK4 integration with zero-order hold on u"""
 function dynamics!(xnew, x, u, _)
     f1 = QuadrotorODE.dynamics(quadrotor, x, u)
@@ -47,6 +72,8 @@ function dynamics!(xnew, x, u, _)
     xnew .= x + (h / 6.0) * (f1 + 2 * f2 + 2 * f3 + f4)
     return nothing
 end
+
+# and `ForwardDiff.jl` to obtain its Jacobians
 
 function dynamics_diff!(∇f, x, u, k)
     nx = QuadrotorODE.nx
@@ -62,7 +89,9 @@ function dynamics_diff!(∇f, x, u, k)
     return nothing
 end
 
-# Running cost
+# Cost function
+# As the running cost we can use a function that is quadratic in `x` and `u`
+
 function running_cost(x, u, _)
     r, q, v, ω = x[1:3], x[4:7], x[8:10], x[11:13]
     q⃗ = q[2:4]
@@ -81,7 +110,8 @@ function running_cost_diff!(∇l, ∇2l, x, u, k)
     return nothing
 end
 
-# Final cost
+# this means that the final cost can be derived as the inifinite-horizon LQR value function. To calculate it, we use the the coordinate jacobian, which allows us to linearize the system's dynamics, as well as the running cost, on the state-space manifold
+
 S, _ = begin
     nx = QuadrotorODE.nx
     nu = QuadrotorODE.nu
@@ -112,7 +142,10 @@ function final_cost_diff!(Φx, Φxx, x, k)
     return nothing
 end
 
-# Plotting callback
+# ## Plotting callback
+# During the optimization process we will plot the position and orientation of the quadrotor in
+# space, as well as the inputs and cumulative cost.
+
 function plotting_callback(workset)
     range = 0:workset.N
 
@@ -132,51 +165,62 @@ function plotting_callback(workset)
     return plt
 end
 
-# Workset
+# ## Optimization
+# First we initialize the workset based on the length of the horizon and dimensions of the systems
+# state and input vector
+
 workset = IterativeLQR.Workset{Float64}(QuadrotorODE.nx, QuadrotorODE.nu, N, QuadrotorODE.nz)
 
-## warmstart by first creating a stabilizing controller at equilibrium
-if warmstart
-    IterativeLQR.set_initial_state!(workset, xₜ)
-    IterativeLQR.set_nominal_inputs!(workset, [uₜ for _ in 1:N])
+# ### Warmstart
+# We first run and optimization that stabilizes the quadrotor at the target equilibrium. This
+# will essentially computes the gains of an infinite-horizon LQR which will drastically improve the
+# convergence rate of the second optimization from the perturbed state
 
-    IterativeLQR.iLQR!(
-        workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-        stacked_derivatives=true, regularization=:none,
-        state_difference=QuadrotorODE.state_difference, coordinate_jacobian=QuadrotorODE.jacobian,
-        verbose=true, plotting_callback=plotting_callback
-    )
-end
+IterativeLQR.set_initial_state!(workset, xₜ)
+IterativeLQR.set_nominal_inputs!(workset, [uₜ for _ in 1:N])
 
-## re-stabilization
+IterativeLQR.iLQR!(
+    workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
+    stacked_derivatives=true, regularization=:none,
+    state_difference=QuadrotorODE.state_difference, coordinate_jacobian=QuadrotorODE.jacobian,
+    verbose=true, plotting_callback=plotting_callback
+)
+
+# Note that as the system's state lies on a manifold we supply `state_difference` and
+# `coordinate_jacobian` to optimize directly on the manifold.
+
+# ### Recovery
+# The second optimization is now run with `rollout = :partial` to re-use the gains from the previous
+# optimization
+
 IterativeLQR.set_initial_state!(workset, x₀)
 warmstart || IterativeLQR.set_initial_inputs!(workset, [u₀(k) for k in 1:N])
 
-df = IterativeLQR.iLQR!(
+IterativeLQR.iLQR!(
     workset, dynamics!, dynamics_diff!, running_cost, running_cost_diff!, final_cost, final_cost_diff!,
-    stacked_derivatives=true, regularization=:none, rollout=warmstart ? :partial : :full,
+    stacked_derivatives=true, regularization=:none, rollout=:partial,
     state_difference=QuadrotorODE.state_difference, coordinate_jacobian=QuadrotorODE.jacobian,
-    verbose=true, logging=true, plotting_callback=plotting_callback,
+    verbose=true, plotting_callback=plotting_callback,
 )
 
+# ## Visualization
+# We can visualize the execution of the trajectory using `MeshCat.jl` for which we wrote a wrapper.
 
-# Save iterations log to csv
-# warmstart_string = warmstart ? "-warmstart" : ""
-# CSV.write("quadrotor/results/iterations$warmstart_string.csv", df)
-
-# Visualization
 vis = (@isdefined vis) ? vis : Visualizer()
 render(vis)
 
-## quadrotor and target
+# First we initialize the quadrotor and target
+
 MeshCatBenchmarkMechanisms.set_quadrotor!(vis, 2 * quadrotor.a, 0.07, 0.12)
 MeshCatBenchmarkMechanisms.set_target!(vis, 0.07)
 
-## initial configuration
+# and their initial configurations
+
 MeshCatBenchmarkMechanisms.set_quadrotor_state!(vis, nominal_trajectory(workset).x[1])
 MeshCatBenchmarkMechanisms.set_target_position!(vis, xₜ[1:3])
 
-## animation
+# Then we animate the recovery
+
 anim = MeshCatBenchmarkMechanisms.Animation(vis, fps=1 / h)
 for (i, x) in enumerate(nominal_trajectory(workset).x)
     atframe(anim, i) do
@@ -184,3 +228,5 @@ for (i, x) in enumerate(nominal_trajectory(workset).x)
     end
 end
 setanimation!(vis, anim, play=false);
+
+# You can view the animation in your browser at the address given by running `> vis` in your REPL.

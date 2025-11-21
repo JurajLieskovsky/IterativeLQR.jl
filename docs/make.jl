@@ -1,11 +1,11 @@
 using Documenter, IterativeLQR
 using Literate
 
-SOURCE = joinpath(@__DIR__, "..", "examples", "cartpole", "swing_up.jl")
-OUTPUT = joinpath(@__DIR__, "src", "generated")
-
-Literate.markdown(SOURCE, OUTPUT, codefence="```julia" => "```")
-# Literate.script(SOURCE, OUTPUT)
+for example in ("cartpole/swing_up.jl", "quadrotor/hover_to_hover.jl")
+    SOURCE = joinpath(@__DIR__, "..", "examples", example)
+    OUTPUT = joinpath(@__DIR__, "src", "generated")
+    Literate.markdown(SOURCE, OUTPUT, codefence="```julia" => "```")
+end
 
 makedocs(
     sitename="IterativeLQR.jl",
@@ -13,16 +13,14 @@ makedocs(
         "Home" => "index.md",
         "Getting started" => "guide.md",
         "Examples" => [
-            "Cartpole swing-up" => "generated/swing_up.md"
+            "Cart-pole swing-up" => "generated/swing_up.md"
+            "Quadrotor recovery" => "generated/hover_to_hover.md"
         ],
         "reference.md"
     ],
     repo = Remotes.GitHub("JurajLieskovsky", "IterativeLQR.jl")
-    # repo="github.com/JurajLieskovsky/IterativeLQR.jl.git"
 )
-
 
 deploydocs(
     repo = Remotes.GitHub("JurajLieskovsky", "IterativeLQR.jl")
-    # repo="github.com/JurajLieskovsky/IterativeLQR.jl.git"
 )

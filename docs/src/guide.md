@@ -5,9 +5,9 @@ The package can be added to your project using the command
 ```
 ] add https://github.com/JurajLieskovsky/IterativeLQR.jl.git
 ```
-in your REPL. For usage, we recommend taking a look at one of the [examples](@repo/examples/cartpole/swing_up.jl].
+in your REPL. For usage, we recommend taking a look at the examples.
 
-## Examples
+## Running Examples
 
 To run the examples we recommend cloning main repository
 ```
