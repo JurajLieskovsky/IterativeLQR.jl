@@ -5,10 +5,10 @@
 
 # ## Dependencies
 # Two of the dependencies are not registered, namely
-# [CartPoleODE](https://github.com/JurajLieskovsky/CartPoleODE.jl) and 
-# [MeshCatBenchmarkMechanisms](https://github.com/JurajLieskovsky/MeshCatBenchmarkMechanisms.jl).
-# However, if you if run the examples from a clone of the repository according to the
-# [instructions](@ref "Running Examples") in the docs, they load automatically.
+# [`CartPoleODE.jl`](https://github.com/JurajLieskovsky/CartPoleODE.jl) and
+# [`MeshCatBenchmarkMechanisms.jl`](https://github.com/JurajLieskovsky/MeshCatBenchmarkMechanisms.jl).
+# However, if you if run the examples from a clone of the repository according to the [instructions]
+# (@ref "Running Examples") in the docs, they load automatically.
 
 using Revise
 

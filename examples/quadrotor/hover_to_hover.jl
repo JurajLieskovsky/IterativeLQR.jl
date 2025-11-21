@@ -6,10 +6,9 @@
 # ## Dependencies
 # Two of the dependencies are not registered, namely
 # [`QuadrotorODE.jl`](https://github.com/JurajLieskovsky/QuadrotorODE.jl) and 
-# [`MeshCatBenchmarkMechanisms.jl`]
-# (https://github.com/JurajLieskovsky/MeshCatBenchmarkMechanisms.jl).
-# However, if you if run the examples from a clone of the repository according to the
-# [instructions](@ref "Running Examples") in the docs, they load automatically.
+# [`MeshCatBenchmarkMechanisms.jl`](https://github.com/JurajLieskovsky/MeshCatBenchmarkMechanisms.jl).
+# However, if you if run the examples from a clone of the repository according to the [instructions]
+# (@ref "Running Examples") in the docs, they load automatically.
 
 using Revise
 
